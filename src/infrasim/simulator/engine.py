@@ -96,12 +96,30 @@ class SimulationEngine:
             risk_score=risk_score,
         )
 
-    def run_all_defaults(self) -> SimulationReport:
-        """Run all default scenarios."""
+    def run_all_defaults(self, include_feed: bool = True) -> SimulationReport:
+        """Run all default scenarios plus feed-generated scenarios."""
         component_ids = list(self.graph.components.keys())
         scenarios = generate_default_scenarios(
             component_ids, components=self.graph.components
         )
+
+        if include_feed:
+            from infrasim.feeds.store import load_feed_scenarios
+
+            feed_scenarios = load_feed_scenarios()
+            if feed_scenarios:
+                # Filter to only scenarios whose targets exist in this graph
+                valid = []
+                for s in feed_scenarios:
+                    valid_faults = [
+                        f for f in s.faults
+                        if f.target_component_id in self.graph.components
+                    ]
+                    if valid_faults:
+                        s.faults = valid_faults
+                        valid.append(s)
+                scenarios.extend(valid)
+
         return self.run_scenarios(scenarios)
 
     def run_scenarios(self, scenarios: list[Scenario]) -> SimulationReport:

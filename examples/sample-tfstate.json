@@ -1,0 +1,100 @@
+{
+  "version": 4,
+  "terraform_version": "1.9.0",
+  "resources": [
+    {
+      "type": "aws_alb",
+      "name": "main",
+      "instances": [
+        {
+          "attributes": {
+            "name": "main-alb",
+            "tags": {"Name": "main-alb"},
+            "dns_name": "main-alb-123.ap-northeast-1.elb.amazonaws.com"
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_ecs_service",
+      "name": "api",
+      "instances": [
+        {
+          "attributes": {
+            "name": "api-service",
+            "desired_count": 3,
+            "tags": {"Name": "api-service"}
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_ecs_service",
+      "name": "worker",
+      "instances": [
+        {
+          "attributes": {
+            "name": "worker-service",
+            "desired_count": 2,
+            "tags": {"Name": "worker-service"}
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_db_instance",
+      "name": "main",
+      "instances": [
+        {
+          "attributes": {
+            "identifier": "main-db",
+            "instance_class": "db.r6g.large",
+            "allocated_storage": 100,
+            "multi_az": true,
+            "port": 5432,
+            "endpoint": "main-db.xxx.ap-northeast-1.rds.amazonaws.com",
+            "tags": {"Name": "main-db"}
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_elasticache_replication_group",
+      "name": "main",
+      "instances": [
+        {
+          "attributes": {
+            "replication_group_id": "main-cache",
+            "num_cache_clusters": 2,
+            "port": 6379,
+            "tags": {"Name": "main-cache"}
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_sqs_queue",
+      "name": "tasks",
+      "instances": [
+        {
+          "attributes": {
+            "name": "task-queue",
+            "tags": {"Name": "task-queue"}
+          }
+        }
+      ]
+    },
+    {
+      "type": "aws_s3_bucket",
+      "name": "assets",
+      "instances": [
+        {
+          "attributes": {
+            "bucket": "myapp-assets",
+            "tags": {"Name": "myapp-assets"}
+          }
+        }
+      ]
+    }
+  ]
+}

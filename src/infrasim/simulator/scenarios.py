@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from itertools import combinations
 
 from pydantic import BaseModel, Field
 
@@ -38,266 +39,537 @@ class Scenario(BaseModel):
     traffic_multiplier: float = 1.0  # 1.0 = normal, 2.0 = double traffic
 
 
-def generate_default_scenarios(
-    component_ids: list[str],
-    components: dict | None = None,
-) -> list[Scenario]:
-    """Generate chaos scenarios based on component types present.
-
-    Args:
-        component_ids: List of component IDs.
-        components: Optional dict mapping component ID to Component objects.
-            When provided, scenarios are tailored to component types.
-    """
-    scenarios: list[Scenario] = []
-
-    # Categorize components by type if component objects are provided
-    databases: list[str] = []
-    caches: list[str] = []
-    app_servers: list[str] = []
-    load_balancers: list[str] = []
-    queues: list[str] = []
-    storage: list[str] = []
-    other: list[str] = []
-
+def _categorize(components: dict | None, component_ids: list[str]) -> dict[str, list[str]]:
+    """Categorize components by type."""
+    cats: dict[str, list[str]] = {
+        "databases": [], "caches": [], "app_servers": [], "load_balancers": [],
+        "queues": [], "storage": [], "dns": [], "web_servers": [], "other": [],
+    }
     if components:
         for comp_id, comp in components.items():
             ctype = comp.type.value if hasattr(comp.type, "value") else str(comp.type)
             if ctype == "database":
-                databases.append(comp_id)
+                cats["databases"].append(comp_id)
             elif ctype == "cache":
-                caches.append(comp_id)
-            elif ctype in ("app_server", "web_server"):
-                app_servers.append(comp_id)
+                cats["caches"].append(comp_id)
+            elif ctype == "app_server":
+                cats["app_servers"].append(comp_id)
+            elif ctype == "web_server":
+                cats["web_servers"].append(comp_id)
             elif ctype == "load_balancer":
-                load_balancers.append(comp_id)
+                cats["load_balancers"].append(comp_id)
             elif ctype == "queue":
-                queues.append(comp_id)
+                cats["queues"].append(comp_id)
             elif ctype == "storage":
-                storage.append(comp_id)
+                cats["storage"].append(comp_id)
+            elif ctype == "dns":
+                cats["dns"].append(comp_id)
             else:
-                other.append(comp_id)
+                cats["other"].append(comp_id)
     else:
-        # Fallback: treat all as generic
-        other = list(component_ids)
+        cats["other"] = list(component_ids)
+    return cats
 
-    all_categorized = databases + caches + app_servers + load_balancers + queues + storage + other
 
-    # --- Category 1: Single component failures (core scenarios) ---
-    for comp_id in component_ids:
-        scenarios.append(
-            Scenario(
-                id=f"single-failure-{comp_id}",
-                name=f"Single failure: {comp_id}",
-                description=f"Simulate complete failure of {comp_id}",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.COMPONENT_DOWN,
-                    )
-                ],
-            )
-        )
+def _host_groups(components: dict | None) -> dict[str, list[str]]:
+    """Group components by host for zone/rack failure scenarios."""
+    groups: dict[str, list[str]] = {}
+    if not components:
+        return groups
+    for comp_id, comp in components.items():
+        host = comp.host or "unknown"
+        groups.setdefault(host, []).append(comp_id)
+    return groups
 
-    # --- Category 2: Resource-type-specific scenarios ---
 
-    # Connection pool exhaustion - only for databases and app servers (components that use pools)
-    pool_targets = databases + app_servers if components else component_ids
-    for comp_id in pool_targets:
-        scenarios.append(
-            Scenario(
-                id=f"pool-exhaustion-{comp_id}",
-                name=f"Connection pool exhaustion: {comp_id}",
-                description=f"Connection pool reaches capacity on {comp_id}",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.CONNECTION_POOL_EXHAUSTION,
-                    )
-                ],
-            )
-        )
+def generate_default_scenarios(
+    component_ids: list[str],
+    components: dict | None = None,
+) -> list[Scenario]:
+    """Generate comprehensive chaos scenarios.
 
-    # Disk full - only for databases and storage (components with significant disk usage)
-    disk_targets = databases + storage if components else component_ids
-    for comp_id in disk_targets:
-        scenarios.append(
-            Scenario(
-                id=f"disk-full-{comp_id}",
-                name=f"Disk full: {comp_id}",
-                description=f"Disk reaches capacity on {comp_id}",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.DISK_FULL,
-                    )
-                ],
-            )
-        )
+    Generates scenarios across 20 categories covering single faults, compound faults,
+    resource exhaustion, traffic patterns, network failures, and more.
+    """
+    scenarios: list[Scenario] = []
+    cats = _categorize(components, component_ids)
 
-    # --- Category 3: Latency degradation scenarios ---
-    for comp_id in databases:
-        scenarios.append(
-            Scenario(
-                id=f"db-latency-spike-{comp_id}",
-                name=f"DB latency 10x: {comp_id}",
-                description=f"Database query latency increases 10x on {comp_id} (slow queries, lock contention)",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.LATENCY_SPIKE,
-                        parameters={"multiplier": 10},
-                    )
-                ],
-            )
-        )
+    db = cats["databases"]
+    cache = cats["caches"]
+    app = cats["app_servers"] + cats["web_servers"]
+    lb = cats["load_balancers"]
+    queue = cats["queues"]
+    stor = cats["storage"]
+    dns = cats["dns"]
 
-    # Network latency spikes for load balancers
-    for comp_id in load_balancers:
-        scenarios.append(
-            Scenario(
-                id=f"network-latency-{comp_id}",
-                name=f"Network latency spike: {comp_id}",
-                description=f"Network latency spike on {comp_id} affecting all downstream traffic",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.LATENCY_SPIKE,
-                        parameters={"multiplier": 5},
-                    )
-                ],
-            )
-        )
+    # =========================================================================
+    # CATEGORY 1: Single component failure (every component)
+    # =========================================================================
+    for cid in component_ids:
+        scenarios.append(Scenario(
+            id=f"single-failure-{cid}", name=f"Single failure: {cid}",
+            description=f"Complete failure of {cid}",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN)],
+        ))
 
-    # --- Category 4: Compound failures (two components fail simultaneously) ---
+    # =========================================================================
+    # CATEGORY 2: CPU saturation (every component)
+    # =========================================================================
+    for cid in component_ids:
+        scenarios.append(Scenario(
+            id=f"cpu-saturation-{cid}", name=f"CPU saturation: {cid}",
+            description=f"CPU reaches 100% on {cid}, all processing stalls",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.CPU_SATURATION)],
+        ))
 
-    # Cache failure + traffic spike (very common real-world pattern: cache goes down,
-    # all traffic hits the database)
-    for cache_id in caches:
-        scenarios.append(
-            Scenario(
-                id=f"cache-down-traffic-spike-{cache_id}",
-                name=f"Cache stampede: {cache_id} down + traffic spike",
-                description=(
-                    f"Cache {cache_id} fails while traffic increases 2x. "
-                    "Classic thundering herd / cache stampede scenario."
-                ),
-                faults=[
-                    Fault(
-                        target_component_id=cache_id,
-                        fault_type=FaultType.COMPONENT_DOWN,
-                    )
-                ],
-                traffic_multiplier=2.0,
-            )
-        )
+    # =========================================================================
+    # CATEGORY 3: Memory exhaustion (every component)
+    # =========================================================================
+    for cid in component_ids:
+        scenarios.append(Scenario(
+            id=f"oom-{cid}", name=f"OOM kill: {cid}",
+            description=f"Memory exhaustion on {cid} triggers OOM killer",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.MEMORY_EXHAUSTION)],
+        ))
 
-    # Database + one app server down simultaneously
-    if databases and app_servers:
-        db_id = databases[0]
-        app_id = app_servers[0]
-        scenarios.append(
-            Scenario(
-                id=f"compound-db-app-{db_id}-{app_id}",
-                name=f"Compound: {db_id} + {app_id} down",
-                description=f"Simultaneous failure of database {db_id} and app server {app_id}",
-                faults=[
-                    Fault(
-                        target_component_id=db_id,
-                        fault_type=FaultType.COMPONENT_DOWN,
-                    ),
-                    Fault(
-                        target_component_id=app_id,
-                        fault_type=FaultType.COMPONENT_DOWN,
-                    ),
-                ],
-            )
-        )
+    # =========================================================================
+    # CATEGORY 4: Connection pool exhaustion (DB + App + Cache)
+    # =========================================================================
+    pool_targets = db + app + cache if components else component_ids
+    for cid in pool_targets:
+        scenarios.append(Scenario(
+            id=f"pool-exhaustion-{cid}", name=f"Pool exhaustion: {cid}",
+            description=f"All connection pool slots consumed on {cid}, new requests rejected",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.CONNECTION_POOL_EXHAUSTION)],
+        ))
 
-    # --- Category 5: Cascading resource exhaustion ---
+    # =========================================================================
+    # CATEGORY 5: Disk full (DB + Storage + App + Queue)
+    # =========================================================================
+    disk_targets = db + stor + app + queue if components else component_ids
+    for cid in disk_targets:
+        scenarios.append(Scenario(
+            id=f"disk-full-{cid}", name=f"Disk full: {cid}",
+            description=f"Disk reaches 100% on {cid}, writes fail",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.DISK_FULL)],
+        ))
 
-    # Memory leak (gradual OOM) on app servers
-    for comp_id in app_servers:
-        scenarios.append(
-            Scenario(
-                id=f"memory-leak-{comp_id}",
-                name=f"Memory leak (OOM): {comp_id}",
-                description=f"Gradual memory exhaustion on {comp_id} simulating a memory leak leading to OOM",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.MEMORY_EXHAUSTION,
-                        parameters={"leak_rate": "gradual"},
-                    )
-                ],
-            )
-        )
+    # =========================================================================
+    # CATEGORY 6: Network partition (every component)
+    # =========================================================================
+    for cid in component_ids:
+        scenarios.append(Scenario(
+            id=f"net-partition-{cid}", name=f"Network partition: {cid}",
+            description=f"Network partition isolates {cid} from all other components",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.NETWORK_PARTITION)],
+        ))
 
-    # Log explosion / disk fill on databases
-    for comp_id in databases:
-        scenarios.append(
-            Scenario(
-                id=f"log-explosion-{comp_id}",
-                name=f"Log explosion (disk fill): {comp_id}",
-                description=f"Transaction logs or slow query logs fill disk on {comp_id}",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.DISK_FULL,
-                        parameters={"cause": "log_explosion"},
-                    )
-                ],
-            )
-        )
+    # =========================================================================
+    # CATEGORY 7: Latency spike (every component, varying severity)
+    # =========================================================================
+    for cid in component_ids:
+        scenarios.append(Scenario(
+            id=f"latency-5x-{cid}", name=f"Latency 5x: {cid}",
+            description=f"Response time increases 5x on {cid}",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"multiplier": 5})],
+        ))
+    for cid in db:
+        scenarios.append(Scenario(
+            id=f"latency-20x-{cid}", name=f"DB latency 20x: {cid}",
+            description=f"Severe slow query or lock contention on {cid}, 20x latency",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"multiplier": 20})],
+        ))
 
-    # --- Category 6: Traffic spike scenarios ---
+    # =========================================================================
+    # CATEGORY 8: Traffic spike (graduated: 1.5x, 2x, 3x, 5x, 10x)
+    # =========================================================================
+    for mult, desc in [(1.5, "moderate increase"), (2, "doubles"), (3, "peak hour"),
+                       (5, "viral event"), (10, "DDoS-level")]:
+        scenarios.append(Scenario(
+            id=f"traffic-{mult}x", name=f"Traffic spike ({mult}x)",
+            description=f"Traffic {desc} ({mult}x normal) across all entry points",
+            faults=[], traffic_multiplier=mult,
+        ))
+
+    # =========================================================================
+    # CATEGORY 9: Pairwise compound failures (every combination of 2)
+    # =========================================================================
+    for a, b in combinations(component_ids, 2):
+        scenarios.append(Scenario(
+            id=f"pair-{a}-{b}", name=f"Pair failure: {a} + {b}",
+            description=f"Simultaneous failure of {a} and {b}",
+            faults=[
+                Fault(target_component_id=a, fault_type=FaultType.COMPONENT_DOWN),
+                Fault(target_component_id=b, fault_type=FaultType.COMPONENT_DOWN),
+            ],
+        ))
+
+    # =========================================================================
+    # CATEGORY 10: Triple failures (every combination of 3, if <= 10 components)
+    # =========================================================================
+    if len(component_ids) <= 10:
+        for combo in combinations(component_ids, 3):
+            ids_str = " + ".join(combo)
+            scenarios.append(Scenario(
+                id=f"triple-{'-'.join(combo)}", name=f"Triple failure: {ids_str}",
+                description=f"Simultaneous failure of {ids_str}",
+                faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN)
+                        for c in combo],
+            ))
+
+    # =========================================================================
+    # CATEGORY 11: Cache stampede (cache down + traffic spike)
+    # =========================================================================
+    for cid in cache:
+        for mult in [2.0, 5.0]:
+            scenarios.append(Scenario(
+                id=f"stampede-{cid}-{mult}x", name=f"Cache stampede: {cid} + {mult}x traffic",
+                description=f"Cache {cid} fails, all requests hit DB. Traffic at {mult}x. Thundering herd pattern.",
+                faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN)],
+                traffic_multiplier=mult,
+            ))
+
+    # =========================================================================
+    # CATEGORY 12: Component down + traffic spike (every component × traffic levels)
+    # =========================================================================
+    for cid in component_ids:
+        for mult in [2.0, 3.0]:
+            scenarios.append(Scenario(
+                id=f"down-traffic-{cid}-{mult}x",
+                name=f"{cid} down + {mult}x traffic",
+                description=f"{cid} fails during {mult}x traffic surge. Remaining components must absorb load.",
+                faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN)],
+                traffic_multiplier=mult,
+            ))
+
+    # =========================================================================
+    # CATEGORY 13: Zone / host failure (all components on same host fail)
+    # =========================================================================
+    hosts = _host_groups(components)
+    for host, host_comps in hosts.items():
+        if len(host_comps) >= 2:
+            scenarios.append(Scenario(
+                id=f"zone-failure-{host}", name=f"Zone failure: host {host}",
+                description=f"All components on host {host} fail simultaneously ({len(host_comps)} components)",
+                faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN)
+                        for c in host_comps],
+            ))
+
+    # =========================================================================
+    # CATEGORY 14: DB-specific deep scenarios
+    # =========================================================================
+    for cid in db:
+        # Slow query log explosion fills disk
+        scenarios.append(Scenario(
+            id=f"log-explosion-{cid}", name=f"Log explosion: {cid}",
+            description=f"Slow query logs / WAL on {cid} fill disk, write operations blocked",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.DISK_FULL,
+                          parameters={"cause": "log_explosion"})],
+        ))
+        # Replication lag (latency + degraded)
+        scenarios.append(Scenario(
+            id=f"replication-lag-{cid}", name=f"Replication lag: {cid}",
+            description=f"Primary-replica lag on {cid} causes stale reads and write backpressure",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"multiplier": 10, "cause": "replication_lag"})],
+        ))
+        # Connection storm after restart
+        scenarios.append(Scenario(
+            id=f"connection-storm-{cid}", name=f"Connection storm: {cid}",
+            description=f"After {cid} restarts, all app servers reconnect simultaneously overwhelming the pool",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.CONNECTION_POOL_EXHAUSTION,
+                          parameters={"cause": "reconnection_storm"})],
+        ))
+        # Long-running transaction locks
+        scenarios.append(Scenario(
+            id=f"lock-contention-{cid}", name=f"Lock contention: {cid}",
+            description=f"Long-running transaction on {cid} holds row locks, blocking all writes",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"multiplier": 50, "cause": "lock_contention"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 15: Queue-specific scenarios
+    # =========================================================================
+    for cid in queue:
+        # Queue backpressure (disk full from accumulated messages)
+        scenarios.append(Scenario(
+            id=f"queue-backpressure-{cid}", name=f"Queue backpressure: {cid}",
+            description=f"Consumers stall, messages accumulate on {cid} until disk fills",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.DISK_FULL,
+                          parameters={"cause": "message_accumulation"})],
+        ))
+        # Poison message (queue becomes stuck)
+        scenarios.append(Scenario(
+            id=f"poison-message-{cid}", name=f"Poison message: {cid}",
+            description=f"Unprocessable message on {cid} blocks consumer, messages pile up",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"cause": "poison_message", "multiplier": 100})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 16: LB-specific scenarios
+    # =========================================================================
+    for cid in lb:
+        # Health check misconfiguration
+        scenarios.append(Scenario(
+            id=f"healthcheck-fail-{cid}", name=f"Health check failure: {cid}",
+            description=f"LB {cid} marks all backends unhealthy due to health check misconfiguration",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "healthcheck_misconfiguration"})],
+        ))
+        # TLS certificate expiry
+        scenarios.append(Scenario(
+            id=f"tls-expiry-{cid}", name=f"TLS cert expired: {cid}",
+            description=f"SSL/TLS certificate on {cid} expires, all HTTPS connections rejected",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "tls_cert_expiry"})],
+        ))
+        # LB config hot-reload failure
+        scenarios.append(Scenario(
+            id=f"config-reload-{cid}", name=f"Config reload failure: {cid}",
+            description=f"Configuration reload on {cid} fails, routing rules corrupted",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "config_reload_failure"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 17: App server-specific scenarios
+    # =========================================================================
+    for cid in app:
+        # Memory leak (gradual OOM)
+        scenarios.append(Scenario(
+            id=f"memory-leak-{cid}", name=f"Memory leak: {cid}",
+            description=f"Gradual memory leak on {cid} eventually triggers OOM killer",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.MEMORY_EXHAUSTION,
+                          parameters={"cause": "memory_leak"})],
+        ))
+        # Thread pool exhaustion
+        scenarios.append(Scenario(
+            id=f"thread-exhaustion-{cid}", name=f"Thread pool exhaustion: {cid}",
+            description=f"All worker threads on {cid} blocked on slow downstream calls",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.CONNECTION_POOL_EXHAUSTION,
+                          parameters={"cause": "thread_pool_exhaustion"})],
+        ))
+        # GC pause (JVM / Go / .NET)
+        scenarios.append(Scenario(
+            id=f"gc-pause-{cid}", name=f"GC pause: {cid}",
+            description=f"Long garbage collection pause on {cid} (Stop-the-World), all requests timeout",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"cause": "gc_pause", "multiplier": 30})],
+        ))
+        # Deployment gone wrong (new version crashes)
+        scenarios.append(Scenario(
+            id=f"bad-deploy-{cid}", name=f"Bad deployment: {cid}",
+            description=f"New version deployed to {cid} crashes on startup, component becomes unavailable",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "bad_deployment"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 18: Cache-specific scenarios
+    # =========================================================================
+    for cid in cache:
+        # Cache eviction storm
+        scenarios.append(Scenario(
+            id=f"eviction-storm-{cid}", name=f"Eviction storm: {cid}",
+            description=f"Memory pressure on {cid} causes mass key eviction, hit rate drops to 0%",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.MEMORY_EXHAUSTION,
+                          parameters={"cause": "eviction_storm"})],
+        ))
+        # Cache partition (split brain in cluster)
+        scenarios.append(Scenario(
+            id=f"cache-split-brain-{cid}", name=f"Cache split brain: {cid}",
+            description=f"Cluster partition on {cid} causes inconsistent reads across nodes",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.NETWORK_PARTITION,
+                          parameters={"cause": "split_brain"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 19: DNS-specific scenarios
+    # =========================================================================
+    for cid in dns:
+        scenarios.append(Scenario(
+            id=f"dns-failure-{cid}", name=f"DNS failure: {cid}",
+            description=f"DNS resolution on {cid} fails, all name-based service discovery breaks",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "dns_failure"})],
+        ))
+        scenarios.append(Scenario(
+            id=f"dns-latency-{cid}", name=f"DNS latency: {cid}",
+            description=f"DNS resolution on {cid} takes 5s+ per query, adds latency to every request",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"cause": "dns_slow", "multiplier": 50})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 20: Storage-specific scenarios
+    # =========================================================================
+    for cid in stor:
+        # I/O throttling
+        scenarios.append(Scenario(
+            id=f"io-throttle-{cid}", name=f"I/O throttling: {cid}",
+            description=f"Storage IOPS limit reached on {cid}, all I/O operations queued",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"cause": "io_throttling", "multiplier": 20})],
+        ))
+        # Data corruption
+        scenarios.append(Scenario(
+            id=f"data-corruption-{cid}", name=f"Data corruption: {cid}",
+            description=f"Data integrity check fails on {cid}, storage marked read-only",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "data_corruption"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 21: Cascading timeout chain
+    # =========================================================================
+    # All DBs slow → apps timeout → LB returns 504
+    if db and app:
+        faults = [Fault(target_component_id=d, fault_type=FaultType.LATENCY_SPIKE,
+                        parameters={"multiplier": 15}) for d in db]
+        scenarios.append(Scenario(
+            id="cascading-timeout", name="Cascading timeout chain",
+            description="All databases become slow, causing app server timeouts, LB returns 504 to users",
+            faults=faults,
+        ))
+
+    # =========================================================================
+    # CATEGORY 22: Total infrastructure meltdown
+    # =========================================================================
+    if len(component_ids) >= 3:
+        # All components fail
+        scenarios.append(Scenario(
+            id="total-meltdown", name="Total infrastructure meltdown",
+            description="Complete failure of all components simultaneously (worst case scenario)",
+            faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN)
+                    for c in component_ids],
+        ))
+
+    # =========================================================================
+    # CATEGORY 23: Noisy neighbor / resource contention
+    # =========================================================================
+    for cid in app:
+        scenarios.append(Scenario(
+            id=f"noisy-neighbor-{cid}", name=f"Noisy neighbor: {cid}",
+            description=f"One process on {cid} consumes all CPU, starving the main service",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.CPU_SATURATION,
+                          parameters={"cause": "noisy_neighbor"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 24: Dependency timeout + traffic (realistic incident pattern)
+    # =========================================================================
+    for cid in db:
+        scenarios.append(Scenario(
+            id=f"slow-db-peak-{cid}", name=f"Slow DB at peak: {cid}",
+            description=f"DB {cid} latency spikes during peak traffic (3x). Timeouts cascade through app layer.",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"multiplier": 10})],
+            traffic_multiplier=3.0,
+        ))
+
+    # =========================================================================
+    # CATEGORY 25: Rolling restart failure
+    # =========================================================================
+    if len(app) >= 2:
+        # Half the app servers down during rolling deployment
+        half = app[:len(app) // 2 + 1]
+        scenarios.append(Scenario(
+            id="rolling-restart-fail", name="Rolling restart failure",
+            description=f"Rolling deployment: {len(half)}/{len(app)} app servers down simultaneously during restart",
+            faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "rolling_restart"}) for c in half],
+        ))
+
+    # =========================================================================
+    # CATEGORY 26: Downstream external API failure (if external_api components exist)
+    # =========================================================================
+    external = [cid for cid, c in (components or {}).items()
+                if hasattr(c, 'type') and c.type.value == "external_api"]
+    for cid in external:
+        scenarios.append(Scenario(
+            id=f"external-timeout-{cid}", name=f"External API timeout: {cid}",
+            description=f"External dependency {cid} stops responding, blocking all calling services",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.LATENCY_SPIKE,
+                          parameters={"cause": "external_api_timeout", "multiplier": 100})],
+        ))
+        scenarios.append(Scenario(
+            id=f"external-down-{cid}", name=f"External API down: {cid}",
+            description=f"External dependency {cid} returns errors for all requests",
+            faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                          parameters={"cause": "external_api_failure"})],
+        ))
+
+    # =========================================================================
+    # CATEGORY 27: Network partition between tiers
+    # =========================================================================
+    # App servers can't reach DB
+    if app and db:
+        scenarios.append(Scenario(
+            id="partition-app-db", name="Network partition: App <-> DB",
+            description="Network partition between application tier and database tier",
+            faults=[Fault(target_component_id=d, fault_type=FaultType.NETWORK_PARTITION,
+                          parameters={"cause": "inter_tier_partition"}) for d in db],
+        ))
+    # App servers can't reach cache
+    if app and cache:
+        scenarios.append(Scenario(
+            id="partition-app-cache", name="Network partition: App <-> Cache",
+            description="Network partition between application tier and cache tier",
+            faults=[Fault(target_component_id=c, fault_type=FaultType.NETWORK_PARTITION,
+                          parameters={"cause": "inter_tier_partition"}) for c in cache],
+        ))
+    # LB can't reach app servers
+    if lb and app:
+        scenarios.append(Scenario(
+            id="partition-lb-app", name="Network partition: LB <-> App",
+            description="Network partition between load balancer and application tier",
+            faults=[Fault(target_component_id=a, fault_type=FaultType.NETWORK_PARTITION,
+                          parameters={"cause": "inter_tier_partition"}) for a in app],
+        ))
+
+    # =========================================================================
+    # CATEGORY 28: Sustained resource degradation (multiple resources stressed)
+    # =========================================================================
+    for cid in app:
+        scenarios.append(Scenario(
+            id=f"resource-exhaustion-{cid}",
+            name=f"Full resource exhaustion: {cid}",
+            description=f"CPU saturated + memory near limit + disk filling on {cid}. Everything failing at once.",
+            faults=[
+                Fault(target_component_id=cid, fault_type=FaultType.CPU_SATURATION),
+                Fault(target_component_id=cid, fault_type=FaultType.MEMORY_EXHAUSTION),
+            ],
+        ))
+
+    # =========================================================================
+    # CATEGORY 29: Failover testing
+    # =========================================================================
+    # If DB has replicas, test primary failure
+    if components:
+        for cid in db:
+            comp = components.get(cid)
+            if comp and comp.replicas > 1:
+                scenarios.append(Scenario(
+                    id=f"primary-failover-{cid}", name=f"Primary failover: {cid}",
+                    description=f"Primary {cid} fails, replica must promote. Tests failover time and data consistency.",
+                    faults=[Fault(target_component_id=cid, fault_type=FaultType.COMPONENT_DOWN,
+                                  parameters={"cause": "primary_failover"})],
+                ))
+
+    # =========================================================================
+    # CATEGORY 30: Black Friday / flash sale simulation
+    # =========================================================================
     if component_ids:
-        scenarios.append(
-            Scenario(
-                id="traffic-spike-2x",
-                name="Traffic spike (2x)",
-                description="Traffic doubles across all entry points",
-                faults=[],
-                traffic_multiplier=2.0,
-            )
-        )
-
-        scenarios.append(
-            Scenario(
-                id="traffic-spike-5x",
-                name="Traffic spike (5x)",
-                description="Traffic spikes to 5x normal",
-                faults=[],
-                traffic_multiplier=5.0,
-            )
-        )
-
-    # Peak hour simulation: 3x on all components
-    if component_ids:
-        scenarios.append(
-            Scenario(
-                id="peak-hour-3x",
-                name="Peak hour simulation (3x)",
-                description="Simulates peak hour load: all traffic at 3x normal across all components",
-                faults=[],
-                traffic_multiplier=3.0,
-            )
-        )
-
-    # --- Category 7: Network partition scenarios ---
-    for comp_id in databases:
-        scenarios.append(
-            Scenario(
-                id=f"network-partition-{comp_id}",
-                name=f"Network partition: {comp_id}",
-                description=f"Network partition isolates {comp_id} from the rest of the system",
-                faults=[
-                    Fault(
-                        target_component_id=comp_id,
-                        fault_type=FaultType.NETWORK_PARTITION,
-                    )
-                ],
-            )
-        )
+        scenarios.append(Scenario(
+            id="black-friday", name="Black Friday simulation (10x + cache pressure)",
+            description="Flash sale: 10x traffic + cache eviction storm from new access patterns",
+            faults=[Fault(target_component_id=c, fault_type=FaultType.MEMORY_EXHAUSTION,
+                          parameters={"cause": "cache_pressure"}) for c in cache],
+            traffic_multiplier=10.0,
+        ))
 
     return scenarios

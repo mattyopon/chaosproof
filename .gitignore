@@ -6,5 +6,8 @@ build/
 .venv/
 *.json
 !pyproject.toml
+!examples/*.json
 .ruff_cache/
 .pytest_cache/
+infrasim-model.json
+*.docx
