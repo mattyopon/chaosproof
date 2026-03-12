@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import deque
 from pathlib import Path
 
 import networkx as nx
@@ -68,14 +69,14 @@ class InfraGraph:
 
     def get_all_affected(self, component_id: str) -> set[str]:
         """Get all components transitively affected by a failure."""
-        affected = set()
-        queue = [component_id]
-        while queue:
-            current = queue.pop(0)
+        affected: set[str] = set()
+        bfs_queue: deque[str] = deque([component_id])
+        while bfs_queue:
+            current = bfs_queue.popleft()
             for dep in self.get_dependents(current):
                 if dep.id not in affected:
                     affected.add(dep.id)
-                    queue.append(dep.id)
+                    bfs_queue.append(dep.id)
         return affected
 
     def get_critical_paths(self) -> list[list[str]]:

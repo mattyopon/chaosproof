@@ -506,7 +506,7 @@ def _assess_change_risk(
 def _diff_attributes(before: dict, after: dict) -> list[dict]:
     """Find changed attributes between before and after state."""
     changes = []
-    all_keys = set(list(before.keys()) + list(after.keys()))
+    all_keys = before.keys() | after.keys()
 
     # Skip noisy attributes
     skip_keys = {"tags", "tags_all", "arn", "id", "self_link", "timeouts"}

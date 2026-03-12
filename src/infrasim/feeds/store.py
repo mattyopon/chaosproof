@@ -7,10 +7,13 @@ across simulation runs.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from infrasim.simulator.scenarios import Fault, FaultType, Scenario
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_STORE_DIR = Path.home() / ".infrasim"
 DEFAULT_STORE_FILE = DEFAULT_STORE_DIR / "feed-scenarios.json"
@@ -102,7 +105,8 @@ def load_feed_scenarios(store_path: Path = DEFAULT_STORE_FILE) -> list[Scenario]
     for d in raw.get("scenarios", []):
         try:
             scenarios.append(_dict_to_scenario(d))
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as exc:
+            logger.warning("Skipping malformed feed scenario (id=%s): %s", d.get("id", "?"), exc)
             continue
     return scenarios
 
@@ -113,7 +117,8 @@ def load_store_raw(store_path: Path = DEFAULT_STORE_FILE) -> dict:
         return {"scenarios": [], "articles": [], "last_updated": None}
     try:
         return json.loads(store_path.read_text())
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not read feed store at %s: %s", store_path, exc)
         return {"scenarios": [], "articles": [], "last_updated": None}
 
 

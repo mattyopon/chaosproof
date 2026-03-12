@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import platform
+import logging
 import socket
-import subprocess
 
 import psutil
+
+logger = logging.getLogger(__name__)
 
 from infrasim.model.components import (
     Capacity,
@@ -74,8 +75,10 @@ def scan_listening_services() -> list[dict]:
             try:
                 proc = psutil.Process(pid)
                 proc_name = proc.name()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+            except psutil.NoSuchProcess:
+                logger.debug("Process %d no longer exists, skipping", pid)
+            except psutil.AccessDenied:
+                logger.debug("Access denied reading process %d, skipping", pid)
 
         services.append({
             "port": port,
