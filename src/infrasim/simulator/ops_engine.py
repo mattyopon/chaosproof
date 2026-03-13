@@ -1,0 +1,1322 @@
+"""Operational simulation engine for InfraSim v3.0.
+
+Models real-world operational scenarios over days/weeks: deployments,
+maintenance windows, gradual degradation (memory leaks, disk fill,
+connection leaks), random failures based on MTBF, SLO tracking with
+error budgets, and composite traffic patterns (diurnal-weekly + growth).
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import random
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from infrasim.model.components import (
+    Component,
+    HealthStatus,
+    SLOTarget,
+)
+from infrasim.model.graph import InfraGraph
+from infrasim.simulator.scenarios import Fault, FaultType
+from infrasim.simulator.traffic import (
+    TrafficPattern,
+    TrafficPatternType,
+    create_diurnal_weekly,
+    create_growth_trend,
+)
+
+logger = logging.getLogger(__name__)
+
+# Seeded RNG for reproducible operational simulation results.
+_ops_rng = random.Random(2024)
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class TimeUnit(str, Enum):
+    """Granularity for the operational simulation time steps."""
+
+    MINUTE = "1min"
+    FIVE_MINUTES = "5min"
+    HOUR = "1hour"
+
+
+class OpsEventType(str, Enum):
+    """Types of operational events that can occur during simulation."""
+
+    DEPLOY = "deploy"
+    MAINTENANCE = "maintenance"
+    CERT_RENEWAL = "cert_renewal"
+    RANDOM_FAILURE = "random_failure"
+    MEMORY_LEAK_OOM = "memory_leak_oom"
+    DISK_FULL = "disk_full"
+    CONN_POOL_EXHAUSTION = "conn_pool_exhaustion"
+
+
+# ---------------------------------------------------------------------------
+# Data models
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class OpsEvent:
+    """A single operational event occurring at a specific time."""
+
+    time_seconds: int
+    event_type: OpsEventType
+    target_component_id: str
+    duration_seconds: int = 0
+    description: str = ""
+
+
+class OpsScenario(BaseModel):
+    """Configuration for an operational simulation run."""
+
+    id: str
+    name: str
+    description: str = ""
+    duration_days: int = 7
+    time_unit: TimeUnit = TimeUnit.FIVE_MINUTES
+    traffic_patterns: list[TrafficPattern] = Field(default_factory=list)
+    scheduled_deploys: list[dict[str, Any]] = Field(default_factory=list)
+    # scheduled_deploys: list of dicts like:
+    #   {"component_id": "app-1", "day_of_week": 1, "hour": 14,
+    #    "downtime_seconds": 30}
+    enable_random_failures: bool = False
+    enable_degradation: bool = False
+    enable_maintenance: bool = False
+    maintenance_day_of_week: int = 6  # 0=Mon, 6=Sun
+    maintenance_hour: int = 2  # 2 AM
+    random_seed: int = 2024
+
+
+@dataclass
+class SLIDataPoint:
+    """A single SLI measurement at a point in time."""
+
+    time_seconds: int
+    total_components: int = 0
+    healthy_count: int = 0
+    degraded_count: int = 0
+    overloaded_count: int = 0
+    down_count: int = 0
+    availability_percent: float = 100.0
+    estimated_latency_p99_ms: float = 0.0
+    error_rate: float = 0.0
+    max_utilization: float = 0.0
+
+
+@dataclass
+class ErrorBudgetStatus:
+    """Error budget status for a single SLO target."""
+
+    slo: SLOTarget
+    component_id: str
+    budget_total_minutes: float = 0.0
+    budget_consumed_minutes: float = 0.0
+    budget_remaining_minutes: float = 0.0
+    budget_remaining_percent: float = 100.0
+    burn_rate_1h: float = 0.0
+    burn_rate_6h: float = 0.0
+    is_budget_exhausted: bool = False
+
+
+@dataclass
+class OpsSimulationResult:
+    """Result of running an operational simulation."""
+
+    scenario: OpsScenario
+    events: list[OpsEvent] = field(default_factory=list)
+    sli_timeline: list[SLIDataPoint] = field(default_factory=list)
+    error_budget_statuses: list[ErrorBudgetStatus] = field(default_factory=list)
+    total_downtime_seconds: int = 0
+    total_deploys: int = 0
+    total_failures: int = 0
+    total_degradation_events: int = 0
+    peak_utilization: float = 0.0
+    min_availability: float = 100.0
+    summary: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Internal mutable state tracked per-component
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _OpsComponentState:
+    """Mutable bookkeeping for a single component during ops simulation."""
+
+    component_id: str
+    base_utilization: float
+    current_utilization: float = 0.0
+    current_health: HealthStatus = HealthStatus.HEALTHY
+    current_replicas: int = 1
+    base_replicas: int = 1
+
+    # Degradation accumulators
+    leaked_memory_mb: float = 0.0
+    filled_disk_gb: float = 0.0
+    leaked_connections: float = 0.0
+
+    # Autoscaling cooldown tracking
+    last_scale_up_time: int = -999999
+    last_scale_down_time: int = -999999
+
+
+# ---------------------------------------------------------------------------
+# SLO Tracker
+# ---------------------------------------------------------------------------
+
+
+class SLOTracker:
+    """Tracks SLI measurements and computes error budget status."""
+
+    def __init__(self, graph: InfraGraph) -> None:
+        self.graph = graph
+        self._measurements: list[SLIDataPoint] = []
+        # Per-component, per-metric violation tracking
+        # Key: (component_id, metric), Value: list of (time_seconds, violated)
+        self._violations: dict[tuple[str, str], list[tuple[int, bool]]] = {}
+
+    def record(
+        self,
+        time_seconds: int,
+        comp_states: dict[str, _OpsComponentState],
+    ) -> SLIDataPoint:
+        """Record SLI measurements at a point in time.
+
+        Parameters
+        ----------
+        time_seconds:
+            Current simulation time.
+        comp_states:
+            Current state of all components.
+
+        Returns
+        -------
+        SLIDataPoint
+            The measurement recorded.
+        """
+        total = len(comp_states)
+        healthy = sum(
+            1
+            for s in comp_states.values()
+            if s.current_health == HealthStatus.HEALTHY
+        )
+        degraded = sum(
+            1
+            for s in comp_states.values()
+            if s.current_health == HealthStatus.DEGRADED
+        )
+        overloaded = sum(
+            1
+            for s in comp_states.values()
+            if s.current_health == HealthStatus.OVERLOADED
+        )
+        down = sum(
+            1
+            for s in comp_states.values()
+            if s.current_health == HealthStatus.DOWN
+        )
+
+        # Availability: fraction of components that are not DOWN
+        availability = ((total - down) / total * 100.0) if total > 0 else 100.0
+
+        # Max utilization across all components
+        max_util = max(
+            (s.current_utilization for s in comp_states.values()), default=0.0
+        )
+
+        # Estimated p99 latency based on max utilization (hockey stick curve)
+        latency_p99 = self._estimate_latency(max_util)
+
+        # Error rate: fraction of components that are DOWN or OVERLOADED
+        error_rate = ((down + overloaded) / total) if total > 0 else 0.0
+
+        point = SLIDataPoint(
+            time_seconds=time_seconds,
+            total_components=total,
+            healthy_count=healthy,
+            degraded_count=degraded,
+            overloaded_count=overloaded,
+            down_count=down,
+            availability_percent=round(availability, 4),
+            estimated_latency_p99_ms=round(latency_p99, 2),
+            error_rate=round(error_rate, 6),
+            max_utilization=round(max_util, 2),
+        )
+        self._measurements.append(point)
+
+        # Track per-component violations for error budget computation
+        for comp_id, state in comp_states.items():
+            comp = self.graph.get_component(comp_id)
+            if comp is None:
+                continue
+            for slo in comp.slo_targets:
+                key = (comp_id, slo.metric)
+                if key not in self._violations:
+                    self._violations[key] = []
+
+                violated = False
+                if slo.metric == "availability":
+                    # Component-level: DOWN = violated
+                    violated = state.current_health == HealthStatus.DOWN
+                elif slo.metric == "latency_p99":
+                    # Estimate latency for this component
+                    comp_latency = self._estimate_latency(
+                        state.current_utilization
+                    )
+                    violated = comp_latency > slo.target
+                elif slo.metric == "error_rate":
+                    # Component contributing errors if DOWN or OVERLOADED
+                    comp_error = (
+                        1.0
+                        if state.current_health
+                        in (HealthStatus.DOWN, HealthStatus.OVERLOADED)
+                        else 0.0
+                    )
+                    violated = comp_error > slo.target
+
+                self._violations[key].append((time_seconds, violated))
+
+        return point
+
+    def error_budget_status(self) -> list[ErrorBudgetStatus]:
+        """Compute error budget status for all SLO targets.
+
+        Returns
+        -------
+        list[ErrorBudgetStatus]
+            One entry per (component, SLO) pair.
+        """
+        statuses: list[ErrorBudgetStatus] = []
+
+        for comp_id, comp in self.graph.components.items():
+            for slo in comp.slo_targets:
+                total = self._budget_total(slo)
+                consumed = self._budget_consumed(slo, comp_id)
+                remaining = max(0.0, total - consumed)
+                remaining_pct = (
+                    (remaining / total * 100.0) if total > 0 else 100.0
+                )
+
+                # Burn rates
+                burn_1h = self._burn_rate(slo, comp_id, 3600)
+                burn_6h = self._burn_rate(slo, comp_id, 21600)
+
+                statuses.append(
+                    ErrorBudgetStatus(
+                        slo=slo,
+                        component_id=comp_id,
+                        budget_total_minutes=round(total, 2),
+                        budget_consumed_minutes=round(consumed, 2),
+                        budget_remaining_minutes=round(remaining, 2),
+                        budget_remaining_percent=round(remaining_pct, 2),
+                        burn_rate_1h=round(burn_1h, 4),
+                        burn_rate_6h=round(burn_6h, 4),
+                        is_budget_exhausted=remaining <= 0,
+                    )
+                )
+
+        return statuses
+
+    @staticmethod
+    def _estimate_latency(max_utilization: float) -> float:
+        """Estimate p99 latency using a hockey-stick curve.
+
+        At low utilization, latency is ~5ms.  As utilization approaches
+        100%, latency rises exponentially, modelling queue build-up.
+
+        Parameters
+        ----------
+        max_utilization:
+            Peak utilization percentage (0-100+).
+
+        Returns
+        -------
+        float
+            Estimated p99 latency in milliseconds.
+        """
+        base_ms = 5.0
+        if max_utilization <= 0:
+            return base_ms
+
+        # Normalise to 0-1 range (allow > 1.0 for overloaded)
+        u = max_utilization / 100.0
+
+        if u < 0.5:
+            # Low utilization: linear, roughly base to 2*base
+            return base_ms * (1.0 + u)
+        elif u < 0.8:
+            # Medium: gentle curve
+            return base_ms * (1.0 + u + (u - 0.5) ** 2 * 10)
+        else:
+            # High utilization: hockey stick
+            # At u=1.0 -> ~50ms, at u=1.2 -> ~200ms
+            overshoot = max(0.0, u - 0.8)
+            return base_ms * (1.0 + u + overshoot ** 2 * 500)
+
+    def _budget_total(self, slo: SLOTarget) -> float:
+        """Calculate total error budget in minutes for an SLO.
+
+        For availability SLOs:
+            budget = window_days * 24 * 60 * (1 - target/100)
+        For latency/error_rate: use window duration directly.
+        """
+        window_minutes = slo.window_days * 24.0 * 60.0
+
+        if slo.metric == "availability":
+            # e.g. 99.9% over 30 days -> 43.2 minutes of allowed downtime
+            return window_minutes * (1.0 - slo.target / 100.0)
+        else:
+            # For latency and error_rate, budget is a fraction of the window
+            # where violations are allowed.  We define budget as 0.1% of
+            # window.
+            return window_minutes * 0.001
+
+    def _budget_consumed(self, slo: SLOTarget, comp_id: str) -> float:
+        """Calculate consumed error budget in minutes."""
+        key = (comp_id, slo.metric)
+        violations = self._violations.get(key, [])
+        if not violations:
+            return 0.0
+
+        violated_count = sum(1 for _, v in violations if v)
+        total_count = len(violations)
+        if total_count == 0:
+            return 0.0
+
+        # Determine the time span covered by measurements
+        if total_count >= 2:
+            time_span_seconds = violations[-1][0] - violations[0][0]
+        else:
+            time_span_seconds = 300  # default 5-minute window
+
+        # Consumed = fraction of time in violation * time span in minutes
+        violation_ratio = violated_count / total_count
+        return violation_ratio * (time_span_seconds / 60.0)
+
+    def _burn_rate(
+        self, slo: SLOTarget, comp_id: str, window_seconds: int
+    ) -> float:
+        """Calculate burn rate over a recent window.
+
+        Burn rate = (violation ratio in window) / (allowed violation ratio).
+        A burn rate of 1.0 means budget is being consumed at exactly the
+        expected rate.  > 1.0 means faster than sustainable.
+        """
+        key = (comp_id, slo.metric)
+        violations = self._violations.get(key, [])
+        if not violations:
+            return 0.0
+
+        latest_time = violations[-1][0]
+        window_start = latest_time - window_seconds
+
+        # Filter to recent window
+        recent = [(t, v) for t, v in violations if t >= window_start]
+        if not recent:
+            return 0.0
+
+        violated_count = sum(1 for _, v in recent if v)
+        total_count = len(recent)
+        if total_count == 0:
+            return 0.0
+
+        violation_ratio = violated_count / total_count
+
+        # Expected violation ratio based on SLO
+        if slo.metric == "availability":
+            allowed_ratio = 1.0 - slo.target / 100.0
+        else:
+            allowed_ratio = 0.001  # 0.1%
+
+        if allowed_ratio <= 0:
+            return float("inf") if violation_ratio > 0 else 0.0
+
+        return violation_ratio / allowed_ratio
+
+
+# ---------------------------------------------------------------------------
+# Operational Simulation Engine
+# ---------------------------------------------------------------------------
+
+
+class OpsSimulationEngine:
+    """Operational simulation engine for multi-day infrastructure scenarios.
+
+    Simulates realistic operational conditions including deployments,
+    maintenance, gradual degradation, random failures (MTBF-based),
+    and tracks SLO compliance with error budgets.
+    """
+
+    def __init__(self, graph: InfraGraph) -> None:
+        self.graph = graph
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def run_ops_scenario(self, scenario: OpsScenario) -> OpsSimulationResult:
+        """Run a single operational scenario.
+
+        This is the main simulation method.  It steps through time at
+        the configured granularity, applying traffic patterns,
+        degradation models, scheduled events, and random failures,
+        while tracking SLI measurements and error budgets.
+
+        Parameters
+        ----------
+        scenario:
+            The operational scenario configuration.
+
+        Returns
+        -------
+        OpsSimulationResult
+            Full simulation results including events, SLI timeline,
+            and error budget status.
+        """
+        rng = random.Random(scenario.random_seed)
+        total_seconds = scenario.duration_days * 86400
+        step_seconds = self._time_unit_to_seconds(scenario.time_unit)
+
+        # Initialise component states
+        ops_states = self._init_ops_states()
+
+        # Schedule all events up front
+        events = self._schedule_events(scenario, total_seconds, rng)
+
+        # Sort events by time for efficient lookup
+        events.sort(key=lambda e: e.time_seconds)
+
+        # Create SLO tracker
+        tracker = SLOTracker(self.graph)
+
+        result = OpsSimulationResult(scenario=scenario)
+        result.events = list(events)
+
+        # Pre-count event types
+        result.total_deploys = sum(
+            1 for e in events if e.event_type == OpsEventType.DEPLOY
+        )
+        result.total_failures = sum(
+            1
+            for e in events
+            if e.event_type
+            in (
+                OpsEventType.RANDOM_FAILURE,
+                OpsEventType.MEMORY_LEAK_OOM,
+                OpsEventType.DISK_FULL,
+                OpsEventType.CONN_POOL_EXHAUSTION,
+            )
+        )
+
+        total_down_seconds = 0
+        peak_util = 0.0
+        min_avail = 100.0
+
+        # Accumulate degradation events generated during simulation
+        degradation_events: list[OpsEvent] = []
+
+        # Main simulation loop
+        num_steps = total_seconds // step_seconds
+        for step_idx in range(num_steps + 1):
+            t = step_idx * step_seconds
+
+            # 1. Compute composite traffic multiplier
+            traffic_mult = self._composite_traffic(t, scenario)
+
+            # 2. Apply degradation models
+            new_deg_events = self._apply_degradation(
+                ops_states, t, step_seconds, scenario
+            )
+            degradation_events.extend(new_deg_events)
+            result.total_degradation_events += len(new_deg_events)
+
+            # 3. Get active faults from scheduled events + degradation
+            # events at this time
+            all_events_so_far = events + degradation_events
+            active_faults = self._get_active_faults(all_events_so_far, t)
+
+            # 4. Update component health and utilization
+            for comp_id, state in ops_states.items():
+                comp = self.graph.get_component(comp_id)
+                if comp is None:
+                    continue
+
+                # Check if this component is targeted by an active fault
+                is_faulted = any(
+                    f.target_component_id == comp_id for f in active_faults
+                )
+
+                if is_faulted:
+                    state.current_health = HealthStatus.DOWN
+                    state.current_utilization = 0.0
+                else:
+                    # Calculate effective utilization
+                    base_util = state.base_utilization
+                    effective_util = base_util * traffic_mult / max(
+                        state.current_replicas, 1
+                    )
+
+                    # Add degradation-induced utilization pressure
+                    if (
+                        comp.capacity.max_memory_mb > 0
+                        and state.leaked_memory_mb > 0
+                    ):
+                        mem_pressure = (
+                            state.leaked_memory_mb
+                            / comp.capacity.max_memory_mb
+                            * 100.0
+                        )
+                        effective_util += mem_pressure * 0.5
+
+                    if (
+                        comp.capacity.max_disk_gb > 0
+                        and state.filled_disk_gb > 0
+                    ):
+                        disk_pressure = (
+                            state.filled_disk_gb
+                            / comp.capacity.max_disk_gb
+                            * 100.0
+                        )
+                        effective_util += disk_pressure * 0.3
+
+                    if (
+                        comp.capacity.connection_pool_size > 0
+                        and state.leaked_connections > 0
+                    ):
+                        conn_pressure = (
+                            state.leaked_connections
+                            / comp.capacity.connection_pool_size
+                            * 100.0
+                        )
+                        effective_util += conn_pressure * 0.4
+
+                    # Cap at 120% (allows overload detection)
+                    effective_util = min(effective_util, 120.0)
+                    state.current_utilization = effective_util
+
+                    # Determine health from utilization
+                    if effective_util > 100.0:
+                        state.current_health = HealthStatus.DOWN
+                    elif effective_util > 90.0:
+                        state.current_health = HealthStatus.OVERLOADED
+                    elif effective_util > 70.0:
+                        state.current_health = HealthStatus.DEGRADED
+                    else:
+                        state.current_health = HealthStatus.HEALTHY
+
+                # 5. Simplified autoscaling
+                if comp.autoscaling.enabled and not is_faulted:
+                    cfg = comp.autoscaling
+                    util = state.current_utilization
+
+                    # Scale up
+                    if util > cfg.scale_up_threshold:
+                        cooldown_elapsed = t - state.last_scale_up_time
+                        if cooldown_elapsed >= cfg.scale_up_delay_seconds:
+                            new_replicas = min(
+                                state.current_replicas + cfg.scale_up_step,
+                                cfg.max_replicas,
+                            )
+                            if new_replicas > state.current_replicas:
+                                logger.debug(
+                                    "[t=%ds] OPS AUTO-SCALE UP %s: %d -> %d",
+                                    t,
+                                    comp_id,
+                                    state.current_replicas,
+                                    new_replicas,
+                                )
+                                state.current_replicas = new_replicas
+                                state.last_scale_up_time = t
+
+                    # Scale down
+                    elif util < cfg.scale_down_threshold:
+                        cooldown_elapsed = t - state.last_scale_down_time
+                        if cooldown_elapsed >= cfg.scale_down_delay_seconds:
+                            new_replicas = max(
+                                state.current_replicas - 1,
+                                cfg.min_replicas,
+                            )
+                            if new_replicas < state.current_replicas:
+                                logger.debug(
+                                    "[t=%ds] OPS AUTO-SCALE DOWN %s: %d -> %d",
+                                    t,
+                                    comp_id,
+                                    state.current_replicas,
+                                    new_replicas,
+                                )
+                                state.current_replicas = new_replicas
+                                state.last_scale_down_time = t
+
+            # 6. Record SLI measurements
+            sli_point = tracker.record(t, ops_states)
+            result.sli_timeline.append(sli_point)
+
+            # Track aggregate metrics
+            if sli_point.max_utilization > peak_util:
+                peak_util = sli_point.max_utilization
+
+            if sli_point.availability_percent < min_avail:
+                min_avail = sli_point.availability_percent
+
+            # Count downtime
+            down_count = sum(
+                1
+                for s in ops_states.values()
+                if s.current_health == HealthStatus.DOWN
+            )
+            if down_count > 0:
+                total_down_seconds += step_seconds
+
+        # Include degradation-generated events in the result
+        result.events.extend(degradation_events)
+        result.events.sort(key=lambda e: e.time_seconds)
+
+        # Compute final error budget statuses
+        result.error_budget_statuses = tracker.error_budget_status()
+        result.total_downtime_seconds = total_down_seconds
+        result.peak_utilization = round(peak_util, 2)
+        result.min_availability = round(min_avail, 4)
+
+        # Generate summary
+        result.summary = self._build_summary(result)
+
+        return result
+
+    def run_default_ops_scenarios(self) -> list[OpsSimulationResult]:
+        """Run a suite of default operational scenarios.
+
+        Generates 5 standard scenarios covering baseline operations,
+        deployments, full operations with degradation, growth trends,
+        and extended stress testing.
+
+        Returns
+        -------
+        list[OpsSimulationResult]
+            Results for all 5 default scenarios.
+        """
+        component_ids = list(self.graph.components.keys())
+
+        # Identify app-server-like components for deploy targets
+        deploy_targets: list[str] = []
+        for comp_id, comp in self.graph.components.items():
+            if comp.type.value in ("app_server", "web_server"):
+                deploy_targets.append(comp_id)
+        if not deploy_targets:
+            deploy_targets = (
+                component_ids[:2]
+                if len(component_ids) >= 2
+                else list(component_ids)
+            )
+
+        scenarios: list[OpsScenario] = []
+
+        # --- Shared deploy schedules ---
+        tuesday_deploys = [
+            {
+                "component_id": comp_id,
+                "day_of_week": 1,  # Tuesday (0=Mon)
+                "hour": 14,
+                "downtime_seconds": 30,
+            }
+            for comp_id in deploy_targets
+        ]
+        thursday_deploys = [
+            {
+                "component_id": comp_id,
+                "day_of_week": 3,  # Thursday
+                "hour": 14,
+                "downtime_seconds": 30,
+            }
+            for comp_id in deploy_targets
+        ]
+
+        # 1. ops-7d-baseline: 7 days, normal traffic, no events
+        scenarios.append(
+            OpsScenario(
+                id="ops-7d-baseline",
+                name="7-day baseline (no events)",
+                description=(
+                    "Baseline operational simulation for 7 days with "
+                    "diurnal-weekly traffic pattern but no deployments, "
+                    "failures, or degradation.  Establishes normal "
+                    "operating SLI baselines."
+                ),
+                duration_days=7,
+                time_unit=TimeUnit.FIVE_MINUTES,
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=2.0, duration=604800, weekend_factor=0.6
+                    ),
+                ],
+                enable_random_failures=False,
+                enable_degradation=False,
+                enable_maintenance=False,
+            )
+        )
+
+        # 2. ops-7d-with-deploys: 7 days with Tue/Thu deploys
+        scenarios.append(
+            OpsScenario(
+                id="ops-7d-with-deploys",
+                name="7-day with Tue/Thu deploys",
+                description=(
+                    "7-day simulation with diurnal-weekly traffic and "
+                    "scheduled deployments on Tuesday and Thursday at "
+                    "14:00.  Tests the impact of routine deployments "
+                    "on SLO compliance."
+                ),
+                duration_days=7,
+                time_unit=TimeUnit.FIVE_MINUTES,
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=2.0, duration=604800, weekend_factor=0.6
+                    ),
+                ],
+                scheduled_deploys=tuesday_deploys + thursday_deploys,
+                enable_random_failures=False,
+                enable_degradation=False,
+                enable_maintenance=False,
+            )
+        )
+
+        # 3. ops-7d-full: 7 days with deploys + random failures +
+        #    degradation
+        scenarios.append(
+            OpsScenario(
+                id="ops-7d-full",
+                name="7-day full operations",
+                description=(
+                    "Full operational simulation for 7 days including "
+                    "diurnal-weekly traffic, scheduled deployments "
+                    "(Tue/Thu), random MTBF-based failures, gradual "
+                    "degradation (memory leaks, disk fill), and "
+                    "weekly maintenance windows."
+                ),
+                duration_days=7,
+                time_unit=TimeUnit.FIVE_MINUTES,
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=2.5, duration=604800, weekend_factor=0.6
+                    ),
+                ],
+                scheduled_deploys=tuesday_deploys + thursday_deploys,
+                enable_random_failures=True,
+                enable_degradation=True,
+                enable_maintenance=True,
+                maintenance_day_of_week=6,  # Sunday
+                maintenance_hour=2,
+            )
+        )
+
+        # 4. ops-14d-growth: 14 days with 10% monthly growth
+        scenarios.append(
+            OpsScenario(
+                id="ops-14d-growth",
+                name="14-day with 10% monthly growth",
+                description=(
+                    "14-day simulation combining diurnal-weekly traffic "
+                    "with a 10% monthly growth trend.  Tests whether "
+                    "autoscaling and capacity planning keep up with "
+                    "increasing demand."
+                ),
+                duration_days=14,
+                time_unit=TimeUnit.FIVE_MINUTES,
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=2.0, duration=1209600, weekend_factor=0.6
+                    ),
+                    create_growth_trend(
+                        monthly_rate=0.1, duration=1209600
+                    ),
+                ],
+                scheduled_deploys=tuesday_deploys + thursday_deploys,
+                enable_random_failures=True,
+                enable_degradation=True,
+                enable_maintenance=True,
+                maintenance_day_of_week=6,
+                maintenance_hour=2,
+            )
+        )
+
+        # 5. ops-30d-stress: 30 days full stress test
+        scenarios.append(
+            OpsScenario(
+                id="ops-30d-stress",
+                name="30-day stress test",
+                description=(
+                    "Extended 30-day stress test with elevated "
+                    "diurnal-weekly traffic (3.5x peak), aggressive "
+                    "growth (15% monthly), full degradation models, "
+                    "frequent random failures, and bi-weekly "
+                    "deployments.  Validates long-term operational "
+                    "resilience and error budget consumption."
+                ),
+                duration_days=30,
+                time_unit=TimeUnit.HOUR,  # Hourly steps for 30-day sim
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=3.5, duration=2592000, weekend_factor=0.5
+                    ),
+                    create_growth_trend(
+                        monthly_rate=0.15, duration=2592000
+                    ),
+                ],
+                scheduled_deploys=tuesday_deploys + thursday_deploys,
+                enable_random_failures=True,
+                enable_degradation=True,
+                enable_maintenance=True,
+                maintenance_day_of_week=6,
+                maintenance_hour=2,
+                random_seed=42,
+            )
+        )
+
+        # Run all scenarios
+        results: list[OpsSimulationResult] = []
+        for scenario in scenarios:
+            result = self.run_ops_scenario(scenario)
+            results.append(result)
+
+        return results
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _time_unit_to_seconds(unit: TimeUnit) -> int:
+        """Convert a TimeUnit enum value to seconds."""
+        if unit == TimeUnit.MINUTE:
+            return 60
+        elif unit == TimeUnit.FIVE_MINUTES:
+            return 300
+        elif unit == TimeUnit.HOUR:
+            return 3600
+        return 300  # default fallback
+
+    @staticmethod
+    def _composite_traffic(t: int, scenario: OpsScenario) -> float:
+        """Compute the composite traffic multiplier at time *t*.
+
+        When multiple traffic patterns are configured, their multipliers
+        are combined multiplicatively.  For example, a diurnal pattern
+        producing 2.0x and a growth trend producing 1.05x yields 2.1x.
+
+        Parameters
+        ----------
+        t:
+            Current time in seconds from simulation start.
+        scenario:
+            The scenario containing traffic patterns.
+
+        Returns
+        -------
+        float
+            Combined traffic multiplier (>= 1.0).
+        """
+        if not scenario.traffic_patterns:
+            return 1.0
+
+        composite = 1.0
+        for pattern in scenario.traffic_patterns:
+            mult = pattern.multiplier_at(t)
+            composite *= mult
+
+        return max(1.0, composite)
+
+    def _schedule_events(
+        self,
+        scenario: OpsScenario,
+        total_seconds: int,
+        rng: random.Random,
+    ) -> list[OpsEvent]:
+        """Pre-schedule all operational events for the simulation.
+
+        Generates:
+        - Deployment events from ``scheduled_deploys``
+        - Random failures based on component MTBF
+        - Maintenance windows
+
+        Parameters
+        ----------
+        scenario:
+            The scenario configuration.
+        total_seconds:
+            Total simulation duration in seconds.
+        rng:
+            Seeded random number generator.
+
+        Returns
+        -------
+        list[OpsEvent]
+            All scheduled events sorted by time.
+        """
+        events: list[OpsEvent] = []
+
+        # --- Scheduled deployments ---
+        for deploy_cfg in scenario.scheduled_deploys:
+            comp_id = deploy_cfg.get("component_id", "")
+            day_of_week = deploy_cfg.get("day_of_week", 1)  # 0=Mon
+            hour = deploy_cfg.get("hour", 14)
+            downtime = deploy_cfg.get("downtime_seconds", 30)
+
+            comp = self.graph.get_component(comp_id)
+            if comp is not None:
+                # Use the component's operational profile downtime if
+                # available and non-zero
+                profile_downtime = (
+                    comp.operational_profile.deploy_downtime_seconds
+                )
+                if profile_downtime > 0:
+                    downtime = int(profile_downtime)
+
+            # Schedule deployments for each matching day in the
+            # simulation window
+            for day in range(scenario.duration_days):
+                # day 0 = Monday 00:00, day_of_week 0 = Monday
+                if day % 7 == day_of_week:
+                    deploy_time = day * 86400 + hour * 3600
+                    if deploy_time < total_seconds:
+                        events.append(
+                            OpsEvent(
+                                time_seconds=deploy_time,
+                                event_type=OpsEventType.DEPLOY,
+                                target_component_id=comp_id,
+                                duration_seconds=downtime,
+                                description=(
+                                    f"Scheduled deploy to {comp_id} "
+                                    f"(day {day}, {hour}:00, "
+                                    f"{downtime}s downtime)"
+                                ),
+                            )
+                        )
+
+        # --- Random failures based on MTBF ---
+        if scenario.enable_random_failures:
+            for comp_id, comp in self.graph.components.items():
+                mtbf_hours = comp.operational_profile.mtbf_hours
+                if mtbf_hours <= 0:
+                    # If no MTBF configured, use a default of 720 hours
+                    # (30 days)
+                    mtbf_hours = 720.0
+
+                mtbf_seconds = mtbf_hours * 3600.0
+                mttr_seconds = (
+                    comp.operational_profile.mttr_minutes * 60.0
+                )
+
+                # Generate failures using exponential distribution
+                t_cursor = rng.expovariate(1.0 / mtbf_seconds)
+                while t_cursor < total_seconds:
+                    events.append(
+                        OpsEvent(
+                            time_seconds=int(t_cursor),
+                            event_type=OpsEventType.RANDOM_FAILURE,
+                            target_component_id=comp_id,
+                            duration_seconds=int(mttr_seconds),
+                            description=(
+                                f"Random failure of {comp_id} at "
+                                f"t={int(t_cursor)}s "
+                                f"(MTBF={mtbf_hours}h, "
+                                f"MTTR="
+                                f"{comp.operational_profile.mttr_minutes}"
+                                f"min)"
+                            ),
+                        )
+                    )
+                    # Next failure: skip MTTR + exponential wait
+                    t_cursor += mttr_seconds + rng.expovariate(
+                        1.0 / mtbf_seconds
+                    )
+
+        # --- Maintenance windows ---
+        if scenario.enable_maintenance:
+            for day in range(scenario.duration_days):
+                if day % 7 == scenario.maintenance_day_of_week:
+                    maint_time = (
+                        day * 86400 + scenario.maintenance_hour * 3600
+                    )
+
+                    if maint_time < total_seconds:
+                        # Maintenance affects all components
+                        for comp_id, comp in self.graph.components.items():
+                            maint_duration = int(
+                                comp.operational_profile
+                                .maintenance_downtime_minutes
+                                * 60
+                            )
+                            events.append(
+                                OpsEvent(
+                                    time_seconds=maint_time,
+                                    event_type=OpsEventType.MAINTENANCE,
+                                    target_component_id=comp_id,
+                                    duration_seconds=maint_duration,
+                                    description=(
+                                        f"Scheduled maintenance for "
+                                        f"{comp_id} (day {day}, "
+                                        f"{scenario.maintenance_hour}"
+                                        f":00, {maint_duration}s)"
+                                    ),
+                                )
+                            )
+
+        events.sort(key=lambda e: e.time_seconds)
+        return events
+
+    def _init_ops_states(self) -> dict[str, _OpsComponentState]:
+        """Create initial mutable state for every component."""
+        states: dict[str, _OpsComponentState] = {}
+        for comp_id, comp in self.graph.components.items():
+            base_util = comp.utilization()
+            states[comp_id] = _OpsComponentState(
+                component_id=comp_id,
+                base_utilization=base_util,
+                current_utilization=base_util,
+                current_health=comp.health,
+                current_replicas=comp.replicas,
+                base_replicas=comp.replicas,
+            )
+        return states
+
+    def _apply_degradation(
+        self,
+        ops_states: dict[str, _OpsComponentState],
+        t: int,
+        step_seconds: int,
+        scenario: OpsScenario,
+    ) -> list[OpsEvent]:
+        """Apply gradual degradation models to all components.
+
+        Updates the degradation accumulators in ``ops_states`` based on
+        each component's ``DegradationConfig``.  When a threshold is
+        breached (e.g. leaked memory > max memory), generates an
+        operational event (OOM, disk full, or connection pool
+        exhaustion).
+
+        Parameters
+        ----------
+        ops_states:
+            Current mutable component states.
+        t:
+            Current simulation time in seconds.
+        step_seconds:
+            Duration of the current time step.
+        scenario:
+            Scenario configuration (checked for
+            ``enable_degradation``).
+
+        Returns
+        -------
+        list[OpsEvent]
+            Any new degradation-triggered events.
+        """
+        events: list[OpsEvent] = []
+
+        if not scenario.enable_degradation:
+            return events
+
+        step_hours = step_seconds / 3600.0
+
+        for comp_id, state in ops_states.items():
+            comp = self.graph.get_component(comp_id)
+            if comp is None:
+                continue
+
+            # Skip components that are already DOWN
+            if state.current_health == HealthStatus.DOWN:
+                continue
+
+            degradation = comp.operational_profile.degradation
+
+            # Memory leak
+            if degradation.memory_leak_mb_per_hour > 0:
+                state.leaked_memory_mb += (
+                    degradation.memory_leak_mb_per_hour * step_hours
+                )
+                if (
+                    comp.capacity.max_memory_mb > 0
+                    and state.leaked_memory_mb
+                    >= comp.capacity.max_memory_mb
+                ):
+                    events.append(
+                        OpsEvent(
+                            time_seconds=t,
+                            event_type=OpsEventType.MEMORY_LEAK_OOM,
+                            target_component_id=comp_id,
+                            duration_seconds=int(
+                                comp.operational_profile.mttr_minutes
+                                * 60
+                            ),
+                            description=(
+                                f"OOM: {comp_id} leaked "
+                                f"{state.leaked_memory_mb:.0f}MB "
+                                f"(max "
+                                f"{comp.capacity.max_memory_mb:.0f}MB)"
+                            ),
+                        )
+                    )
+                    # Reset leaked memory after OOM restart
+                    state.leaked_memory_mb = 0.0
+
+            # Disk fill
+            if degradation.disk_fill_gb_per_hour > 0:
+                state.filled_disk_gb += (
+                    degradation.disk_fill_gb_per_hour * step_hours
+                )
+                if (
+                    comp.capacity.max_disk_gb > 0
+                    and state.filled_disk_gb
+                    >= comp.capacity.max_disk_gb
+                ):
+                    events.append(
+                        OpsEvent(
+                            time_seconds=t,
+                            event_type=OpsEventType.DISK_FULL,
+                            target_component_id=comp_id,
+                            duration_seconds=int(
+                                comp.operational_profile.mttr_minutes
+                                * 60
+                            ),
+                            description=(
+                                f"Disk full: {comp_id} filled "
+                                f"{state.filled_disk_gb:.1f}GB "
+                                f"(max "
+                                f"{comp.capacity.max_disk_gb:.0f}GB)"
+                            ),
+                        )
+                    )
+                    # Reset after cleanup
+                    state.filled_disk_gb = 0.0
+
+            # Connection leak
+            if degradation.connection_leak_per_hour > 0:
+                state.leaked_connections += (
+                    degradation.connection_leak_per_hour * step_hours
+                )
+                if (
+                    comp.capacity.connection_pool_size > 0
+                    and state.leaked_connections
+                    >= comp.capacity.connection_pool_size
+                ):
+                    events.append(
+                        OpsEvent(
+                            time_seconds=t,
+                            event_type=OpsEventType.CONN_POOL_EXHAUSTION,
+                            target_component_id=comp_id,
+                            duration_seconds=int(
+                                comp.operational_profile.mttr_minutes
+                                * 60
+                            ),
+                            description=(
+                                f"Connection pool exhausted: "
+                                f"{comp_id} leaked "
+                                f"{state.leaked_connections:.0f} "
+                                f"connections (pool size "
+                                f"{comp.capacity.connection_pool_size})"
+                            ),
+                        )
+                    )
+                    # Reset after restart
+                    state.leaked_connections = 0.0
+
+        return events
+
+    @staticmethod
+    def _get_active_faults(
+        events: list[OpsEvent], t: int
+    ) -> list[Fault]:
+        """Determine which faults are active at time *t*.
+
+        An event is active if ``t`` falls within
+        ``[event.time_seconds,
+         event.time_seconds + event.duration_seconds)``.
+
+        Parameters
+        ----------
+        events:
+            All scheduled and generated events.
+        t:
+            Current simulation time in seconds.
+
+        Returns
+        -------
+        list[Fault]
+            Active faults converted to the Fault model.
+        """
+        faults: list[Fault] = []
+        for event in events:
+            start = event.time_seconds
+            end = start + event.duration_seconds
+            if start <= t < end:
+                # Map event type to fault type
+                fault_type_map = {
+                    OpsEventType.DEPLOY: FaultType.COMPONENT_DOWN,
+                    OpsEventType.MAINTENANCE: FaultType.COMPONENT_DOWN,
+                    OpsEventType.CERT_RENEWAL: FaultType.COMPONENT_DOWN,
+                    OpsEventType.RANDOM_FAILURE: FaultType.COMPONENT_DOWN,
+                    OpsEventType.MEMORY_LEAK_OOM: (
+                        FaultType.MEMORY_EXHAUSTION
+                    ),
+                    OpsEventType.DISK_FULL: FaultType.DISK_FULL,
+                    OpsEventType.CONN_POOL_EXHAUSTION: (
+                        FaultType.CONNECTION_POOL_EXHAUSTION
+                    ),
+                }
+                mapped_type = fault_type_map.get(
+                    event.event_type, FaultType.COMPONENT_DOWN
+                )
+                faults.append(
+                    Fault(
+                        target_component_id=event.target_component_id,
+                        fault_type=mapped_type,
+                        duration_seconds=event.duration_seconds,
+                    )
+                )
+
+        return faults
+
+    @staticmethod
+    def _build_summary(result: OpsSimulationResult) -> str:
+        """Build a human-readable summary of the simulation results."""
+        lines = [
+            f"Scenario: {result.scenario.name}",
+            f"Duration: {result.scenario.duration_days} days",
+            f"Total events: {len(result.events)}",
+            f"  Deployments: {result.total_deploys}",
+            f"  Failures: {result.total_failures}",
+            f"  Degradation events: {result.total_degradation_events}",
+            (
+                f"Total downtime: {result.total_downtime_seconds}s "
+                f"({result.total_downtime_seconds / 60:.1f} min)"
+            ),
+            f"Peak utilization: {result.peak_utilization}%",
+            f"Min availability: {result.min_availability}%",
+        ]
+
+        if result.error_budget_statuses:
+            lines.append("Error budgets:")
+            for ebs in result.error_budget_statuses:
+                status = (
+                    "EXHAUSTED" if ebs.is_budget_exhausted else "OK"
+                )
+                lines.append(
+                    f"  {ebs.component_id}/{ebs.slo.metric}: "
+                    f"{ebs.budget_remaining_percent:.1f}% remaining "
+                    f"(burn 1h={ebs.burn_rate_1h:.2f}x, "
+                    f"6h={ebs.burn_rate_6h:.2f}x) [{status}]"
+                )
+
+        return "\n".join(lines)

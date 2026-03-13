@@ -24,6 +24,8 @@ class TrafficPatternType(str, Enum):
     DDoS_SLOWLORIS = "ddos_slowloris"
     FLASH_CROWD = "flash_crowd"
     DIURNAL = "diurnal"
+    DIURNAL_WEEKLY = "diurnal_weekly"
+    GROWTH_TREND = "growth_trend"
 
 
 # Seeded RNG for reproducible jitter in DDoS patterns.
@@ -109,6 +111,12 @@ class TrafficPattern(BaseModel):
 
         if pt == TrafficPatternType.DIURNAL:
             return self._diurnal(t)
+
+        if pt == TrafficPatternType.DIURNAL_WEEKLY:
+            return self._diurnal_weekly(t)
+
+        if pt == TrafficPatternType.GROWTH_TREND:
+            return self._growth_trend(t)
 
         return 1.0
 
@@ -244,6 +252,63 @@ class TrafficPattern(BaseModel):
         midpoint = 1.0 + amplitude
         return midpoint - amplitude * math.cos(2.0 * math.pi * t / duration)
 
+    def _diurnal_weekly(self, t: int) -> float:
+        """DIURNAL_WEEKLY: realistic 24h cycle with weekend factor.
+
+        Maps t=0 to Monday 00:00.  The daily cycle uses a sine wave that
+        peaks between 11:00-14:00 and is at its minimum around 03:00.
+
+        On weekends (Saturday/Sunday), the multiplier is reduced by the
+        weekend_factor stored in ``wave_period_seconds`` (interpreted as
+        a percentage, e.g. 70 means 70% of weekday peak).  If
+        ``wave_period_seconds`` is 0 or negative, a default weekend factor
+        of 0.6 (60%) is used.
+        """
+        peak = self.peak_multiplier
+        # Interpret wave_period_seconds as weekend_factor percentage
+        if self.wave_period_seconds > 0:
+            weekend_factor = self.wave_period_seconds / 100.0
+        else:
+            weekend_factor = 0.6
+
+        seconds_per_day = 86400
+        seconds_per_week = seconds_per_day * 7
+
+        # Normalise t into the week
+        t_in_week = t % seconds_per_week
+        day_of_week = t_in_week // seconds_per_day  # 0=Mon .. 6=Sun
+        t_in_day = t_in_week % seconds_per_day
+        hour_of_day = t_in_day / 3600.0
+
+        # Daily sine curve: minimum at 03:00, peak at ~12:30
+        # sin reaches -1 at 03:00 and +1 at 15:00, so we shift by 3h.
+        # Phase: sin(2*pi*(hour - 3)/24 - pi/2) peaks at hour=9+(24/4)=15
+        # We want peak around 11-14, so use: sin(2*pi*(hour - 3)/24 - pi/2)
+        # Actually let's use a cosine centred at 12.5:
+        # cos(2*pi*(hour - 12.5)/24) is +1 at 12.5 and -1 at 0.5
+        phase = 2.0 * math.pi * (hour_of_day - 12.5) / 24.0
+        daily_factor = 0.5 * (1.0 + math.cos(phase))  # 0..1, peak at 12.5
+
+        # Apply weekend reduction
+        is_weekend = day_of_week >= 5  # Saturday=5, Sunday=6
+        if is_weekend:
+            daily_factor *= weekend_factor
+
+        # Map daily_factor [0..1] to [1.0 .. peak_multiplier]
+        return 1.0 + (peak - 1.0) * daily_factor
+
+    def _growth_trend(self, t: int) -> float:
+        """GROWTH_TREND: exponential growth over time.
+
+        Applies ``(1 + monthly_rate)^(elapsed_days / 30)`` where
+        ``monthly_rate`` is stored in ``peak_multiplier`` (e.g. 0.1 for
+        10% monthly growth).  The multiplier starts at 1.0 at t=0 and
+        grows exponentially.
+        """
+        monthly_rate = self.peak_multiplier
+        elapsed_days = t / 86400.0
+        return math.pow(1.0 + monthly_rate, elapsed_days / 30.0)
+
 
 # =====================================================================
 # Factory functions
@@ -336,4 +401,65 @@ def create_diurnal(
         peak_multiplier=peak,
         duration_seconds=duration,
         description=f"Diurnal cycle: {peak}x peak, compressed into {duration}s",
+    )
+
+
+def create_diurnal_weekly(
+    peak: float = 3.0,
+    duration: int = 604800,
+    weekend_factor: float = 0.6,
+) -> TrafficPattern:
+    """Create a diurnal weekly traffic pattern.
+
+    Models a realistic 24h cycle with peak traffic between 11:00-14:00 and
+    minimum around 03:00.  Weekend traffic is reduced by *weekend_factor*
+    (e.g. 0.6 means 60% of weekday peak).
+
+    Parameters
+    ----------
+    peak:
+        Maximum traffic multiplier during weekday peak hours.
+    duration:
+        Total duration in seconds (default: 604800 = 7 days).
+    weekend_factor:
+        Weekend traffic as a fraction of weekday peak (0.0-1.0).
+    """
+    # Store weekend_factor as a percentage in wave_period_seconds
+    weekend_pct = int(weekend_factor * 100)
+    return TrafficPattern(
+        pattern_type=TrafficPatternType.DIURNAL_WEEKLY,
+        peak_multiplier=peak,
+        duration_seconds=duration,
+        wave_period_seconds=weekend_pct,
+        description=(
+            f"Diurnal weekly: {peak}x weekday peak, "
+            f"{weekend_factor:.0%} weekend factor, {duration}s duration"
+        ),
+    )
+
+
+def create_growth_trend(
+    monthly_rate: float = 0.1,
+    duration: int = 2592000,
+) -> TrafficPattern:
+    """Create an exponential growth trend traffic pattern.
+
+    Models steady traffic growth over time using the formula:
+    ``(1 + monthly_rate)^(elapsed_days / 30)``
+
+    Parameters
+    ----------
+    monthly_rate:
+        Monthly growth rate as a decimal (e.g. 0.1 for 10% monthly growth).
+    duration:
+        Total duration in seconds (default: 2592000 = 30 days).
+    """
+    return TrafficPattern(
+        pattern_type=TrafficPatternType.GROWTH_TREND,
+        peak_multiplier=monthly_rate,
+        duration_seconds=duration,
+        description=(
+            f"Growth trend: {monthly_rate:.0%} monthly rate, "
+            f"{duration // 86400}d duration"
+        ),
     )

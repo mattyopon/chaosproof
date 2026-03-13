@@ -13,11 +13,14 @@ from infrasim.model.components import (
     CircuitBreakerConfig,
     Component,
     ComponentType,
+    DegradationConfig,
     Dependency,
     FailoverConfig,
+    OperationalProfile,
     ResourceMetrics,
     RetryStrategy,
     SingleflightConfig,
+    SLOTarget,
 )
 from infrasim.model.graph import InfraGraph
 
@@ -88,6 +91,14 @@ def load_yaml(path: Path) -> InfraGraph:
         singleflight = (
             SingleflightConfig(**entry["singleflight"]) if "singleflight" in entry else SingleflightConfig()
         )
+        slo_targets = [SLOTarget(**s) for s in entry.get("slo_targets", [])]
+        if "operational_profile" in entry:
+            op_data = dict(entry["operational_profile"])
+            if "degradation" in op_data:
+                op_data["degradation"] = DegradationConfig(**op_data["degradation"])
+            operational_profile = OperationalProfile(**op_data)
+        else:
+            operational_profile = OperationalProfile()
 
         component = Component(
             id=comp_id,
@@ -102,6 +113,8 @@ def load_yaml(path: Path) -> InfraGraph:
             failover=failover,
             cache_warming=cache_warming,
             singleflight=singleflight,
+            slo_targets=slo_targets,
+            operational_profile=operational_profile,
             parameters=entry.get("parameters", {}),
             tags=entry.get("tags", []),
         )
@@ -153,3 +166,30 @@ def load_yaml(path: Path) -> InfraGraph:
         graph.add_dependency(dep)
 
     return graph
+
+
+def load_yaml_with_ops(path: Path) -> tuple[InfraGraph, dict]:
+    """Load infrastructure definition and operational simulation config from YAML.
+
+    In addition to building the :class:`InfraGraph` via :func:`load_yaml`, this
+    function parses top-level ``slos`` and ``operational_simulation`` sections
+    that configure v3.0 long-running operational simulations.
+
+    Args:
+        path: Path to the YAML file.
+
+    Returns:
+        Tuple of ``(InfraGraph, ops_config)`` where *ops_config* is a dict
+        with ``'slos'`` (list of :class:`SLOTarget`) and
+        ``'operational_simulation'`` (raw dict of simulation parameters).
+    """
+    # Build the graph using the existing loader
+    graph = load_yaml(path)
+
+    # Parse additional ops sections from the raw YAML
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    ops_config: dict = {
+        "slos": [SLOTarget(**s) for s in raw.get("slos", [])],
+        "operational_simulation": raw.get("operational_simulation", {}),
+    }
+    return graph, ops_config

@@ -161,6 +161,284 @@ def dynamic(
 
 
 @app.command()
+def ops_sim(
+    model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path (JSON or YAML)"),
+    yaml_file: Path | None = typer.Option(None, "--yaml", "-y", help="YAML file with ops config"),
+    days: int = typer.Option(7, "--days", help="Simulation duration in days (1-30)"),
+    step: str = typer.Option("5min", "--step", help="Time step: 1min, 5min, 1hour"),
+    html: Path | None = typer.Option(None, "--html", help="Export HTML report"),
+    growth: float = typer.Option(0.0, "--growth", help="Monthly traffic growth rate (0.1 = 10%)"),
+    diurnal_peak: float = typer.Option(3.0, "--diurnal-peak", help="Diurnal peak multiplier"),
+    weekend_factor: float = typer.Option(0.6, "--weekend-factor", help="Weekend traffic reduction"),
+    deploy_days: str | None = typer.Option(None, "--deploy-days", help="Deploy days (e.g., 'tue,thu')"),
+    deploy_hour: int = typer.Option(14, "--deploy-hour", help="Deploy hour (0-23)"),
+    no_random: bool = typer.Option(False, "--no-random-failures", help="Disable random failures"),
+    no_degradation: bool = typer.Option(False, "--no-degradation", help="Disable degradation"),
+    defaults: bool = typer.Option(False, "--defaults", help="Run all default ops scenarios"),
+) -> None:
+    """Run long-running operational simulation with SLO tracking."""
+    from infrasim.model.components import SLOTarget
+    from infrasim.simulator.ops_engine import OpsScenario, OpsSimulationEngine
+
+    # Resolve time step to seconds
+    step_map = {"1min": 60, "5min": 300, "1hour": 3600}
+    step_seconds = step_map.get(step)
+    if step_seconds is None:
+        console.print(f"[red]Invalid step '{step}'. Use: 1min, 5min, 1hour[/]")
+        raise typer.Exit(1)
+
+    # Validate days
+    if days < 1 or days > 30:
+        console.print("[red]--days must be between 1 and 30[/]")
+        raise typer.Exit(1)
+
+    # Load model
+    graph: InfraGraph
+    slos: list[SLOTarget] = []
+    ops_config: dict = {}
+
+    if yaml_file is not None:
+        from infrasim.model.loader import load_yaml_with_ops
+
+        if not yaml_file.exists():
+            console.print(f"[red]YAML file not found: {yaml_file}[/]")
+            raise typer.Exit(1)
+
+        console.print(f"[cyan]Loading infrastructure from YAML: {yaml_file}...[/]")
+        try:
+            graph, ops_config = load_yaml_with_ops(yaml_file)
+        except (FileNotFoundError, ValueError) as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+        slos = ops_config.get("slos", [])
+    elif model.exists():
+        if str(model).endswith((".yaml", ".yml")):
+            from infrasim.model.loader import load_yaml_with_ops
+
+            console.print(f"[cyan]Loading infrastructure from YAML: {model}...[/]")
+            try:
+                graph, ops_config = load_yaml_with_ops(model)
+            except (FileNotFoundError, ValueError) as exc:
+                console.print(f"[red]{exc}[/]")
+                raise typer.Exit(1)
+            slos = ops_config.get("slos", [])
+        else:
+            console.print(f"[cyan]Loading infrastructure model from {model}...[/]")
+            graph = InfraGraph.load(model)
+    else:
+        console.print(f"[red]Model file not found: {model}[/]")
+        console.print("Run [cyan]infrasim scan[/] or [cyan]infrasim load[/] first.")
+        raise typer.Exit(1)
+
+    # Collect SLOs from components if not from YAML global section
+    if not slos:
+        for comp in graph.components.values():
+            slos.extend(comp.slo_targets)
+    if not slos:
+        slos = [
+            SLOTarget(name="Availability", metric="availability", target=99.9, unit="percent"),
+            SLOTarget(name="Error Rate", metric="error_rate", target=0.1, unit="percent"),
+        ]
+
+    engine = OpsSimulationEngine(graph)
+
+    if defaults:
+        console.print(
+            f"[cyan]Running all default operational simulations "
+            f"({len(graph.components)} components)...[/]"
+        )
+        results = engine.run_default_ops_scenarios()
+        for result in results:
+            _print_ops_results(result, console)
+            console.print()
+    else:
+        from infrasim.simulator.traffic import create_diurnal_weekly, create_growth_trend
+
+        # Parse deploy days into day_of_week integers (0=Mon)
+        day_map = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+        parsed_deploy_days: list[int] = []
+        if deploy_days is not None:
+            for d in deploy_days.split(","):
+                d = d.strip().lower()
+                if d in day_map:
+                    parsed_deploy_days.append(day_map[d])
+        else:
+            parsed_deploy_days = [1, 3]  # Tue, Thu
+
+        # Build deploy schedule for app_server components
+        deploy_targets = [
+            cid for cid, c in graph.components.items()
+            if c.type.value in ("app_server", "web_server")
+        ]
+        if not deploy_targets:
+            deploy_targets = list(graph.components.keys())[:2]
+
+        scheduled_deploys = []
+        for dow in parsed_deploy_days:
+            for comp_id in deploy_targets:
+                scheduled_deploys.append({
+                    "component_id": comp_id,
+                    "day_of_week": dow,
+                    "hour": deploy_hour,
+                    "downtime_seconds": 30,
+                })
+
+        # Build traffic patterns
+        duration_seconds = days * 86400
+        traffic_patterns = [
+            create_diurnal_weekly(peak=diurnal_peak, duration=duration_seconds, weekend_factor=weekend_factor),
+        ]
+        if growth > 0:
+            traffic_patterns.append(create_growth_trend(monthly_rate=growth, duration=duration_seconds))
+
+        scenario = OpsScenario(
+            id=f"ops-custom-{days}d",
+            name=f"Custom ({days}d, step={step})",
+            duration_days=days,
+            traffic_patterns=traffic_patterns,
+            scheduled_deploys=scheduled_deploys,
+            enable_random_failures=not no_random,
+            enable_degradation=not no_degradation,
+        )
+
+        console.print(
+            f"[cyan]Running operational simulation "
+            f"({len(graph.components)} components, "
+            f"{days} days, step={step})...[/]"
+        )
+        result = engine.run_ops_scenario(scenario)
+        _print_ops_results(result, console)
+
+    if html:
+        console.print(f"\n[dim]HTML export for ops-sim is not yet implemented.[/]")
+
+
+def _print_ops_results(result: "OpsSimulationResult", con: Console) -> None:  # noqa: F821
+    """Print operational simulation results using Rich formatting."""
+    from rich.panel import Panel
+    from rich.table import Table
+
+    scenario = result.scenario
+
+    # ---- 1. Simulation Summary Box ----------------------------------------
+    avail = result.min_availability
+    if avail >= 99.9:
+        avail_color = "green"
+    elif avail >= 99.0:
+        avail_color = "yellow"
+    else:
+        avail_color = "red"
+
+    total_events = len(result.events)
+    downtime_min = result.total_downtime_seconds / 60.0
+    num_steps = len(result.sli_timeline)
+
+    # Calculate average availability from SLI timeline
+    avg_avail = 100.0
+    if result.sli_timeline:
+        avg_avail = sum(p.availability_percent for p in result.sli_timeline) / len(result.sli_timeline)
+
+    summary_text = (
+        f"[bold]Scenario:[/] {scenario.name}\n"
+        f"[bold]Duration:[/] {scenario.duration_days} days  "
+        f"[bold]Steps:[/] {num_steps:,}\n\n"
+        f"[bold]Avg Availability:[/] [{avail_color}]{avg_avail:.4f}%[/]  "
+        f"[bold]Min Availability:[/] {avail:.2f}%\n"
+        f"[bold]Total Downtime:[/] {downtime_min:.1f} min  "
+        f"[bold]Peak Utilization:[/] {result.peak_utilization:.1f}%\n"
+        f"[bold]Deploys:[/] {result.total_deploys}  "
+        f"[bold]Failures:[/] {result.total_failures}  "
+        f"[bold]Degradation Events:[/] {result.total_degradation_events}\n"
+        f"[bold]Total Events:[/] {total_events}"
+    )
+
+    con.print()
+    con.print(Panel(
+        summary_text,
+        title="[bold]InfraSim Operational Simulation Report[/]",
+        border_style=avail_color,
+    ))
+
+    # ---- 2. Error Budget Table --------------------------------------------
+    if result.error_budget_statuses:
+        budget_table = Table(title="Error Budget Status", show_header=True)
+        budget_table.add_column("SLO", style="cyan", width=22)
+        budget_table.add_column("Component", width=16)
+        budget_table.add_column("Total", width=10, justify="right")
+        budget_table.add_column("Consumed", width=10, justify="right")
+        budget_table.add_column("Remaining", width=10, justify="right")
+        budget_table.add_column("Remaining %", width=12, justify="right")
+        budget_table.add_column("Burn 1h", width=8, justify="right")
+        budget_table.add_column("Burn 6h", width=8, justify="right")
+        budget_table.add_column("Status", width=10, justify="center")
+
+        for eb in result.error_budget_statuses:
+            pct = eb.budget_remaining_percent
+            if pct >= 50:
+                pct_color = "green"
+            elif pct >= 20:
+                pct_color = "yellow"
+            else:
+                pct_color = "red"
+
+            status = "[bold red]EXHAUSTED[/]" if eb.is_budget_exhausted else f"[{pct_color}]OK[/]"
+
+            budget_table.add_row(
+                eb.slo.name or eb.slo.metric,
+                eb.component_id or "system",
+                f"{eb.budget_total_minutes:.1f}m",
+                f"{eb.budget_consumed_minutes:.1f}m",
+                f"{eb.budget_remaining_minutes:.1f}m",
+                f"[{pct_color}]{pct:.1f}%[/]",
+                f"{eb.burn_rate_1h:.2f}x",
+                f"{eb.burn_rate_6h:.2f}x",
+                status,
+            )
+
+        con.print()
+        con.print(budget_table)
+
+    # ---- 3. Incident Timeline (top 10 events) ----------------------------
+    if result.events:
+        # Show last 10 events
+        recent = result.events[-10:]
+        event_table = Table(title=f"Event Timeline (last {len(recent)} of {total_events})", show_header=True)
+        event_table.add_column("Time", style="dim", width=12)
+        event_table.add_column("Type", width=18)
+        event_table.add_column("Component", style="cyan", width=20)
+        event_table.add_column("Description", width=50)
+
+        for ev in recent:
+            hours = ev.time_seconds / 3600
+            day = int(hours // 24) + 1
+            hour = int(hours % 24)
+            time_str = f"Day {day} {hour:02d}:00"
+
+            etype = ev.event_type.value
+            if etype in ("random_failure", "memory_leak_oom", "disk_full", "conn_pool_exhaustion"):
+                type_style = f"[red]{etype}[/]"
+            elif etype == "deploy":
+                type_style = f"[yellow]{etype}[/]"
+            else:
+                type_style = f"[dim]{etype}[/]"
+
+            event_table.add_row(
+                time_str,
+                type_style,
+                ev.target_component_id,
+                (ev.description or "")[:50],
+            )
+
+        con.print()
+        con.print(event_table)
+
+    # ---- 4. Summary -------------------------------------------------------
+    if result.summary:
+        con.print()
+        con.print(f"[dim]{result.summary}[/]")
+
+
+@app.command()
 def show(
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
 ) -> None:

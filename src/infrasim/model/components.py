@@ -105,6 +105,34 @@ class SingleflightConfig(BaseModel):
     coalesce_ratio: float = 0.8  # fraction of duplicate requests coalesced (0-1)
 
 
+class SLOTarget(BaseModel):
+    """Service Level Objective definition."""
+
+    name: str = ""
+    metric: str = "availability"  # availability | latency_p99 | error_rate
+    target: float = 99.9
+    unit: str = "percent"  # percent | ms | ratio
+    window_days: int = 30
+
+
+class DegradationConfig(BaseModel):
+    """Gradual degradation model for a component."""
+
+    memory_leak_mb_per_hour: float = 0.0
+    disk_fill_gb_per_hour: float = 0.0
+    connection_leak_per_hour: float = 0.0
+
+
+class OperationalProfile(BaseModel):
+    """Operational characteristics of a component."""
+
+    mtbf_hours: float = 0.0
+    mttr_minutes: float = 30.0
+    deploy_downtime_seconds: float = 30.0
+    maintenance_downtime_minutes: float = 60.0
+    degradation: DegradationConfig = Field(default_factory=DegradationConfig)
+
+
 class HealthStatus(str, Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
@@ -128,6 +156,8 @@ class Component(BaseModel):
     failover: FailoverConfig = Field(default_factory=FailoverConfig)
     cache_warming: CacheWarmingConfig = Field(default_factory=CacheWarmingConfig)
     singleflight: SingleflightConfig = Field(default_factory=SingleflightConfig)
+    slo_targets: list[SLOTarget] = Field(default_factory=list)
+    operational_profile: OperationalProfile = Field(default_factory=OperationalProfile)
     parameters: dict[str, float | int | str] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
 
