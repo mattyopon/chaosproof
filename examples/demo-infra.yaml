@@ -19,7 +19,7 @@ components:
     metrics:
       cpu_percent: 15
       memory_percent: 20
-      disk_percent: 30
+      disk_percent: 25
 
   - id: app-1
     name: "api-server-1"
@@ -33,9 +33,9 @@ components:
       timeout_seconds: 30
       max_memory_mb: 4096
     metrics:
-      cpu_percent: 30
-      memory_percent: 33
-      disk_percent: 30
+      cpu_percent: 22
+      memory_percent: 25
+      disk_percent: 22
       network_connections: 200
 
   - id: app-2
@@ -50,9 +50,9 @@ components:
       timeout_seconds: 30
       max_memory_mb: 4096
     metrics:
-      cpu_percent: 28
-      memory_percent: 30
-      disk_percent: 28
+      cpu_percent: 20
+      memory_percent: 24
+      disk_percent: 20
       network_connections: 180
 
   - id: postgres
@@ -65,9 +65,9 @@ components:
       max_connections: 200
       max_disk_gb: 500
     metrics:
-      cpu_percent: 25
-      memory_percent: 34
-      disk_percent: 32
+      cpu_percent: 20
+      memory_percent: 26
+      disk_percent: 24
       network_connections: 40
 
   - id: redis
@@ -80,7 +80,7 @@ components:
       max_connections: 10000
     metrics:
       cpu_percent: 8
-      memory_percent: 28
+      memory_percent: 22
       network_connections: 100
 
   - id: rabbitmq

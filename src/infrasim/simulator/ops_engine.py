@@ -199,7 +199,8 @@ class OpsSimulationResult:
     events: list[OpsEvent] = field(default_factory=list)
     sli_timeline: list[SLIDataPoint] = field(default_factory=list)
     error_budget_statuses: list[ErrorBudgetStatus] = field(default_factory=list)
-    total_downtime_seconds: int = 0
+    total_downtime_seconds: float = 0.0
+    total_component_down_seconds: float = 0.0
     total_deploys: int = 0
     total_failures: int = 0
     total_degradation_events: int = 0
@@ -587,7 +588,8 @@ class OpsSimulationEngine:
             )
         )
 
-        total_down_seconds = 0
+        total_down_seconds = 0.0
+        total_component_down_seconds = 0.0
         peak_util = 0.0
         min_avail = 100.0
 
@@ -749,14 +751,16 @@ class OpsSimulationEngine:
             if sli_point.availability_percent < min_avail:
                 min_avail = sli_point.availability_percent
 
-            # Count downtime
+            # Count downtime (proportional to fraction of components down)
             down_count = sum(
                 1
                 for s in ops_states.values()
                 if s.current_health == HealthStatus.DOWN
             )
-            if down_count > 0:
-                total_down_seconds += step_seconds
+            total_components = len(ops_states)
+            if down_count > 0 and total_components > 0:
+                total_down_seconds += step_seconds * down_count / total_components
+                total_component_down_seconds += down_count * step_seconds
 
         # Include degradation-generated events in the result
         result.events.extend(degradation_events)
@@ -765,6 +769,7 @@ class OpsSimulationEngine:
         # Compute final error budget statuses
         result.error_budget_statuses = tracker.error_budget_status()
         result.total_downtime_seconds = total_down_seconds
+        result.total_component_down_seconds = total_component_down_seconds
         result.peak_utilization = round(peak_util, 2)
         result.min_availability = round(min_avail, 4)
 
@@ -1003,7 +1008,7 @@ class OpsSimulationEngine:
         Returns
         -------
         float
-            Combined traffic multiplier (>= 1.0).
+            Combined traffic multiplier (>= 0.1).
         """
         if not scenario.traffic_patterns:
             return 1.0
@@ -1013,7 +1018,8 @@ class OpsSimulationEngine:
             mult = pattern.multiplier_at(t)
             composite *= mult
 
-        return max(1.0, composite)
+        # Floor at 0.1 to allow below-baseline traffic while preventing near-zero values
+        return max(0.1, composite)
 
     def _schedule_events(
         self,
@@ -1216,7 +1222,7 @@ class OpsSimulationEngine:
                                         maint_time + global_offset
                                     )
                                     if maint_start < total_seconds:
-                                        global_group_idx += 0
+                                        global_group_idx += 1
                                         events.append(
                                             OpsEvent(
                                                 time_seconds=maint_start,
@@ -1250,12 +1256,9 @@ class OpsSimulationEngine:
     def _ops_utilization(comp: "InfraComponent") -> float:
         """Compute a representative utilization for ops simulation.
 
-        Unlike ``comp.utilization()`` (which returns *max* of all
-        metrics — useful for capacity planning), this returns a
-        **weighted average** so that normal operating conditions
-        (30-65 % typical) remain in the HEALTHY band.  Only genuine
-        traffic spikes or degradation should push utilization toward
-        the overload thresholds.
+        Uses ``max()`` of all resource metrics, matching the
+        ``Component.utilization()`` method — the bottleneck resource
+        determines component health (limiting-factor principle).
         """
         factors: list[float] = []
         if comp.metrics.cpu_percent > 0:
@@ -1274,7 +1277,7 @@ class OpsSimulationEngine:
                 * 100.0
             )
             factors.append(conn_pct)
-        return sum(factors) / len(factors) if factors else 0.0
+        return max(factors) if factors else 0.0
 
     def _init_ops_states(self) -> dict[str, _OpsComponentState]:
         """Create initial mutable state for every component."""
@@ -1586,8 +1589,12 @@ class OpsSimulationEngine:
             f"  Failures: {result.total_failures}",
             f"  Degradation events: {result.total_degradation_events}",
             (
-                f"Total downtime: {result.total_downtime_seconds}s "
+                f"Weighted downtime: {result.total_downtime_seconds:.1f}s "
                 f"({result.total_downtime_seconds / 60:.1f} min)"
+            ),
+            (
+                f"Component downtime: {result.total_component_down_seconds:.1f}s "
+                f"({result.total_component_down_seconds / 60:.1f} min)"
             ),
             f"Peak utilization: {result.peak_utilization}%",
             f"Min availability: {result.min_availability}%",

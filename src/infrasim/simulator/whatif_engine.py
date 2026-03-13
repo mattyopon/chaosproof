@@ -184,35 +184,39 @@ class WhatIfEngine:
         total_downtimes: list[int] = []
         slo_pass: list[bool] = []
 
-        for value in whatif.values:
-            logger.info(
-                "What-if: %s=%s (scenario=%s)",
-                whatif.parameter,
-                value,
-                whatif.base_scenario.id,
-            )
+        original_rng = ops_engine_mod._ops_rng
+        try:
+            for value in whatif.values:
+                logger.info(
+                    "What-if: %s=%s (scenario=%s)",
+                    whatif.parameter,
+                    value,
+                    whatif.base_scenario.id,
+                )
 
-            # Apply the parameter modification
-            modified_graph, modified_scenario = self._apply_factor(
-                whatif.parameter, value, whatif.base_scenario
-            )
+                # Apply the parameter modification
+                modified_graph, modified_scenario = self._apply_factor(
+                    whatif.parameter, value, whatif.base_scenario
+                )
 
-            # Reset the module-level RNG to ensure identical random
-            # event sequences across sweep values, making results
-            # truly comparable.
-            ops_engine_mod._ops_rng = random.Random(whatif.seed)
+                # Reset the module-level RNG to ensure identical random
+                # event sequences across sweep values, making results
+                # truly comparable.
+                ops_engine_mod._ops_rng = random.Random(whatif.seed)
 
-            # Run the ops simulation on the modified graph
-            engine = OpsSimulationEngine(modified_graph)
-            result = engine.run_ops_scenario(modified_scenario)
+                # Run the ops simulation on the modified graph
+                engine = OpsSimulationEngine(modified_graph)
+                result = engine.run_ops_scenario(modified_scenario)
 
-            # Collect metrics
-            avg_avail = self._compute_avg_availability(result)
-            avg_availabilities.append(round(avg_avail, 4))
-            min_availabilities.append(result.min_availability)
-            total_failures.append(result.total_failures)
-            total_downtimes.append(result.total_downtime_seconds)
-            slo_pass.append(avg_avail >= _SLO_THRESHOLD)
+                # Collect metrics
+                avg_avail = self._compute_avg_availability(result)
+                avg_availabilities.append(round(avg_avail, 4))
+                min_availabilities.append(result.min_availability)
+                total_failures.append(result.total_failures)
+                total_downtimes.append(result.total_downtime_seconds)
+                slo_pass.append(avg_avail >= _SLO_THRESHOLD)
+        finally:
+            ops_engine_mod._ops_rng = original_rng
 
         # Find the breakpoint: first value where SLO fails
         breakpoint_value: float | None = None
@@ -379,12 +383,16 @@ class WhatIfEngine:
             elif param == "maint_duration_factor":
                 modified_scenario.maintenance_duration_factor = value
 
-        # Reset the module-level RNG for reproducibility
-        ops_engine_mod._ops_rng = random.Random(whatif.seed)
+        # Reset the module-level RNG for reproducibility, restoring after
+        original_rng = ops_engine_mod._ops_rng
+        try:
+            ops_engine_mod._ops_rng = random.Random(whatif.seed)
 
-        # Run the ops simulation
-        engine = OpsSimulationEngine(modified_graph)
-        result = engine.run_ops_scenario(modified_scenario)
+            # Run the ops simulation
+            engine = OpsSimulationEngine(modified_graph)
+            result = engine.run_ops_scenario(modified_scenario)
+        finally:
+            ops_engine_mod._ops_rng = original_rng
 
         # Collect metrics
         avg_avail = self._compute_avg_availability(result)
