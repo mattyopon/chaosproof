@@ -25,7 +25,7 @@ from infrasim.model.components import (
 from infrasim.model.graph import InfraGraph
 
 
-def load_yaml(path: Path) -> InfraGraph:
+def load_yaml(path: Path | str) -> InfraGraph:
     """Load an infrastructure definition from a YAML file.
 
     The YAML file should contain top-level ``components`` and ``dependencies``
@@ -33,7 +33,7 @@ def load_yaml(path: Path) -> InfraGraph:
     Capacity and metrics fields are optional and will use defaults when omitted.
 
     Args:
-        path: Path to the YAML file.
+        path: Path to the YAML file (accepts both ``str`` and ``Path``).
 
     Returns:
         A fully constructed InfraGraph.
@@ -42,6 +42,8 @@ def load_yaml(path: Path) -> InfraGraph:
         FileNotFoundError: If the YAML file does not exist.
         ValueError: If required fields are missing or types are invalid.
     """
+    if isinstance(path, str):
+        path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"YAML file not found: {path}")
 
@@ -168,7 +170,7 @@ def load_yaml(path: Path) -> InfraGraph:
     return graph
 
 
-def load_yaml_with_ops(path: Path) -> tuple[InfraGraph, dict]:
+def load_yaml_with_ops(path: Path | str) -> tuple[InfraGraph, dict]:
     """Load infrastructure definition and operational simulation config from YAML.
 
     In addition to building the :class:`InfraGraph` via :func:`load_yaml`, this

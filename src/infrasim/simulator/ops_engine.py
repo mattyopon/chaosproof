@@ -634,7 +634,7 @@ class OpsSimulationEngine:
         step_seconds = self._time_unit_to_seconds(scenario.time_unit)
 
         # Initialise component states
-        ops_states = self._init_ops_states()
+        ops_states = self._init_ops_states(scenario)
 
         # Schedule all events up front
         events = self._schedule_events(scenario, total_seconds, rng)
@@ -1228,22 +1228,17 @@ class OpsSimulationEngine:
             for comp_id, comp in self.graph.components.items():
                 comp_type = comp.type.value
 
-                # Pre-populate zero profile values with type-based
-                # defaults so What-if factor modifications take effect
-                # (0 * factor = 0, so we need a real base value).
-                if comp.operational_profile.mtbf_hours <= 0:
-                    comp.operational_profile.mtbf_hours = (
-                        _DEFAULT_MTBF_HOURS.get(comp_type, 2160.0)
-                    )
-                if comp.operational_profile.mttr_minutes <= 0:
-                    comp.operational_profile.mttr_minutes = (
-                        _DEFAULT_MTTR_MINUTES.get(comp_type, 30.0)
-                    )
-
+                # Use local variables instead of mutating the component's
+                # operational profile so the input graph stays unchanged.
                 mtbf_hours = comp.operational_profile.mtbf_hours
-                mtbf_seconds = mtbf_hours * 3600.0
+                if mtbf_hours <= 0:
+                    mtbf_hours = _DEFAULT_MTBF_HOURS.get(comp_type, 2160.0)
 
                 mttr_minutes = comp.operational_profile.mttr_minutes
+                if mttr_minutes <= 0:
+                    mttr_minutes = _DEFAULT_MTTR_MINUTES.get(comp_type, 30.0)
+
+                mtbf_seconds = mtbf_hours * 3600.0
                 mttr_seconds = mttr_minutes * 60.0
 
                 # Generate failures using exponential distribution
@@ -1385,15 +1380,17 @@ class OpsSimulationEngine:
             factors.append(conn_pct)
         return max(factors) if factors else 0.0
 
-    def _init_ops_states(self) -> dict[str, _OpsComponentState]:
+    def _init_ops_states(self, scenario: OpsScenario) -> dict[str, _OpsComponentState]:
         """Create initial mutable state for every component."""
+        # Use a per-scenario RNG (+1 to differentiate from the event RNG)
+        jitter_rng = random.Random(scenario.random_seed + 1)
         states: dict[str, _OpsComponentState] = {}
         for comp_id, comp in self.graph.components.items():
             base_util = self._ops_utilization(comp)
             # Assign jitter factor (0.7-1.3) per component to prevent
             # thundering herd when multiple instances share the same
             # degradation rate — they'll hit thresholds at different times.
-            jitter = 0.7 + _ops_rng.random() * 0.6
+            jitter = 0.7 + jitter_rng.random() * 0.6
             states[comp_id] = _OpsComponentState(
                 component_id=comp_id,
                 base_utilization=base_util,

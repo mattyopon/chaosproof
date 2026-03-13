@@ -162,6 +162,7 @@ def dynamic(
 
 @app.command()
 def ops_sim(
+    yaml_pos: Path | None = typer.Argument(None, help="YAML file path (positional)"),
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path (JSON or YAML)"),
     yaml_file: Path | None = typer.Option(None, "--yaml", "-y", help="YAML file with ops config"),
     days: int = typer.Option(7, "--days", help="Simulation duration in days (1-30)"),
@@ -178,6 +179,7 @@ def ops_sim(
     defaults: bool = typer.Option(False, "--defaults", help="Run all default ops scenarios"),
 ) -> None:
     """Run long-running operational simulation with SLO tracking."""
+    yaml_file = yaml_pos or yaml_file
     from infrasim.model.components import SLOTarget
     from infrasim.simulator.ops_engine import OpsScenario, OpsSimulationEngine
 
@@ -926,6 +928,7 @@ def _load_graph_for_analysis(
 
 @app.command()
 def whatif(
+    yaml_pos: Path | None = typer.Argument(None, help="YAML file path (positional)"),
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Path to model JSON"),
     yaml_file: Path | None = typer.Option(None, "--yaml", help="Path to YAML (alternative to model)"),
     parameter: str | None = typer.Option(
@@ -938,13 +941,14 @@ def whatif(
     ),
 ) -> None:
     """Run what-if analysis by sweeping infrastructure parameters."""
+    resolved_yaml = yaml_pos or yaml_file
     try:
         from infrasim.simulator.whatif_engine import WhatIfEngine
     except ImportError:
         console.print("[red]What-if engine not available. Install infrasim with what-if support.[/]")
         raise typer.Exit(1)
 
-    graph = _load_graph_for_analysis(model, yaml_file)
+    graph = _load_graph_for_analysis(model, resolved_yaml)
     engine = WhatIfEngine(graph)
 
     if multi is not None:
@@ -1088,6 +1092,7 @@ def _print_multi_whatif_result(result: object, con: Console) -> None:
 
 @app.command()
 def capacity(
+    yaml_pos: Path | None = typer.Argument(None, help="YAML file path (positional)"),
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Path to model JSON"),
     yaml_file: Path | None = typer.Option(None, "--yaml", help="Path to YAML (alternative to model)"),
     growth: float = typer.Option(0.10, "--growth", help="Monthly growth rate (default: 0.10 = 10%)"),
@@ -1095,13 +1100,14 @@ def capacity(
     simulate: bool = typer.Option(False, "--simulate", help="Run ops simulation to get actual burn rate"),
 ) -> None:
     """Run capacity planning analysis with growth forecasting."""
+    resolved_yaml = yaml_pos or yaml_file
     try:
         from infrasim.simulator.capacity_engine import CapacityPlanningEngine
     except ImportError:
         console.print("[red]Capacity planning engine not available. Install infrasim with capacity support.[/]")
         raise typer.Exit(1)
 
-    graph = _load_graph_for_analysis(model, yaml_file)
+    graph = _load_graph_for_analysis(model, resolved_yaml)
 
     from rich.panel import Panel
     from rich.table import Table

@@ -76,6 +76,10 @@ class TrafficPattern(BaseModel):
         default_factory=list,
         description="Component IDs affected by this pattern.  Empty means all.",
     )
+    weekend_factor: float = Field(
+        default=0.6,
+        description="Weekend traffic as a fraction of weekday peak (0.0-1.0). Used by DIURNAL_WEEKLY.",
+    )
     description: str = Field(
         default="",
         description="Human-readable description of the traffic pattern.",
@@ -257,18 +261,11 @@ class TrafficPattern(BaseModel):
         Maps t=0 to Monday 00:00.  The daily cycle uses a sine wave that
         peaks between 11:00-14:00 and is at its minimum around 03:00.
 
-        On weekends (Saturday/Sunday), the multiplier is reduced by the
-        weekend_factor stored in ``wave_period_seconds`` (interpreted as
-        a percentage, e.g. 70 means 70% of weekday peak).  If
-        ``wave_period_seconds`` is 0 or negative, a default weekend factor
-        of 0.6 (60%) is used.
+        On weekends (Saturday/Sunday), the multiplier is reduced by
+        ``self.weekend_factor`` (e.g. 0.6 means 60% of weekday peak).
         """
         peak = self.peak_multiplier
-        # Interpret wave_period_seconds as weekend_factor percentage
-        if self.wave_period_seconds > 0:
-            weekend_factor = self.wave_period_seconds / 100.0
-        else:
-            weekend_factor = 0.6
+        weekend_factor = self.weekend_factor
 
         seconds_per_day = 86400
         seconds_per_week = seconds_per_day * 7
@@ -423,13 +420,11 @@ def create_diurnal_weekly(
     weekend_factor:
         Weekend traffic as a fraction of weekday peak (0.0-1.0).
     """
-    # Store weekend_factor as a percentage in wave_period_seconds
-    weekend_pct = int(weekend_factor * 100)
     return TrafficPattern(
         pattern_type=TrafficPatternType.DIURNAL_WEEKLY,
         peak_multiplier=peak,
         duration_seconds=duration,
-        wave_period_seconds=weekend_pct,
+        weekend_factor=weekend_factor,
         description=(
             f"Diurnal weekly: {peak}x weekday peak, "
             f"{weekend_factor:.0%} weekend factor, {duration}s duration"
