@@ -354,15 +354,21 @@ class SLOTracker:
         self._last_effective_health = effective_health
 
         healthy = degraded = overloaded = down = 0
-        for h in effective_health.values():
-            if h == HealthStatus.HEALTHY:
+        for comp_id, h in effective_health.items():
+            if h == HealthStatus.DOWN:
+                # If the component has failover enabled, treat as DEGRADED
+                # for availability: the service continues via replicas/failover.
+                comp = self.graph.get_component(comp_id)
+                if comp and comp.failover.enabled:
+                    degraded += 1
+                else:
+                    down += 1
+            elif h == HealthStatus.HEALTHY:
                 healthy += 1
             elif h == HealthStatus.DEGRADED:
                 degraded += 1
             elif h == HealthStatus.OVERLOADED:
                 overloaded += 1
-            elif h == HealthStatus.DOWN:
-                down += 1
 
         # Availability: DOWN = 0%, OVERLOADED = 80% (20% error rate),
         # DEGRADED/HEALTHY = 100%.
