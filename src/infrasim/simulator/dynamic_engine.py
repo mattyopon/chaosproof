@@ -307,19 +307,32 @@ class DynamicSimulationEngine:
         result.recovery_time_seconds = recovery_time
         return result
 
-    def run_all_dynamic_defaults(self) -> DynamicSimulationReport:
+    def run_all_dynamic_defaults(
+        self,
+        duration: int = 300,
+        step: int = 5,
+    ) -> DynamicSimulationReport:
         """Generate a suite of dynamic scenarios and run them all.
 
         The default suite combines existing static scenarios (converted to
         dynamic form) with purpose-built traffic-pattern scenarios such as
         DDoS, flash crowd, and viral events.
 
+        Parameters
+        ----------
+        duration:
+            Simulation duration in seconds for each scenario.
+        step:
+            Time step interval in seconds.
+
         Returns
         -------
         DynamicSimulationReport
             Aggregate report sorted by peak severity descending.
         """
-        scenarios = self._generate_default_dynamic_scenarios()
+        scenarios = self._generate_default_dynamic_scenarios(
+            duration=duration, step=step,
+        )
         results: list[DynamicScenarioResult] = []
 
         for scenario in scenarios:
@@ -904,12 +917,16 @@ class DynamicSimulationEngine:
     # Default scenario generation
     # ------------------------------------------------------------------
 
-    def _generate_default_dynamic_scenarios(self) -> list[DynamicScenario]:
+    def _generate_default_dynamic_scenarios(
+        self,
+        duration: int = 300,
+        step: int = 5,
+    ) -> list[DynamicScenario]:
         """Build the default suite of dynamic scenarios.
 
         This includes:
         - Conversion of every static default scenario into a dynamic form
-          (5 s step, 300 s duration, no traffic pattern).
+          with configurable duration and step.
         - Purpose-built traffic-pattern scenarios (DDoS volumetric, flash
           crowd, viral event) both standalone and combined with component
           faults.
@@ -928,15 +945,15 @@ class DynamicSimulationEngine:
                 description=static.description,
                 faults=static.faults,
                 traffic_pattern=None,
-                duration_seconds=300,
-                time_step_seconds=5,
+                duration_seconds=duration,
+                time_step_seconds=step,
             )
             # Carry over static traffic_multiplier as a constant pattern
             if static.traffic_multiplier > 1.0:
                 ds.traffic_pattern = TrafficPattern(
                     pattern_type=TrafficPatternType.CONSTANT,
                     peak_multiplier=static.traffic_multiplier,
-                    duration_seconds=300,
+                    duration_seconds=duration,
                     description=f"Constant {static.traffic_multiplier}x traffic",
                 )
             scenarios.append(ds)
@@ -946,17 +963,17 @@ class DynamicSimulationEngine:
             (
                 "ddos-volumetric-10x",
                 "Volumetric DDoS (10x peak)",
-                create_ddos_volumetric(peak=10.0, duration=300),
+                create_ddos_volumetric(peak=10.0, duration=duration),
             ),
             (
                 "flash-crowd-8x",
                 "Flash crowd (8x peak, 30s ramp)",
-                create_flash_crowd(peak=8.0, ramp=30, duration=300),
+                create_flash_crowd(peak=8.0, ramp=30, duration=duration),
             ),
             (
                 "viral-event-15x",
                 "Viral event (15x peak, 60s ramp)",
-                create_viral_event(peak=15.0, duration=300),
+                create_viral_event(peak=15.0, duration=duration),
             ),
         ]
         for pat_id, pat_name, pattern in traffic_patterns:
@@ -967,7 +984,7 @@ class DynamicSimulationEngine:
                 faults=[],
                 traffic_pattern=pattern,
                 duration_seconds=pattern.duration_seconds,
-                time_step_seconds=5,
+                time_step_seconds=step,
             ))
 
         # --- Combined: traffic pattern + single component fault ---
@@ -987,9 +1004,9 @@ class DynamicSimulationEngine:
                     target_component_id=comp_id,
                     fault_type=FaultType.COMPONENT_DOWN,
                 )],
-                traffic_pattern=create_ddos_volumetric(peak=10.0, duration=300),
-                duration_seconds=300,
-                time_step_seconds=5,
+                traffic_pattern=create_ddos_volumetric(peak=10.0, duration=duration),
+                duration_seconds=duration,
+                time_step_seconds=step,
             ))
 
         return scenarios
