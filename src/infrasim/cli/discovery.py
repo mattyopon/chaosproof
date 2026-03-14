@@ -26,9 +26,35 @@ def scan(
     prometheus_url: str | None = typer.Option(
         None, "--prometheus-url", help="Prometheus server URL (e.g. http://localhost:9090)"
     ),
+    aws: bool = typer.Option(False, "--aws", help="Scan AWS infrastructure via boto3"),
+    region: str = typer.Option("ap-northeast-1", "--region", help="AWS region (used with --aws)"),
+    profile: str | None = typer.Option(None, "--profile", help="AWS profile name (used with --aws)"),
+    save_yaml: Path | None = typer.Option(
+        None, "--save-yaml", help="Export discovered model as YAML to this path"
+    ),
 ) -> None:
     """Scan local system and build infrastructure model."""
-    if prometheus_url:
+    if aws:
+        from infrasim.discovery.aws_scanner import AWSScanner
+
+        console.print(f"[cyan]Scanning AWS infrastructure in {region}...[/]")
+        try:
+            scanner = AWSScanner(region=region, profile=profile)
+            result = scanner.scan()
+        except RuntimeError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+
+        graph = result.graph
+        console.print(
+            f"[green]Discovered {result.components_found} components, "
+            f"{result.dependencies_inferred} dependencies "
+            f"in {result.scan_duration_seconds:.1f}s[/]"
+        )
+        if result.warnings:
+            for w in result.warnings:
+                console.print(f"[yellow]Warning: {w}[/]")
+    elif prometheus_url:
         from infrasim.discovery.prometheus import PrometheusClient
 
         console.print(f"[cyan]Discovering infrastructure from Prometheus at {prometheus_url}...[/]")
@@ -42,6 +68,12 @@ def scan(
 
     graph.save(output)
     console.print(f"\n[green]Model saved to {output}[/]")
+
+    if save_yaml:
+        from infrasim.discovery.aws_scanner import export_yaml
+
+        export_yaml(graph, save_yaml)
+        console.print(f"[green]YAML exported to {save_yaml}[/]")
 
 
 @app.command()

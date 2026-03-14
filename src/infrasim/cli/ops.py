@@ -1047,3 +1047,82 @@ def security(
         console.print("\n[bold]Top Recommendations:[/]")
         for i, rec in enumerate(all_recs[:10], 1):
             console.print(f"  {i}. {rec}")
+
+
+@app.command()
+def fix(
+    yaml_pos: Path | None = typer.Argument(None, help="YAML file path (positional)"),
+    model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path (JSON or YAML)"),
+    yaml_file: Path | None = typer.Option(None, "--yaml", "-y", help="YAML file with infrastructure definition"),
+    output: Path = typer.Option(Path("./remediation"), "--output", "-o", help="Output directory for IaC files"),
+    target_score: float = typer.Option(90.0, "--target-score", "-t", help="Target resilience score (0-100)"),
+    json_output: bool = typer.Option(False, "--json", help="Output plan as JSON instead of writing files"),
+) -> None:
+    """Generate IaC remediation code (Terraform/Kubernetes) to fix infrastructure issues."""
+    import json as json_lib
+
+    from rich.panel import Panel
+    from rich.table import Table
+
+    from infrasim.remediation.iac_generator import IaCGenerator
+
+    resolved_yaml = yaml_pos or yaml_file
+    graph = _load_graph_for_analysis(model, resolved_yaml)
+
+    generator = IaCGenerator(graph)
+    plan = generator.generate(target_score=target_score)
+
+    if json_output:
+        console.print_json(data=plan.to_dict())
+        return
+
+    if not plan.files:
+        console.print("[green]No issues found. Infrastructure meets the target score.[/]")
+        return
+
+    # Summary panel
+    score_before = plan.expected_score_before
+    score_after = plan.expected_score_after
+    if score_after >= 90:
+        score_color = "green"
+    elif score_after >= 70:
+        score_color = "yellow"
+    else:
+        score_color = "red"
+
+    summary_text = (
+        f"[bold]Resilience Score:[/] {score_before:.1f} -> [{score_color}]{score_after:.1f}[/]\n"
+        f"[bold]Risk Reduction:[/] {plan.risk_reduction_percent:.1f}%\n"
+        f"[bold]Monthly Cost:[/] ${plan.total_monthly_cost:,.2f}\n"
+        f"[bold]ROI:[/] {plan.roi_percent:.1f} score-points per $100/mo\n"
+        f"[bold]Phases:[/] {plan.total_phases}  [bold]Files:[/] {len(plan.files)}"
+    )
+    console.print()
+    console.print(Panel(summary_text, title="[bold]ChaosProof Remediation Plan[/]", border_style=score_color))
+
+    # Files table
+    table = Table(title="Remediation Files", show_header=True)
+    table.add_column("Phase", justify="center", width=6)
+    table.add_column("File", style="cyan", width=45)
+    table.add_column("Category", width=12)
+    table.add_column("Impact", justify="right", width=8)
+    table.add_column("Cost/mo", justify="right", width=10)
+    table.add_column("Description", width=40)
+
+    for f in plan.files:
+        table.add_row(
+            str(f.phase),
+            f.path,
+            f.category,
+            f"+{f.impact_score_delta:.1f}",
+            f"${f.monthly_cost:,.2f}",
+            f.description[:40],
+        )
+
+    console.print()
+    console.print(table)
+
+    # Write files
+    generator.write_to_directory(plan, output)
+    console.print(f"\n[green]Remediation files written to: {output}[/]")
+    console.print(f"[dim]See {output / 'README.md'} for application instructions.[/]")
