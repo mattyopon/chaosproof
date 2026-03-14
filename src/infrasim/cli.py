@@ -52,9 +52,8 @@ def scan(
 def simulate(
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
     html: Path | None = typer.Option(None, "--html", help="Export HTML report to this path"),
-    csv_path: Path | None = typer.Option(None, "--csv", help="Export results as CSV to this path"),
-    json_path: Path | None = typer.Option(None, "--json", help="Export results as JSON to this path"),
     dynamic: bool = typer.Option(False, "--dynamic", "-d", help="Run dynamic time-stepped simulation"),
+    analyze_flag: bool = typer.Option(False, "--analyze", "-a", help="Run AI analysis after simulation"),
 ) -> None:
     """Run chaos simulation against infrastructure model."""
     if not model.exists():
@@ -82,23 +81,19 @@ def simulate(
 
     print_simulation_report(report, console)
 
+    if analyze_flag:
+        from infrasim.ai.analyzer import InfraSimAnalyzer
+
+        console.print("\n[cyan]Running AI analysis...[/]")
+        ai_analyzer = InfraSimAnalyzer()
+        ai_report = ai_analyzer.analyze(graph, report)
+        _print_ai_analysis(ai_report, console)
+
     if html:
         from infrasim.reporter.html_report import save_html_report
 
         save_html_report(report, graph, html)
         console.print(f"\n[green]HTML report saved to {html}[/]")
-
-    if csv_path:
-        from infrasim.reporter.export import export_csv
-
-        out = export_csv(report, csv_path)
-        console.print(f"\n[green]CSV report saved to {out}[/]")
-
-    if json_path:
-        from infrasim.reporter.export import export_json
-
-        out = export_json(report, json_path)
-        console.print(f"\n[green]JSON report saved to {out}[/]")
 
 
 def _print_dynamic_results(results: list, con: Console) -> None:
@@ -146,6 +141,146 @@ def _print_dynamic_results(results: list, con: Console) -> None:
         con.print(f"    Autoscaling events: {len(autoscale)}")
         con.print(f"    Failover events: {len(failover)}")
         con.print()
+
+
+def _print_ai_analysis(ai_report: "AIAnalysisReport", con: Console) -> None:  # noqa: F821
+    """Print AI analysis results with Rich formatting."""
+    from rich.panel import Panel
+    from rich.table import Table
+
+    # Summary panel
+    con.print()
+    con.print(Panel(
+        f"[bold]{ai_report.summary}[/]",
+        title="[bold]AI Analysis Summary[/]",
+        border_style="cyan",
+    ))
+
+    # Top risks
+    if ai_report.top_risks:
+        con.print("\n[bold cyan]Top Risks:[/]")
+        for i, risk in enumerate(ai_report.top_risks, 1):
+            con.print(f"  {i}. {risk}")
+
+    # Availability assessment
+    con.print(f"\n[bold]Availability:[/] {ai_report.availability_assessment}")
+    con.print(
+        f"  Estimated: [bold]{ai_report.estimated_current_nines:.1f}[/] nines "
+        f"| Potential: [bold]{ai_report.theoretical_max_nines:.1f}[/] nines"
+    )
+
+    # Recommendations table
+    if ai_report.recommendations:
+        rec_table = Table(title="Recommendations", show_header=True)
+        rec_table.add_column("Sev", width=9, justify="center")
+        rec_table.add_column("Category", width=10)
+        rec_table.add_column("Title", style="cyan", width=30)
+        rec_table.add_column("Remediation", width=40)
+        rec_table.add_column("Impact", width=20)
+        rec_table.add_column("Effort", width=8, justify="center")
+
+        sev_colors = {
+            "critical": "bold red",
+            "high": "red",
+            "medium": "yellow",
+            "low": "green",
+        }
+        for rec in ai_report.recommendations:
+            color = sev_colors.get(rec.severity, "white")
+            rec_table.add_row(
+                f"[{color}]{rec.severity.upper()}[/]",
+                rec.category,
+                rec.title,
+                rec.remediation[:80] + ("..." if len(rec.remediation) > 80 else ""),
+                rec.estimated_impact,
+                rec.effort,
+            )
+
+        con.print()
+        con.print(rec_table)
+
+    # Upgrade path
+    if ai_report.upgrade_path:
+        con.print()
+        con.print(Panel(
+            ai_report.upgrade_path,
+            title="[bold]Upgrade Path[/]",
+            border_style="green",
+        ))
+
+
+@app.command()
+def analyze(
+    yaml_file: Path = typer.Argument(..., help="Infrastructure YAML file"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """AI-powered analysis with recommendations (AI analysis + recommendations)."""
+    import json as json_mod
+
+    from infrasim.ai.analyzer import InfraSimAnalyzer
+    from infrasim.model.loader import load_yaml
+
+    if not yaml_file.exists():
+        console.print(f"[red]File not found: {yaml_file}[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Loading infrastructure from {yaml_file}...[/]")
+    try:
+        graph = load_yaml(yaml_file)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
+    engine = SimulationEngine(graph)
+    sim_report = engine.run_all_defaults()
+
+    console.print("[cyan]Running AI analysis...[/]")
+    ai_analyzer = InfraSimAnalyzer()
+    ai_report = ai_analyzer.analyze(graph, sim_report)
+
+    if json_output:
+        import dataclasses
+
+        report_dict = dataclasses.asdict(ai_report)
+        console.print_json(json_mod.dumps(report_dict, indent=2, default=str))
+    else:
+        print_simulation_report(sim_report, console)
+        _print_ai_analysis(ai_report, console)
+
+
+@app.command()
+def dora_report(
+    yaml_file: Path = typer.Argument(..., help="Infrastructure YAML file"),
+    output: Path = typer.Option(Path("dora-report.html"), "--output", "-o", help="Output HTML file path"),
+) -> None:
+    """Generate DORA compliance report (DORA compliance report generation)."""
+    from infrasim.ai.analyzer import InfraSimAnalyzer
+    from infrasim.model.loader import load_yaml
+    from infrasim.reporter.compliance import generate_dora_report
+
+    if not yaml_file.exists():
+        console.print(f"[red]File not found: {yaml_file}[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Loading infrastructure from {yaml_file}...[/]")
+    try:
+        graph = load_yaml(yaml_file)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
+    engine = SimulationEngine(graph)
+    sim_report = engine.run_all_defaults()
+
+    console.print("[cyan]Running AI analysis...[/]")
+    ai_analyzer = InfraSimAnalyzer()
+    ai_report = ai_analyzer.analyze(graph, sim_report)
+
+    console.print("[cyan]Generating DORA compliance report...[/]")
+    result_path = generate_dora_report(graph, sim_report, ai_report, output)
+    console.print(f"\n[green]DORA compliance report saved to {result_path}[/]")
 
 
 @app.command()
@@ -1231,43 +1366,3 @@ def capacity(
 
     # ---- Summary ----
     console.print(f"\n{report.summary}")
-
-
-# ---------------------------------------------------------------------------
-# API key management
-# ---------------------------------------------------------------------------
-
-
-@app.command()
-def create_api_key(
-    email: str = typer.Option(..., "--email", "-e", help="User email address"),
-    name: str = typer.Option(..., "--name", "-n", help="User display name"),
-) -> None:
-    """Generate a new API key for InfraSim web API authentication."""
-    from infrasim.api.auth import generate_api_key, hash_api_key
-    from infrasim.api.database import UserRow, init_db, get_session_factory, reset_engine
-
-    async def _create() -> str:
-        await init_db()
-        api_key = generate_api_key()
-        key_hash = hash_api_key(api_key)
-
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            user = UserRow(email=email, name=name, api_key_hash=key_hash)
-            session.add(user)
-            await session.commit()
-
-        reset_engine()
-        return api_key
-
-    try:
-        api_key = asyncio.run(_create())
-    except Exception as exc:
-        console.print(f"[red]Failed to create API key: {exc}[/]")
-        raise typer.Exit(1)
-
-    console.print(f"\n[green]API key created for {name} ({email})[/]")
-    console.print(f"\n[bold]API Key:[/] {api_key}")
-    console.print("\n[dim]Store this key securely. It cannot be recovered.[/]")
-    console.print("[dim]Use it as: Authorization: Bearer <api_key>[/]")
