@@ -11,7 +11,7 @@ from infrasim.simulator.scenarios import Scenario, generate_default_scenarios
 
 logger = logging.getLogger(__name__)
 
-MAX_SCENARIOS = 1000
+MAX_SCENARIOS = 2000
 
 
 @dataclass

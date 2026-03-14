@@ -303,6 +303,30 @@ class CapacityPlanningEngine:
             )
             urgency = self._scaling_urgency(months_to_cap)
 
+            # HA components (failover-enabled, load balancers, DNS) need at
+            # least 2 replicas for redundancy regardless of utilization.
+            # Cluster components (cache, queue) with 3+ replicas need at
+            # least 3 for quorum/consensus (e.g. Redis Cluster, Kafka).
+            ha_min = 1
+            is_ha = (
+                comp.failover.enabled
+                or comp.type.value in ("load_balancer", "dns")
+            )
+            if is_ha:
+                ha_min = 2
+            if comp.type.value in ("cache", "queue") and comp.replicas >= 3:
+                ha_min = max(ha_min, 3)
+
+            rec_3m = max(ha_min, self._replicas_needed(
+                comp.replicas, current_util, monthly_growth_rate, 3,
+            ))
+            rec_6m = max(ha_min, self._replicas_needed(
+                comp.replicas, current_util, monthly_growth_rate, 6,
+            ))
+            rec_12m = max(ha_min, self._replicas_needed(
+                comp.replicas, current_util, monthly_growth_rate, 12,
+            ))
+
             forecasts.append(
                 CapacityForecast(
                     component_id=comp_id,
@@ -311,15 +335,9 @@ class CapacityPlanningEngine:
                     current_utilization=round(current_util, 2),
                     monthly_growth_rate=monthly_growth_rate,
                     months_to_capacity=round(months_to_cap, 2),
-                    recommended_replicas_3m=self._replicas_needed(
-                        comp.replicas, current_util, monthly_growth_rate, 3,
-                    ),
-                    recommended_replicas_6m=self._replicas_needed(
-                        comp.replicas, current_util, monthly_growth_rate, 6,
-                    ),
-                    recommended_replicas_12m=self._replicas_needed(
-                        comp.replicas, current_util, monthly_growth_rate, 12,
-                    ),
+                    recommended_replicas_3m=rec_3m,
+                    recommended_replicas_6m=rec_6m,
+                    recommended_replicas_12m=rec_12m,
                     scaling_urgency=urgency,
                 )
             )
