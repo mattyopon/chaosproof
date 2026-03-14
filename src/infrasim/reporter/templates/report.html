@@ -317,6 +317,27 @@
     border-top: 1px solid var(--border);
   }
 
+  /* Score explanation */
+  .score-explanation {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin-top: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .score-explanation-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   /* Section: no findings */
   .no-findings {
     color: var(--text-muted);
@@ -368,6 +389,16 @@
       </div>
     </div>
   </div>
+
+  <!-- Score Explanation -->
+  {% if score_explanation %}
+  <div class="score-explanation">
+    <div class="score-explanation-title">Score Explanation</div>
+    {% for line in score_explanation %}
+    <p>{{ line }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Critical Findings -->
   <h2>Critical Findings</h2>

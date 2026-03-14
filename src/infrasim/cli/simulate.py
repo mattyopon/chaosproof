@@ -29,6 +29,7 @@ def simulate(
     plugins_dir: Path | None = typer.Option(None, "--plugins-dir", help="Directory of plugin .py files to load"),
     slack_webhook: str | None = typer.Option(None, "--slack-webhook", help="Slack webhook URL for notifications"),
     pagerduty_key: str | None = typer.Option(None, "--pagerduty-key", help="PagerDuty routing key for critical alerts"),
+    max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max scenarios to test (0 = engine default)"),
 ) -> None:
     """Run chaos simulation against infrastructure model."""
     if not model.exists():
@@ -59,7 +60,21 @@ def simulate(
 
     console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
     engine = SimulationEngine(graph)
-    report = engine.run_all_defaults()
+    report = engine.run_all_defaults(max_scenarios=max_scenarios)
+
+    # Scenario stats
+    if report.was_truncated:
+        console.print(
+            f"\n[yellow]\u26a0 {report.total_generated:,} scenarios generated, "
+            f"truncated to {len(report.results):,}. "
+            f"Use --max-scenarios to adjust.[/]"
+        )
+    console.print(
+        f"[dim]Scenarios: {report.total_generated:,} generated, "
+        f"{len(report.results):,} tested"
+        + (f" ({report.total_generated - len(report.results):,} skipped)" if report.was_truncated else "")
+        + "[/]"
+    )
 
     print_simulation_report(report, console)
 

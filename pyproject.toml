@@ -68,3 +68,7 @@ line-length = 100
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+concurrency = ["thread", "greenlet"]
+source = ["src/infrasim"]

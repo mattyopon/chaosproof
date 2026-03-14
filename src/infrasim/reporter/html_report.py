@@ -262,6 +262,22 @@ def generate_html_report(report: SimulationReport, graph: InfraGraph) -> str:
             "connections": comp.metrics.network_connections,
         })
 
+    # Build score explanation text
+    score_explanation_lines = [
+        "The resilience score measures structural health: single points of failure "
+        "(SPOFs), resource utilization headroom, and dependency chain depth.",
+    ]
+    if score < 70 and not report.critical_findings and not report.warnings:
+        score_explanation_lines.append(
+            "All scenarios passed, indicating good runtime resilience despite "
+            "architectural gaps reflected in the score."
+        )
+    elif report.critical_findings:
+        score_explanation_lines.append(
+            f"{len(report.critical_findings)} critical scenario(s) detected "
+            "cascade failures that could cause widespread outages."
+        )
+
     context = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "resilience_score": f"{score:.0f}",
@@ -274,6 +290,7 @@ def generate_html_report(report: SimulationReport, graph: InfraGraph) -> str:
         "warning_findings": [_build_finding(r) for r in report.warnings],
         "components": comp_rows,
         "dependency_svg": _build_dependency_svg(graph),
+        "score_explanation": score_explanation_lines,
     }
 
     return template.render(**context)

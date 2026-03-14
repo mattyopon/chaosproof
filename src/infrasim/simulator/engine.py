@@ -37,6 +37,8 @@ class SimulationReport:
 
     results: list[ScenarioResult] = field(default_factory=list)
     resilience_score: float = 0.0
+    total_generated: int = 0
+    was_truncated: bool = False
 
     @property
     def critical_findings(self) -> list[ScenarioResult]:
@@ -103,6 +105,7 @@ class SimulationEngine:
 
     def run_all_defaults(
         self, include_feed: bool = True, include_plugins: bool = True,
+        max_scenarios: int = 0,
     ) -> SimulationReport:
         """Run all default scenarios plus feed-generated and plugin scenarios."""
         component_ids = list(self.graph.components.keys())
@@ -148,17 +151,32 @@ class SimulationEngine:
             except ImportError:
                 pass
 
-        return self.run_scenarios(scenarios)
+        return self.run_scenarios(scenarios, max_scenarios=max_scenarios)
 
-    def run_scenarios(self, scenarios: list[Scenario]) -> SimulationReport:
-        """Run a list of scenarios and generate a report."""
-        if len(scenarios) > MAX_SCENARIOS:
+    def run_scenarios(
+        self, scenarios: list[Scenario], max_scenarios: int = 0,
+    ) -> SimulationReport:
+        """Run a list of scenarios and generate a report.
+
+        Parameters
+        ----------
+        scenarios:
+            The scenarios to execute.
+        max_scenarios:
+            Override the truncation limit.  ``0`` means use the module-level
+            ``MAX_SCENARIOS`` default.
+        """
+        limit = max_scenarios if max_scenarios > 0 else MAX_SCENARIOS
+        total_generated = len(scenarios)
+        was_truncated = total_generated > limit
+
+        if was_truncated:
             logger.warning(
                 "Scenario count %d exceeds limit, truncating to %d",
-                len(scenarios),
-                MAX_SCENARIOS,
+                total_generated,
+                limit,
             )
-            scenarios = scenarios[:MAX_SCENARIOS]
+            scenarios = scenarios[:limit]
 
         results = []
         for scenario in scenarios:
@@ -171,4 +189,6 @@ class SimulationEngine:
         return SimulationReport(
             results=results,
             resilience_score=self.graph.resilience_score(),
+            total_generated=total_generated,
+            was_truncated=was_truncated,
         )

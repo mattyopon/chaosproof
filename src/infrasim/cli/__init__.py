@@ -15,6 +15,7 @@ from infrasim.cli.main import (  # noqa: F401 — re-export
 import infrasim.cli.admin  # noqa: F401
 import infrasim.cli.analyze  # noqa: F401
 import infrasim.cli.discovery  # noqa: F401
+import infrasim.cli.evaluate  # noqa: F401
 import infrasim.cli.feeds  # noqa: F401
 import infrasim.cli.ops  # noqa: F401
 import infrasim.cli.simulate  # noqa: F401

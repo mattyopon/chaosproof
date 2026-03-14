@@ -335,6 +335,34 @@ def capacity(
         console.print()
         console.print(fc_table)
 
+    # ---- Right-Size Opportunities ----
+    over_provisioned = [
+        fc for fc in forecasts
+        if fc.recommended_replicas_3m < fc.current_replicas
+    ] if forecasts else []
+    if over_provisioned:
+        rs_table = Table(title="Right-Size Opportunities", show_header=True)
+        rs_table.add_column("Component", style="cyan", width=20)
+        rs_table.add_column("Type", width=12)
+        rs_table.add_column("Util", justify="right", width=6)
+        rs_table.add_column("Current", justify="right", width=8)
+        rs_table.add_column("Recommended", justify="right", width=12)
+        rs_table.add_column("Savings", justify="right", width=8)
+
+        for fc in over_provisioned:
+            diff = fc.current_replicas - fc.recommended_replicas_3m
+            rs_table.add_row(
+                fc.component_id,
+                fc.component_type,
+                f"{fc.current_utilization:.0f}%",
+                str(fc.current_replicas),
+                str(fc.recommended_replicas_3m),
+                f"[green]-{diff}[/]",
+            )
+
+        console.print()
+        console.print(rs_table)
+
     # ---- Error Budget Forecast ----
     eb = report.error_budget
     status_color = {"healthy": "green", "warning": "yellow", "critical": "red", "exhausted": "red"}.get(eb.status, "white")

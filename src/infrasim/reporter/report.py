@@ -110,6 +110,16 @@ def print_simulation_report(report: SimulationReport, console: Console | None = 
         console.print()
         console.print(f"[green]{len(report.passed)} scenarios passed with low risk[/]")
 
+    # Score context: explain structural score vs scenario results
+    if score < 70 and not report.critical_findings and not report.warnings:
+        console.print()
+        console.print(
+            "[dim]  \u2139 Score reflects structural vulnerabilities "
+            "(SPOFs, chain depth).\n"
+            "    All scenarios passed = good runtime resilience "
+            "despite architectural gaps.[/]"
+        )
+
 
 def _print_scenario_result(result: ScenarioResult, console: Console) -> None:
     """Print a single scenario result with cascade tree."""
