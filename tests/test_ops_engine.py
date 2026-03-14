@@ -71,9 +71,10 @@ def test_run_ops_scenario_baseline():
     result = engine.run_ops_scenario(scenario)
     assert isinstance(result, OpsSimulationResult)
     assert len(result.sli_timeline) > 0
-    # Baseline with no failures should have 100% availability
+    # Baseline with no failures should have near-100% availability
+    # (network packet loss and runtime jitter cause tiny micro-penalties)
     avg_avail = sum(p.availability_percent for p in result.sli_timeline) / len(result.sli_timeline)
-    assert avg_avail == 100.0
+    assert avg_avail >= 99.99
 
 
 def test_run_ops_scenario_with_failures():

@@ -463,7 +463,29 @@ class SLOTracker:
                 time_fraction = min(1.0, fo_time / step_window)
                 micro_penalty += instance_share * time_fraction / total * 100.0
 
-        availability = max(0.0, macro_avail - micro_penalty)
+        # Network + runtime jitter: baseline request failure probability.
+        # Even healthy components drop a tiny fraction of requests due to
+        # packet loss, DNS timeouts, GC pauses, kernel scheduling delays.
+        network_penalty = 0.0
+        for comp_id in effective_health:
+            comp = self.graph.get_component(comp_id)
+            if comp is None:
+                continue
+            # Packet loss contributes to request failures
+            pkt_loss = comp.network.packet_loss_rate
+            # GC pauses: fraction of time spent in GC
+            gc_fraction = 0.0
+            if comp.runtime_jitter.gc_pause_frequency > 0:
+                gc_fraction = (
+                    comp.runtime_jitter.gc_pause_ms / 1000.0
+                    * comp.runtime_jitter.gc_pause_frequency
+                )
+            # Combined per-component failure probability
+            comp_fail_prob = pkt_loss + gc_fraction
+            # Weight by component's share of total
+            network_penalty += comp_fail_prob / total * 100.0
+
+        availability = max(0.0, macro_avail - micro_penalty - network_penalty)
 
         # Max utilization across all components
         max_util = max(

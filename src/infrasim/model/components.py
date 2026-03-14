@@ -33,6 +33,24 @@ class ResourceMetrics(BaseModel):
     open_files: int = 0
 
 
+class NetworkProfile(BaseModel):
+    """Network characteristics for request-level availability modeling."""
+
+    rtt_ms: float = 1.0  # Round-trip time in milliseconds
+    packet_loss_rate: float = 0.0001  # Baseline packet loss (0.01%)
+    jitter_ms: float = 0.5  # Network jitter (stddev)
+    dns_resolution_ms: float = 5.0  # DNS lookup time
+    tls_handshake_ms: float = 10.0  # TLS setup time
+
+
+class RuntimeJitter(BaseModel):
+    """Application-level jitter sources."""
+
+    gc_pause_ms: float = 0.0  # Average GC pause (0 = no GC, e.g. Go/Rust)
+    gc_pause_frequency: float = 0.0  # GC pauses per second
+    scheduling_jitter_ms: float = 0.1  # OS kernel scheduling jitter
+
+
 class Capacity(BaseModel):
     """Capacity limits and thresholds for a component."""
 
@@ -158,6 +176,8 @@ class Component(BaseModel):
     singleflight: SingleflightConfig = Field(default_factory=SingleflightConfig)
     slo_targets: list[SLOTarget] = Field(default_factory=list)
     operational_profile: OperationalProfile = Field(default_factory=OperationalProfile)
+    network: NetworkProfile = Field(default_factory=NetworkProfile)
+    runtime_jitter: RuntimeJitter = Field(default_factory=RuntimeJitter)
     parameters: dict[str, float | int | str] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
 
