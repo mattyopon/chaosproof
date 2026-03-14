@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
+from rich.panel import Panel
 
 from infrasim.cli.main import (
     DEFAULT_MODEL_PATH,
@@ -77,6 +79,72 @@ def _static_report_to_json(report: object) -> dict:
     }
 
 
+def _baseline_summary_from_report(report: object) -> dict:
+    """Extract a baseline summary dict from a SimulationReport for saving/comparison."""
+    return {
+        "resilience_score": round(getattr(report, "resilience_score", 0.0), 1),
+        "critical": len(getattr(report, "critical_findings", [])),
+        "warning": len(getattr(report, "warnings", [])),
+        "passed": len(getattr(report, "passed", [])),
+        "total_scenarios": len(getattr(report, "results", [])),
+    }
+
+
+def _compare_baseline(current: dict, baseline: dict, con) -> bool:
+    """Compare current results against baseline and print summary.
+
+    Returns True if regression detected (resilience score dropped).
+    """
+    cur_score = current["resilience_score"]
+    base_score = baseline["resilience_score"]
+    score_delta = cur_score - base_score
+
+    cur_crit = current["critical"]
+    base_crit = baseline["critical"]
+    crit_delta = cur_crit - base_crit
+
+    cur_warn = current["warning"]
+    base_warn = baseline["warning"]
+    warn_delta = cur_warn - base_warn
+
+    # Format delta strings
+    def _delta_str(delta: float | int, invert: bool = False) -> str:
+        """Format a delta value with color. If invert, positive is bad."""
+        if delta == 0:
+            return "[dim]no change[/]"
+        sign = "+" if delta > 0 else ""
+        if invert:
+            color = "red" if delta > 0 else "green"
+        else:
+            color = "green" if delta > 0 else "red"
+        return f"[{color}]{sign}{delta}[/]"
+
+    score_str = _delta_str(round(score_delta, 1), invert=False)
+    crit_str = _delta_str(crit_delta, invert=True)
+    warn_str = _delta_str(warn_delta, invert=True)
+
+    regressed = score_delta < 0
+
+    border = "red" if regressed else "green"
+    status = "[bold red]REGRESSION DETECTED[/]" if regressed else "[bold green]No regression[/]"
+
+    summary = (
+        f"[bold]Resilience Score:[/] {base_score:.1f} -> {cur_score:.1f} ({score_str})\n"
+        f"[bold]Critical findings:[/] {base_crit} -> {cur_crit} ({crit_str})\n"
+        f"[bold]Warnings:[/] {base_warn} -> {cur_warn} ({warn_str})\n\n"
+        f"{status}"
+    )
+
+    con.print()
+    con.print(Panel(
+        summary,
+        title="[bold]Baseline Comparison[/]",
+        border_style=border,
+    ))
+
+    return regressed
+
+
 @app.command()
 def simulate(
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
@@ -90,6 +158,8 @@ def simulate(
     pagerduty_key: str | None = typer.Option(None, "--pagerduty-key", help="PagerDuty routing key for critical alerts"),
     max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max scenarios to test (0 = engine default)"),
     json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
+    baseline: Path | None = typer.Option(None, "--baseline", help="Compare against a previous baseline JSON file"),
+    save_baseline: Path | None = typer.Option(None, "--save-baseline", help="Save current results as a baseline JSON file"),
 ) -> None:
     """Run chaos simulation against infrastructure model."""
     if not model.exists():
@@ -205,6 +275,31 @@ def simulate(
             asyncio.run(_send_notifications())
         except Exception as exc:
             console.print(f"[yellow]Webhook notification error: {exc}[/]")
+
+    # Save baseline
+    if save_baseline is not None:
+        current_summary = _baseline_summary_from_report(report)
+        save_baseline.parent.mkdir(parents=True, exist_ok=True)
+        with open(save_baseline, "w", encoding="utf-8") as fh:
+            json.dump(current_summary, fh, indent=2, ensure_ascii=False)
+        console.print(f"\n[green]Baseline saved to {save_baseline}[/]")
+
+    # Compare against baseline
+    if baseline is not None:
+        if not baseline.exists():
+            console.print(f"\n[yellow]Baseline file not found: {baseline} (skipping comparison)[/]")
+        else:
+            try:
+                with open(baseline, encoding="utf-8") as fh:
+                    baseline_data = json.load(fh)
+            except (json.JSONDecodeError, OSError) as exc:
+                console.print(f"\n[red]Failed to load baseline: {exc}[/]")
+                raise typer.Exit(1)
+
+            current_summary = _baseline_summary_from_report(report)
+            regressed = _compare_baseline(current_summary, baseline_data, console)
+            if regressed:
+                raise typer.Exit(1)
 
 
 @app.command()
