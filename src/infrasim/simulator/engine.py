@@ -101,8 +101,10 @@ class SimulationEngine:
             risk_score=risk_score,
         )
 
-    def run_all_defaults(self, include_feed: bool = True) -> SimulationReport:
-        """Run all default scenarios plus feed-generated scenarios."""
+    def run_all_defaults(
+        self, include_feed: bool = True, include_plugins: bool = True,
+    ) -> SimulationReport:
+        """Run all default scenarios plus feed-generated and plugin scenarios."""
         component_ids = list(self.graph.components.keys())
         scenarios = generate_default_scenarios(
             component_ids, components=self.graph.components
@@ -124,6 +126,27 @@ class SimulationEngine:
                         s.faults = valid_faults
                         valid.append(s)
                 scenarios.extend(valid)
+
+        # Plugin-generated scenarios
+        if include_plugins:
+            try:
+                from infrasim.plugins.registry import PluginRegistry
+
+                for plugin in PluginRegistry.get_scenario_plugins():
+                    try:
+                        extra = plugin.generate_scenarios(
+                            self.graph, component_ids, self.graph.components,
+                        )
+                        if extra:
+                            scenarios.extend(extra)
+                    except Exception:
+                        logger.warning(
+                            "Plugin %s failed to generate scenarios",
+                            getattr(plugin, "name", "unknown"),
+                            exc_info=True,
+                        )
+            except ImportError:
+                pass
 
         return self.run_scenarios(scenarios)
 

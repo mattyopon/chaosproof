@@ -24,12 +24,22 @@ def simulate(
     html: Path | None = typer.Option(None, "--html", help="Export HTML report to this path"),
     dynamic: bool = typer.Option(False, "--dynamic", "-d", help="Run dynamic time-stepped simulation"),
     analyze_flag: bool = typer.Option(False, "--analyze", "-a", help="Run AI analysis after simulation"),
+    plugins_dir: Path | None = typer.Option(None, "--plugins-dir", help="Directory of plugin .py files to load"),
+    slack_webhook: str | None = typer.Option(None, "--slack-webhook", help="Slack webhook URL for notifications"),
+    pagerduty_key: str | None = typer.Option(None, "--pagerduty-key", help="PagerDuty routing key for critical alerts"),
 ) -> None:
     """Run chaos simulation against infrastructure model."""
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
         console.print("Run [cyan]infrasim scan[/] first to create a model.")
         raise typer.Exit(1)
+
+    # Load plugins if a directory is specified
+    if plugins_dir is not None:
+        from infrasim.plugins.registry import PluginRegistry
+
+        console.print(f"[cyan]Loading plugins from {plugins_dir}...[/]")
+        PluginRegistry.load_plugins_from_dir(plugins_dir)
 
     console.print("[cyan]Loading infrastructure model...[/]")
     graph = InfraGraph.load(model)
@@ -64,6 +74,37 @@ def simulate(
 
         save_html_report(report, graph, html)
         console.print(f"\n[green]HTML report saved to {html}[/]")
+
+    # Webhook notifications
+    if slack_webhook or pagerduty_key:
+        import asyncio
+
+        from infrasim.api.server import _report_to_dict
+
+        report_dict = _report_to_dict(report)
+
+        async def _send_notifications():
+            if slack_webhook:
+                from infrasim.integrations.webhooks import send_slack_notification
+
+                ok = await send_slack_notification(slack_webhook, report_dict)
+                if ok:
+                    console.print("[green]Slack notification sent.[/]")
+                else:
+                    console.print("[yellow]Slack notification failed.[/]")
+            if pagerduty_key:
+                from infrasim.integrations.webhooks import send_pagerduty_event
+
+                ok = await send_pagerduty_event(pagerduty_key, report_dict)
+                if ok:
+                    console.print("[green]PagerDuty event sent.[/]")
+                else:
+                    console.print("[dim]PagerDuty: no critical findings, event skipped.[/]")
+
+        try:
+            asyncio.run(_send_notifications())
+        except Exception as exc:
+            console.print(f"[yellow]Webhook notification error: {exc}[/]")
 
 
 @app.command()

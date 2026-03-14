@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import datetime as _dt
+import json as _json
+from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import DateTime, Float, String, Text, ForeignKey, func
+from sqlalchemy import DateTime, Float, Integer, String, Text, ForeignKey, func
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -106,6 +108,62 @@ class SimulationRunRow(Base):
 
     # relationships
     project: Mapped[ProjectRow | None] = relationship(back_populates="simulation_runs")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[str] = mapped_column(
+        String(50), default=lambda: datetime.now(_dt.timezone.utc).isoformat(),
+    )
+
+
+async def log_audit(
+    session: AsyncSession,
+    user_id: int | None,
+    action: str,
+    resource_type: str,
+    resource_id: str | None = None,
+    details: dict | None = None,
+    ip: str | None = None,
+) -> AuditLog:
+    """Persist an audit log entry.
+
+    Parameters
+    ----------
+    session:
+        An active async SQLAlchemy session.
+    user_id:
+        The id of the acting user, or ``None`` for unauthenticated actions.
+    action:
+        Short verb describing the action, e.g. ``"simulate"``, ``"delete_run"``.
+    resource_type:
+        The kind of resource affected, e.g. ``"simulation_run"``, ``"project"``.
+    resource_id:
+        Optional identifier of the affected resource.
+    details:
+        Optional dict with extra context; serialised as JSON.
+    ip:
+        Client IP address if available.
+    """
+    entry = AuditLog(
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        details_json=_json.dumps(details) if details else None,
+        ip_address=ip,
+    )
+    session.add(entry)
+    await session.flush()
+    return entry
 
 
 # ---------------------------------------------------------------------------

@@ -346,7 +346,7 @@ async def simulation_run_get():
 
 
 @app.post("/api/simulate", response_class=JSONResponse)
-async def api_simulate(user=Depends(_optional_user)):
+async def api_simulate(request: Request, user=Depends(_optional_user)):
     """Run simulation and return JSON results (POST endpoint)."""
     global _last_report
     graph = get_graph()
@@ -361,6 +361,25 @@ async def api_simulate(user=Depends(_optional_user)):
     run_id = await _save_run(report_dict, engine_type="static")
     if run_id is not None:
         report_dict["run_id"] = run_id
+
+    # Audit log
+    try:
+        from infrasim.api.database import get_session_factory, log_audit
+
+        sf = get_session_factory()
+        async with sf() as session:
+            await log_audit(
+                session,
+                user_id=user.id if user else None,
+                action="simulate",
+                resource_type="simulation_run",
+                resource_id=str(run_id) if run_id else None,
+                details={"resilience_score": report_dict.get("resilience_score")},
+                ip=request.client.host if request.client else None,
+            )
+            await session.commit()
+    except Exception:
+        logger.debug("Could not write audit log for simulate.", exc_info=True)
 
     return JSONResponse(report_dict)
 
@@ -425,18 +444,47 @@ async def load_demo(request: Request):
 async def list_runs(
     limit: int = 50,
     offset: int = 0,
+    project_id: int | None = None,
     user=Depends(_optional_user),
 ):
-    """List past simulation runs (newest first)."""
+    """List past simulation runs (newest first).
+
+    Optional query parameters:
+    - ``project_id``: filter by project
+    """
     try:
-        from infrasim.api.database import SimulationRunRow, get_session_factory
+        from infrasim.api.database import (
+            ProjectRow,
+            SimulationRunRow,
+            get_session_factory,
+        )
         from sqlalchemy import select
 
         session_factory = get_session_factory()
         async with session_factory() as session:
+            stmt = select(SimulationRunRow)
+
+            # Filter by project_id if provided
+            if project_id is not None:
+                stmt = stmt.where(SimulationRunRow.project_id == project_id)
+
+            # Multi-tenant: when auth is active, only return runs belonging
+            # to projects owned by the user's team.
+            if user is not None and user.team_id is not None:
+                team_project_ids_stmt = select(ProjectRow.id).where(
+                    ProjectRow.team_id == user.team_id
+                )
+                team_project_ids = (
+                    await session.execute(team_project_ids_stmt)
+                ).scalars().all()
+                # Include runs with no project (legacy) or runs in team projects
+                stmt = stmt.where(
+                    (SimulationRunRow.project_id.is_(None))
+                    | (SimulationRunRow.project_id.in_(team_project_ids))
+                )
+
             stmt = (
-                select(SimulationRunRow)
-                .order_by(SimulationRunRow.created_at.desc())
+                stmt.order_by(SimulationRunRow.created_at.desc())
                 .offset(offset)
                 .limit(limit)
             )
@@ -489,10 +537,10 @@ async def get_run(run_id: int, user=Depends(_optional_user)):
 
 
 @app.delete("/api/runs/{run_id}", response_class=JSONResponse)
-async def delete_run(run_id: int, user=Depends(_optional_user)):
+async def delete_run(run_id: int, request: Request, user=Depends(_optional_user)):
     """Delete a simulation run by ID."""
     try:
-        from infrasim.api.database import SimulationRunRow, get_session_factory
+        from infrasim.api.database import SimulationRunRow, get_session_factory, log_audit
         from sqlalchemy import select
 
         session_factory = get_session_factory()
@@ -505,8 +553,165 @@ async def delete_run(run_id: int, user=Depends(_optional_user)):
                 return JSONResponse({"error": "Run not found"}, status_code=404)
 
             await session.delete(row)
+
+            # Audit log
+            await log_audit(
+                session,
+                user_id=user.id if user else None,
+                action="delete_run",
+                resource_type="simulation_run",
+                resource_id=str(run_id),
+                ip=request.client.host if request.client else None,
+            )
+
             await session.commit()
             return JSONResponse({"deleted": True, "id": run_id})
     except Exception as exc:
         logger.debug("Could not delete run: %s", exc)
         return JSONResponse({"error": "Database not available"}, status_code=503)
+
+
+# ---------------------------------------------------------------------------
+# Projects CRUD (multi-tenant)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/projects", response_class=JSONResponse)
+async def create_project(request: Request, user=Depends(_optional_user)):
+    """Create a new project.
+
+    Expects JSON body with ``name`` (required) and ``team_id`` (optional).
+    """
+    try:
+        from infrasim.api.database import ProjectRow, get_session_factory, log_audit
+
+        body = await request.json()
+        name = body.get("name")
+        if not name:
+            return JSONResponse({"error": "name is required"}, status_code=400)
+
+        team_id = body.get("team_id")
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            project = ProjectRow(
+                name=name,
+                owner_id=user.id if user else None,
+                team_id=team_id if team_id else (user.team_id if user else None),
+            )
+            session.add(project)
+            await session.flush()
+
+            # Audit log
+            await log_audit(
+                session,
+                user_id=user.id if user else None,
+                action="create_project",
+                resource_type="project",
+                resource_id=str(project.id),
+                details={"name": name, "team_id": project.team_id},
+                ip=request.client.host if request.client else None,
+            )
+
+            await session.commit()
+            await session.refresh(project)
+
+            return JSONResponse({
+                "id": project.id,
+                "name": project.name,
+                "owner_id": project.owner_id,
+                "team_id": project.team_id,
+                "created_at": project.created_at.isoformat() if project.created_at else None,
+            }, status_code=201)
+    except Exception as exc:
+        logger.debug("Could not create project: %s", exc)
+        return JSONResponse({"error": "Database not available"}, status_code=503)
+
+
+@app.get("/api/projects", response_class=JSONResponse)
+async def list_projects(user=Depends(_optional_user)):
+    """List projects visible to the current user.
+
+    When auth is active and the user belongs to a team, only projects
+    belonging to that team (or owned by the user) are returned.
+    """
+    try:
+        from infrasim.api.database import ProjectRow, get_session_factory
+        from sqlalchemy import select
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            stmt = select(ProjectRow)
+
+            # Multi-tenant filter
+            if user is not None and user.team_id is not None:
+                stmt = stmt.where(
+                    (ProjectRow.team_id == user.team_id)
+                    | (ProjectRow.owner_id == user.id)
+                )
+
+            stmt = stmt.order_by(ProjectRow.created_at.desc())
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+
+            projects = []
+            for row in rows:
+                projects.append({
+                    "id": row.id,
+                    "name": row.name,
+                    "owner_id": row.owner_id,
+                    "team_id": row.team_id,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                })
+            return JSONResponse({"projects": projects, "count": len(projects)})
+    except Exception as exc:
+        logger.debug("Could not list projects: %s", exc)
+        return JSONResponse({"projects": [], "count": 0, "note": "Database not available"})
+
+
+# ---------------------------------------------------------------------------
+# Audit logs (admin only)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/audit-logs", response_class=JSONResponse)
+async def list_audit_logs(
+    limit: int = 100,
+    offset: int = 0,
+    user=Depends(_optional_user),
+):
+    """List audit log entries (admin-only when auth is active).
+
+    In backward-compatible mode (no users), anyone can view logs.
+    When auth is active, only team owners (user_id == 1 by convention) or
+    any authenticated user can access for now.
+    """
+    try:
+        from infrasim.api.database import AuditLog, get_session_factory
+        from sqlalchemy import select
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            stmt = (
+                select(AuditLog)
+                .order_by(AuditLog.id.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+
+            logs = []
+            for row in rows:
+                logs.append({
+                    "id": row.id,
+                    "user_id": row.user_id,
+                    "action": row.action,
+                    "resource_type": row.resource_type,
+                    "resource_id": row.resource_id,
+                    "details": json.loads(row.details_json) if row.details_json else None,
+                    "ip_address": row.ip_address,
+                    "created_at": row.created_at,
+                })
+            return JSONResponse({"audit_logs": logs, "count": len(logs)})
+    except Exception as exc:
+        logger.debug("Could not list audit logs: %s", exc)
+        return JSONResponse({"audit_logs": [], "count": 0, "note": "Database not available"})
