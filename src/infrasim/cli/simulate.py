@@ -18,6 +18,65 @@ from infrasim.cli.main import (
 )
 
 
+def _dynamic_results_to_json(results: list) -> dict:
+    """Convert dynamic simulation results to a JSON-serialisable dict."""
+    total = len(results)
+    critical = sum(1 for r in results if getattr(r, "is_critical", False))
+    warning = sum(1 for r in results if getattr(r, "is_warning", False))
+    passed = total - critical - warning
+
+    scenarios = []
+    for r in results:
+        name = getattr(r, "scenario", None)
+        name = getattr(name, "name", "unknown") if name else "unknown"
+        scenarios.append({
+            "name": name,
+            "peak_severity": getattr(r, "peak_severity", 0.0),
+            "peak_time_seconds": getattr(r, "peak_time_seconds", None),
+            "recovery_time_seconds": getattr(r, "recovery_time_seconds", None),
+            "is_critical": getattr(r, "is_critical", False),
+            "is_warning": getattr(r, "is_warning", False),
+            "autoscaling_events": len(getattr(r, "autoscaling_events", [])),
+            "failover_events": len(getattr(r, "failover_events", [])),
+        })
+
+    return {
+        "total": total,
+        "critical": critical,
+        "warning": warning,
+        "passed": passed,
+        "scenarios": scenarios,
+    }
+
+
+def _static_report_to_json(report: object) -> dict:
+    """Convert a static SimulationReport to a JSON-serialisable dict."""
+    results = getattr(report, "results", [])
+    critical_findings = getattr(report, "critical_findings", [])
+    warnings = getattr(report, "warnings", [])
+    passed = getattr(report, "passed", [])
+
+    scenarios = []
+    for r in results:
+        scenario = getattr(r, "scenario", None)
+        scenarios.append({
+            "name": getattr(scenario, "name", "unknown") if scenario else "unknown",
+            "severity": getattr(r, "severity", "info"),
+            "message": getattr(r, "message", ""),
+        })
+
+    return {
+        "resilience_score": round(getattr(report, "resilience_score", 0.0), 1),
+        "total_scenarios": len(results),
+        "total_generated": getattr(report, "total_generated", len(results)),
+        "was_truncated": getattr(report, "was_truncated", False),
+        "critical": len(critical_findings),
+        "warning": len(warnings),
+        "passed": len(passed),
+        "scenarios": scenarios,
+    }
+
+
 @app.command()
 def simulate(
     model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
@@ -30,6 +89,7 @@ def simulate(
     slack_webhook: str | None = typer.Option(None, "--slack-webhook", help="Slack webhook URL for notifications"),
     pagerduty_key: str | None = typer.Option(None, "--pagerduty-key", help="PagerDuty routing key for critical alerts"),
     max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max scenarios to test (0 = engine default)"),
+    json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
 ) -> None:
     """Run chaos simulation against infrastructure model."""
     if not model.exists():
@@ -44,23 +104,33 @@ def simulate(
         console.print(f"[cyan]Loading plugins from {plugins_dir}...[/]")
         PluginRegistry.load_plugins_from_dir(plugins_dir)
 
-    console.print("[cyan]Loading infrastructure model...[/]")
+    if not json_output:
+        console.print("[cyan]Loading infrastructure model...[/]")
     graph = InfraGraph.load(model)
 
     if dynamic:
         from infrasim.simulator.dynamic_engine import DynamicSimulationEngine
 
-        console.print(f"[cyan]Running dynamic simulation ({len(graph.components)} components)...[/]")
+        if not json_output:
+            console.print(f"[cyan]Running dynamic simulation ({len(graph.components)} components)...[/]")
         dyn_engine = DynamicSimulationEngine(graph)
         report = dyn_engine.run_all_dynamic_defaults()
         # report is a DynamicSimulationReport; extract .results list
         results = getattr(report, "results", report) if not isinstance(report, list) else report
+        if json_output:
+            console.print_json(data=_dynamic_results_to_json(results))
+            return
         _print_dynamic_results(results, console)
         return
 
-    console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
+    if not json_output:
+        console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
     engine = SimulationEngine(graph)
     report = engine.run_all_defaults(max_scenarios=max_scenarios)
+
+    if json_output:
+        console.print_json(data=_static_report_to_json(report))
+        return
 
     # Scenario stats
     if report.was_truncated:
@@ -143,6 +213,7 @@ def dynamic(
     html: Path | None = typer.Option(None, "--html", help="Export HTML report to this path"),
     duration: int = typer.Option(300, "--duration", help="Simulation duration in seconds"),
     step: int = typer.Option(5, "--step", help="Time step interval in seconds"),
+    json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
 ) -> None:
     """Run dynamic time-stepped chaos simulation with realistic traffic patterns."""
     if not model.exists():
@@ -150,20 +221,32 @@ def dynamic(
         console.print("Run [cyan]infrasim scan[/] first to create a model.")
         raise typer.Exit(1)
 
-    console.print("[cyan]Loading infrastructure model...[/]")
+    # Validate step < duration
+    if step >= duration:
+        console.print("[red]Error: --step must be smaller than --duration[/]")
+        raise typer.Exit(1)
+
+    if not json_output:
+        console.print("[cyan]Loading infrastructure model...[/]")
     graph = InfraGraph.load(model)
 
     from infrasim.simulator.dynamic_engine import DynamicSimulationEngine
 
-    console.print(
-        f"[cyan]Running dynamic simulation "
-        f"({len(graph.components)} components, "
-        f"duration={duration}s, step={step}s)...[/]"
-    )
+    if not json_output:
+        console.print(
+            f"[cyan]Running dynamic simulation "
+            f"({len(graph.components)} components, "
+            f"duration={duration}s, step={step}s)...[/]"
+        )
     engine = DynamicSimulationEngine(graph)
     report = engine.run_all_dynamic_defaults(duration=duration, step=step)
     # report is a DynamicSimulationReport; extract .results list
     results = getattr(report, "results", report) if not isinstance(report, list) else report
+
+    if json_output:
+        console.print_json(data=_dynamic_results_to_json(results))
+        return
+
     _print_dynamic_results(results, console)
 
     if html:

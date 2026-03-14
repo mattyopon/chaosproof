@@ -18,6 +18,29 @@ from infrasim.cli.main import (
 )
 
 
+def _ops_result_to_json(result: object) -> dict:
+    """Convert an OpsSimulationResult to a JSON-serialisable dict."""
+    scenario = getattr(result, "scenario", None)
+    sli_timeline = getattr(result, "sli_timeline", [])
+
+    avg_avail = 100.0
+    if sli_timeline:
+        avg_avail = sum(p.availability_percent for p in sli_timeline) / len(sli_timeline)
+
+    return {
+        "scenario": getattr(scenario, "name", "unknown") if scenario else "unknown",
+        "duration_days": getattr(scenario, "duration_days", 0) if scenario else 0,
+        "avg_availability": round(avg_avail, 4),
+        "min_availability": round(getattr(result, "min_availability", 100.0), 2),
+        "total_downtime_seconds": round(getattr(result, "total_downtime_seconds", 0.0), 1),
+        "total_events": len(getattr(result, "events", [])),
+        "total_deploys": getattr(result, "total_deploys", 0),
+        "total_failures": getattr(result, "total_failures", 0),
+        "total_degradation_events": getattr(result, "total_degradation_events", 0),
+        "peak_utilization": round(getattr(result, "peak_utilization", 0.0), 1),
+    }
+
+
 @app.command()
 def ops_sim(
     yaml_pos: Path | None = typer.Argument(None, help="YAML file path (positional)"),
@@ -35,6 +58,7 @@ def ops_sim(
     no_degradation: bool = typer.Option(False, "--no-degradation", help="Disable degradation"),
     no_maintenance: bool = typer.Option(False, "--no-maintenance", help="Disable maintenance windows"),
     defaults: bool = typer.Option(False, "--defaults", help="Run all default ops scenarios"),
+    json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
 ) -> None:
     """Run long-running operational simulation with SLO tracking."""
     yaml_file = yaml_pos or yaml_file
@@ -115,11 +139,15 @@ def ops_sim(
         from infrasim.simulator.ops_engine import TimeUnit
         step_unit_map = {"1min": TimeUnit.MINUTE, "5min": TimeUnit.FIVE_MINUTES, "1hour": TimeUnit.HOUR}
         time_unit_override = step_unit_map.get(step)
-        console.print(
-            f"[cyan]Running all default operational simulations "
-            f"({len(graph.components)} components)...[/]"
-        )
+        if not json_output:
+            console.print(
+                f"[cyan]Running all default operational simulations "
+                f"({len(graph.components)} components)...[/]"
+            )
         results = engine.run_default_ops_scenarios(time_unit_override=time_unit_override if step != "5min" else None)
+        if json_output:
+            console.print_json(data={"scenarios": [_ops_result_to_json(r) for r in results]})
+            return
         for result in results:
             _print_ops_results(result, console)
             console.print()
@@ -174,12 +202,16 @@ def ops_sim(
             enable_maintenance=not no_maintenance,
         )
 
-        console.print(
-            f"[cyan]Running operational simulation "
-            f"({len(graph.components)} components, "
-            f"{days} days, step={step})...[/]"
-        )
+        if not json_output:
+            console.print(
+                f"[cyan]Running operational simulation "
+                f"({len(graph.components)} components, "
+                f"{days} days, step={step})...[/]"
+            )
         result = engine.run_ops_scenario(scenario)
+        if json_output:
+            console.print_json(data=_ops_result_to_json(result))
+            return
         _print_ops_results(result, console)
 
     if html:
@@ -275,6 +307,17 @@ def capacity(
 ) -> None:
     """Run capacity planning analysis with growth forecasting."""
     resolved_yaml = yaml_pos or yaml_file
+
+    # Validate --growth is between -1.0 and 10.0
+    if growth < -1.0 or growth > 10.0:
+        console.print("[red]Error: --growth must be between -1.0 and 10.0[/]")
+        raise typer.Exit(1)
+
+    # Validate --slo is between 0 and 100
+    if slo < 0 or slo > 100:
+        console.print("[red]Error: --slo must be between 0 and 100[/]")
+        raise typer.Exit(1)
+
     try:
         from infrasim.simulator.capacity_engine import CapacityPlanningEngine
     except ImportError:
