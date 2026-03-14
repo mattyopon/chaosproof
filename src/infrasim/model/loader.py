@@ -16,9 +16,11 @@ from infrasim.model.components import (
     DegradationConfig,
     Dependency,
     FailoverConfig,
+    NetworkProfile,
     OperationalProfile,
     ResourceMetrics,
     RetryStrategy,
+    RuntimeJitter,
     SingleflightConfig,
     SLOTarget,
 )
@@ -108,6 +110,13 @@ def load_yaml(path: Path | str) -> InfraGraph:
                 f"Component '{comp_id}': replicas must be a positive integer, got {replicas}"
             )
 
+        network = (
+            NetworkProfile(**entry["network"]) if "network" in entry else NetworkProfile()
+        )
+        runtime_jitter = (
+            RuntimeJitter(**entry["runtime_jitter"]) if "runtime_jitter" in entry else RuntimeJitter()
+        )
+
         component = Component(
             id=comp_id,
             name=comp_name,
@@ -123,6 +132,8 @@ def load_yaml(path: Path | str) -> InfraGraph:
             singleflight=singleflight,
             slo_targets=slo_targets,
             operational_profile=operational_profile,
+            network=network,
+            runtime_jitter=runtime_jitter,
             parameters=entry.get("parameters", {}),
             tags=entry.get("tags", []),
         )
