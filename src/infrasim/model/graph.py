@@ -61,16 +61,17 @@ class InfraGraph:
         return edges
 
     def get_cascade_path(self, failed_component_id: str) -> list[list[str]]:
-        """Find all paths that could be affected by a component failure.
+        """Find all downstream paths showing how a failure cascades from the component.
 
-        Returns paths from the failed component back to all entry points.
+        Returns paths from the failed component to all transitively affected components.
         """
         paths = []
-        for node in self._graph.nodes:
+        reverse = self._graph.reverse()
+        for node in reverse.nodes:
             if node == failed_component_id:
                 continue
             for path in nx.all_simple_paths(
-                self._graph, node, failed_component_id
+                reverse, failed_component_id, node
             ):
                 paths.append(path)
         return paths
@@ -87,7 +88,7 @@ class InfraGraph:
                     bfs_queue.append(dep.id)
         return affected
 
-    def get_critical_paths(self) -> list[list[str]]:
+    def get_critical_paths(self, max_paths: int = 100) -> list[list[str]]:
         """Find the longest dependency chains (most vulnerable to cascade)."""
         paths = []
         for node in self._graph.nodes:
@@ -96,6 +97,9 @@ class InfraGraph:
                     if self._graph.out_degree(target) == 0:  # leaf nodes
                         for path in nx.all_simple_paths(self._graph, node, target):
                             paths.append(path)
+                            if len(paths) >= max_paths:
+                                paths.sort(key=len, reverse=True)
+                                return paths
         paths.sort(key=len, reverse=True)
         return paths
 

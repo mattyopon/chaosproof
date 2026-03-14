@@ -671,6 +671,11 @@ class OpsSimulationEngine:
         # Accumulate degradation events generated during simulation
         degradation_events: list[OpsEvent] = []
 
+        # Build component→events index for efficient downtime lookup
+        _comp_events: dict[str, list] = {}
+        for ev in all_events:
+            _comp_events.setdefault(ev.target_component_id, []).append(ev)
+
         # Main simulation loop
         num_steps = total_seconds // step_seconds
         for step_idx in range(num_steps + 1):
@@ -685,6 +690,8 @@ class OpsSimulationEngine:
             )
             degradation_events.extend(new_deg_events)
             all_events.extend(new_deg_events)
+            for ev in new_deg_events:
+                _comp_events.setdefault(ev.target_component_id, []).append(ev)
             result.total_degradation_events += len(new_deg_events)
 
             # 3. Get active faults from scheduled events + degradation
@@ -850,9 +857,7 @@ class OpsSimulationEngine:
                     # Find the maximum overlap of any active event
                     # targeting this component with the current timestep.
                     max_overlap = 0.0
-                    for ev in all_events:
-                        if ev.target_component_id != comp_id:
-                            continue
+                    for ev in _comp_events.get(comp_id, []):
                         ev_start = ev.time_seconds
                         ev_end = ev_start + ev.duration_seconds
                         overlap = min(ev_end, t + step_seconds) - max(ev_start, t)
@@ -883,7 +888,7 @@ class OpsSimulationEngine:
 
         return result
 
-    def run_default_ops_scenarios(self) -> list[OpsSimulationResult]:
+    def run_default_ops_scenarios(self, time_unit_override: TimeUnit | None = None) -> list[OpsSimulationResult]:
         """Run a suite of default operational scenarios.
 
         Generates 5 standard scenarios covering baseline operations,
@@ -1071,6 +1076,11 @@ class OpsSimulationEngine:
                 random_seed=42,
             )
         )
+
+        # Apply time_unit override if requested
+        if time_unit_override is not None:
+            for scenario in scenarios:
+                scenario.time_unit = time_unit_override
 
         # Run all scenarios
         results: list[OpsSimulationResult] = []

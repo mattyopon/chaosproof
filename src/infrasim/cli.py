@@ -246,11 +246,14 @@ def ops_sim(
     engine = OpsSimulationEngine(graph)
 
     if defaults:
+        from infrasim.simulator.ops_engine import TimeUnit
+        step_unit_map = {"1min": TimeUnit.MINUTE, "5min": TimeUnit.FIVE_MINUTES, "1hour": TimeUnit.HOUR}
+        time_unit_override = step_unit_map.get(step)
         console.print(
             f"[cyan]Running all default operational simulations "
             f"({len(graph.components)} components)...[/]"
         )
-        results = engine.run_default_ops_scenarios()
+        results = engine.run_default_ops_scenarios(time_unit_override=time_unit_override if step != "5min" else None)
         for result in results:
             _print_ops_results(result, console)
             console.print()
@@ -407,10 +410,10 @@ def _print_ops_results(result: "OpsSimulationResult", con: Console) -> None:  # 
         con.print()
         con.print(budget_table)
 
-    # ---- 3. Incident Timeline (top 10 events) ----------------------------
+    # ---- 3. Incident Timeline (last 25 events) ---------------------------
     if result.events:
-        # Show last 10 events
-        recent = result.events[-10:]
+        # Show last 25 events
+        recent = result.events[-25:]
         event_table = Table(title=f"Event Timeline (last {len(recent)} of {total_events})", show_header=True)
         event_table.add_column("Time", style="dim", width=12)
         event_table.add_column("Type", width=18)
