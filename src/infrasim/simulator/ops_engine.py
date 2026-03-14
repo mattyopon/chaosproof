@@ -354,13 +354,24 @@ class SLOTracker:
         self._last_effective_health = effective_health
 
         healthy = degraded = overloaded = down = 0
+        # Fractional DOWN for components with failover: during failover
+        # promotion, some requests fail but the service is not fully down.
+        # We model this as a partial DOWN contribution based on promotion time.
+        fractional_down = 0.0
         for comp_id, h in effective_health.items():
             if h == HealthStatus.DOWN:
-                # If the component has failover enabled, treat as DEGRADED
-                # for availability: the service continues via replicas/failover.
                 comp = self.graph.get_component(comp_id)
                 if comp and comp.failover.enabled:
-                    degraded += 1
+                    # Failover reduces impact: longer promotion = more impact.
+                    # 5s promotion ≈ 10% of a 5-min step is DOWN-equivalent,
+                    # capped at 0.5 (failover can't eliminate more than half).
+                    promotion = comp.failover.promotion_time_seconds
+                    health_interval = comp.failover.health_check_interval_seconds
+                    detection_delay = health_interval * comp.failover.failover_threshold
+                    total_outage = promotion + detection_delay
+                    # Fraction of a typical 5-min window that's impacted
+                    impact_fraction = min(0.5, total_outage / 300.0)
+                    fractional_down += impact_fraction
                 else:
                     down += 1
             elif h == HealthStatus.HEALTHY:
@@ -370,9 +381,9 @@ class SLOTracker:
             elif h == HealthStatus.OVERLOADED:
                 overloaded += 1
 
-        # Availability: DOWN = 0%, OVERLOADED = 80% (20% error rate),
+        # Availability: DOWN = 0%, failover-DOWN = partial, OVERLOADED = 80%,
         # DEGRADED/HEALTHY = 100%.
-        effective_up = total - down - (overloaded * 0.2)
+        effective_up = total - down - fractional_down - (overloaded * 0.2)
         availability = (effective_up / total * 100.0) if total > 0 else 100.0
 
         # Max utilization across all components
