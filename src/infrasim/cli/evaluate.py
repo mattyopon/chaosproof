@@ -29,31 +29,20 @@ def _compute_avg_availability(sli_timeline: list) -> float:
     return total / len(sli_timeline)
 
 
-@app.command()
-def evaluate(
-    model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
-    file: Path = typer.Option(None, "--file", "-f", help="Alias for --model"),
-    html: Path = typer.Option(None, "--html", help="Export cross-engine HTML report"),
-    json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
-    ops_days: int = typer.Option(7, "--ops-days", help="Ops simulation duration in days"),
-    max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max static scenarios (0=default)"),
-) -> None:
-    """Run all 5 simulation engines and produce a unified evaluation report."""
-    from rich.panel import Panel
+def _run_evaluation(
+    graph: object,
+    model_name: str,
+    ops_days: int = 7,
+    max_scenarios: int = 0,
+) -> dict:
+    """Run all 5 simulation engines on a graph and return evaluation data.
 
-    resolved_model = file if file is not None else model
-    graph = _load_graph_for_analysis(resolved_model, yaml_file=None)
-
+    Returns a dict with keys: model, components, dependencies, static,
+    dynamic, ops, whatif, capacity, verdict.
+    """
     num_components = len(graph.components)
     num_dependencies = len(graph.all_dependency_edges())
-    model_name = resolved_model.name
 
-    console.print(
-        f"\n[cyan]Starting full evaluation of [bold]{model_name}[/bold] "
-        f"({num_components} components, {num_dependencies} dependencies)...[/]\n"
-    )
-
-    # Collect results for JSON/HTML output
     evaluation_data: dict = {
         "model": model_name,
         "components": num_components,
@@ -63,19 +52,12 @@ def evaluate(
     # ------------------------------------------------------------------
     # 1. Static Simulation
     # ------------------------------------------------------------------
-    console.print("[cyan]  [1/5] Running static simulation...[/]")
     from infrasim.simulator.engine import SimulationEngine
 
     static_engine = SimulationEngine(graph)
     static_report = static_engine.run_all_defaults()
 
     total_generated = len(static_report.results)
-    if max_scenarios > 0 and total_generated > max_scenarios:
-        # Re-run with truncated scenario list is not needed;
-        # MAX_SCENARIOS in engine already caps at 1000. This just
-        # tracks what the user wanted to display.
-        pass
-
     static_total = len(static_report.results)
     static_critical = len(static_report.critical_findings)
     static_warning = len(static_report.warnings)
@@ -93,7 +75,6 @@ def evaluate(
     # ------------------------------------------------------------------
     # 2. Dynamic Simulation
     # ------------------------------------------------------------------
-    console.print("[cyan]  [2/5] Running dynamic simulation...[/]")
     from infrasim.simulator.dynamic_engine import DynamicSimulationEngine
 
     dyn_engine = DynamicSimulationEngine(graph)
@@ -105,7 +86,6 @@ def evaluate(
     dyn_warning = len(dyn_report.warnings)
     dyn_passed = len(dyn_report.passed)
 
-    # Find worst scenario for display
     dyn_worst_name = None
     dyn_worst_severity = 0.0
     for r in dyn_results:
@@ -125,12 +105,10 @@ def evaluate(
     # ------------------------------------------------------------------
     # 3. Ops Simulation
     # ------------------------------------------------------------------
-    console.print(f"[cyan]  [3/5] Running ops simulation ({ops_days} days)...[/]")
     from infrasim.model.components import SLOTarget
     from infrasim.simulator.ops_engine import OpsScenario, OpsSimulationEngine
     from infrasim.simulator.traffic import create_diurnal_weekly
 
-    # Build a default ops scenario similar to the whatif base
     component_ids = list(graph.components.keys())
     deploy_targets: list[str] = []
     for comp_id, comp in graph.components.items():
@@ -185,24 +163,10 @@ def evaluate(
     # ------------------------------------------------------------------
     # 4. What-If Analysis
     # ------------------------------------------------------------------
-    console.print("[cyan]  [4/5] Running what-if analysis...[/]")
     from infrasim.simulator.whatif_engine import WhatIfEngine
 
     whatif_engine = WhatIfEngine(graph)
     whatif_results = whatif_engine.run_default_whatifs()
-
-    # Build a quick summary of pass/fail per parameter at key values
-    whatif_summary: dict[str, str] = {}
-    for wr in whatif_results:
-        param_display = wr.parameter.replace("_", " ").title()
-        # Find the most extreme tested value that still passes
-        all_pass = all(wr.slo_pass)
-        if all_pass:
-            whatif_summary[param_display] = "PASS"
-        elif wr.breakpoint_value is not None:
-            whatif_summary[param_display] = f"FAIL@{wr.breakpoint_value}"
-        else:
-            whatif_summary[param_display] = "FAIL"
 
     evaluation_data["whatif"] = {
         "parameters_tested": len(whatif_results),
@@ -219,7 +183,6 @@ def evaluate(
     # ------------------------------------------------------------------
     # 5. Capacity Planning
     # ------------------------------------------------------------------
-    console.print("[cyan]  [5/5] Running capacity planning...[/]")
     from infrasim.simulator.capacity_engine import CapacityPlanningEngine
 
     cap_engine = CapacityPlanningEngine(graph)
@@ -244,26 +207,408 @@ def evaluate(
     # ------------------------------------------------------------------
     if dyn_critical > 0 or static_critical > 0:
         verdict = "NEEDS ATTENTION"
-        verdict_color = "red"
     elif dyn_warning > 0 or static_warning > 0:
         verdict = "ACCEPTABLE"
-        verdict_color = "yellow"
     else:
         verdict = "HEALTHY"
-        verdict_color = "green"
 
     evaluation_data["verdict"] = verdict
 
+    # Attach raw objects for Rich/HTML rendering (not serialised)
+    evaluation_data["_raw"] = {
+        "static_report": static_report,
+        "dyn_report": dyn_report,
+        "ops_result": ops_result,
+        "whatif_results": whatif_results,
+        "cap_report": cap_report,
+        "graph": graph,
+    }
+
+    return evaluation_data
+
+
+def _verdict_color(verdict: str) -> str:
+    """Return a Rich color string for a verdict."""
+    if verdict == "NEEDS ATTENTION":
+        return "red"
+    elif verdict == "ACCEPTABLE":
+        return "yellow"
+    return "green"
+
+
+def _print_comparison_table(data_a: dict, data_b: dict) -> None:
+    """Print a side-by-side comparison summary of two evaluation results."""
+    from rich.table import Table
+    from rich.text import Text
+
+    table = Table(
+        title="COMPARISON SUMMARY",
+        show_header=True,
+        header_style="bold",
+        title_style="bold cyan",
+    )
+    table.add_column("Metric", style="cyan", width=24)
+    table.add_column(f"Model A ({data_a['model']})", width=22)
+    table.add_column(f"Model B ({data_b['model']})", width=22)
+    table.add_column("Delta", width=24)
+
+    def _delta_text(val_a: float, val_b: float, fmt: str = ".1f", higher_is_better: bool = True) -> Text:
+        """Build a colored delta Text object."""
+        diff = val_b - val_a
+        if abs(diff) < 1e-9:
+            return Text(f"  0", style="dim")
+        sign = "+" if diff > 0 else ""
+        label = f"{sign}{diff:{fmt}}"
+        if higher_is_better:
+            color = "green" if diff > 0 else "red"
+        else:
+            color = "red" if diff > 0 else "green"
+        return Text(label, style=color)
+
+    def _delta_text_inverse(val_a: float, val_b: float, fmt: str = ".1f") -> Text:
+        """Lower is better (e.g. critical count, downtime)."""
+        return _delta_text(val_a, val_b, fmt=fmt, higher_is_better=False)
+
+    # Resilience Score
+    rs_a = data_a["static"]["resilience_score"]
+    rs_b = data_b["static"]["resilience_score"]
+    table.add_row(
+        "Resilience Score",
+        f"{rs_a:.0f}/100",
+        f"{rs_b:.0f}/100",
+        _delta_text(rs_a, rs_b, ".0f"),
+    )
+
+    # Static Critical
+    sc_a = data_a["static"]["critical"]
+    sc_b = data_b["static"]["critical"]
+    table.add_row(
+        "Static Critical",
+        str(sc_a),
+        str(sc_b),
+        _delta_text_inverse(sc_a, sc_b, ".0f"),
+    )
+
+    # Static Warning
+    sw_a = data_a["static"]["warning"]
+    sw_b = data_b["static"]["warning"]
+    table.add_row(
+        "Static Warning",
+        str(sw_a),
+        str(sw_b),
+        _delta_text_inverse(sw_a, sw_b, ".0f"),
+    )
+
+    # Static Passed
+    sp_a = data_a["static"]["passed"]
+    sp_b = data_b["static"]["passed"]
+    table.add_row(
+        "Static Passed",
+        str(sp_a),
+        str(sp_b),
+        _delta_text(sp_a, sp_b, ".0f"),
+    )
+
+    table.add_section()
+
+    # Dynamic Critical
+    dc_a = data_a["dynamic"]["critical"]
+    dc_b = data_b["dynamic"]["critical"]
+    table.add_row(
+        "Dynamic Critical",
+        str(dc_a),
+        str(dc_b),
+        _delta_text_inverse(dc_a, dc_b, ".0f"),
+    )
+
+    # Dynamic Warning
+    dw_a = data_a["dynamic"]["warning"]
+    dw_b = data_b["dynamic"]["warning"]
+    table.add_row(
+        "Dynamic Warning",
+        str(dw_a),
+        str(dw_b),
+        _delta_text_inverse(dw_a, dw_b, ".0f"),
+    )
+
+    # Dynamic Worst Severity
+    dsev_a = data_a["dynamic"]["worst_severity"]
+    dsev_b = data_b["dynamic"]["worst_severity"]
+    table.add_row(
+        "Dynamic Worst Severity",
+        f"{dsev_a:.1f}",
+        f"{dsev_b:.1f}",
+        _delta_text_inverse(dsev_a, dsev_b, ".1f"),
+    )
+
+    table.add_section()
+
+    # Ops Availability
+    oa_a = data_a["ops"]["avg_availability"]
+    oa_b = data_b["ops"]["avg_availability"]
+    table.add_row(
+        "Ops Availability %",
+        f"{oa_a:.3f}%",
+        f"{oa_b:.3f}%",
+        _delta_text(oa_a, oa_b, ".4f"),
+    )
+
+    # Ops Downtime
+    od_a = data_a["ops"]["total_downtime_seconds"]
+    od_b = data_b["ops"]["total_downtime_seconds"]
+    table.add_row(
+        "Ops Downtime (s)",
+        f"{od_a:.1f}",
+        f"{od_b:.1f}",
+        _delta_text_inverse(od_a, od_b, ".1f"),
+    )
+
+    table.add_section()
+
+    # Over-provisioned
+    op_a = data_a["capacity"]["over_provisioned_count"]
+    op_b = data_b["capacity"]["over_provisioned_count"]
+    table.add_row(
+        "Over-provisioned",
+        str(op_a),
+        str(op_b),
+        _delta_text_inverse(op_a, op_b, ".0f"),
+    )
+
+    # Cost reduction %
+    cr_a = data_a["capacity"]["cost_reduction_percent"]
+    cr_b = data_b["capacity"]["cost_reduction_percent"]
+    table.add_row(
+        "Cost Reduction %",
+        f"{cr_a:.1f}%",
+        f"{cr_b:.1f}%",
+        _delta_text_inverse(cr_a, cr_b, ".1f"),
+    )
+
+    table.add_section()
+
+    # Verdict
+    v_a = data_a["verdict"]
+    v_b = data_b["verdict"]
+    verdict_delta_style = "dim"
+    if v_a != v_b:
+        # Rank: HEALTHY > ACCEPTABLE > NEEDS ATTENTION
+        rank = {"HEALTHY": 3, "ACCEPTABLE": 2, "NEEDS ATTENTION": 1}
+        if rank.get(v_b, 0) > rank.get(v_a, 0):
+            verdict_delta_style = "green"
+        else:
+            verdict_delta_style = "red"
+    table.add_row(
+        "Verdict",
+        Text(v_a, style=_verdict_color(v_a)),
+        Text(v_b, style=_verdict_color(v_b)),
+        Text(
+            "no change" if v_a == v_b else f"{v_a} -> {v_b}",
+            style=verdict_delta_style,
+        ),
+    )
+
+    console.print()
+    console.print(table)
+
+
+def _build_comparison_json(data_a: dict, data_b: dict) -> dict:
+    """Build a JSON-serialisable comparison dict from two evaluation dicts."""
+    def _safe(d: dict) -> dict:
+        """Strip non-serialisable _raw key."""
+        return {k: v for k, v in d.items() if k != "_raw"}
+
+    comparison: dict = {}
+    # Resilience score delta
+    comparison["resilience_score_delta"] = round(
+        data_b["static"]["resilience_score"] - data_a["static"]["resilience_score"], 1
+    )
+    comparison["static_critical_delta"] = (
+        data_b["static"]["critical"] - data_a["static"]["critical"]
+    )
+    comparison["static_warning_delta"] = (
+        data_b["static"]["warning"] - data_a["static"]["warning"]
+    )
+    comparison["static_passed_delta"] = (
+        data_b["static"]["passed"] - data_a["static"]["passed"]
+    )
+    comparison["dynamic_critical_delta"] = (
+        data_b["dynamic"]["critical"] - data_a["dynamic"]["critical"]
+    )
+    comparison["dynamic_warning_delta"] = (
+        data_b["dynamic"]["warning"] - data_a["dynamic"]["warning"]
+    )
+    comparison["dynamic_worst_severity_delta"] = round(
+        data_b["dynamic"]["worst_severity"] - data_a["dynamic"]["worst_severity"], 1
+    )
+    comparison["ops_availability_delta"] = round(
+        data_b["ops"]["avg_availability"] - data_a["ops"]["avg_availability"], 4
+    )
+    comparison["ops_downtime_delta"] = round(
+        data_b["ops"]["total_downtime_seconds"] - data_a["ops"]["total_downtime_seconds"], 1
+    )
+    comparison["over_provisioned_delta"] = (
+        data_b["capacity"]["over_provisioned_count"] - data_a["capacity"]["over_provisioned_count"]
+    )
+    comparison["cost_reduction_delta"] = round(
+        data_b["capacity"]["cost_reduction_percent"] - data_a["capacity"]["cost_reduction_percent"], 1
+    )
+    comparison["verdict_a"] = data_a["verdict"]
+    comparison["verdict_b"] = data_b["verdict"]
+    comparison["verdict_changed"] = data_a["verdict"] != data_b["verdict"]
+
+    return {
+        "model_a": _safe(data_a),
+        "model_b": _safe(data_b),
+        "comparison": comparison,
+    }
+
+
+@app.command()
+def evaluate(
+    model: Path = typer.Option(DEFAULT_MODEL_PATH, "--model", "-m", help="Model file path"),
+    file: Path = typer.Option(None, "--file", "-f", help="Alias for --model"),
+    compare: Path = typer.Option(None, "--compare", "-c", help="Compare with another model"),
+    html: Path = typer.Option(None, "--html", help="Export cross-engine HTML report"),
+    json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
+    ops_days: int = typer.Option(7, "--ops-days", help="Ops simulation duration in days"),
+    max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max static scenarios (0=default)"),
+) -> None:
+    """Run all 5 simulation engines and produce a unified evaluation report."""
+    from rich.panel import Panel
+
+    resolved_model = file if file is not None else model
+    graph = _load_graph_for_analysis(resolved_model, yaml_file=None)
+
+    num_components = len(graph.components)
+    num_dependencies = len(graph.all_dependency_edges())
+    model_name = resolved_model.name
+
+    console.print(
+        f"\n[cyan]Starting full evaluation of [bold]{model_name}[/bold] "
+        f"({num_components} components, {num_dependencies} dependencies)...[/]\n"
+    )
+
+    # Run evaluation on primary model
+    console.print("[cyan]  [1/5] Running static simulation...[/]")
+    console.print("[cyan]  [2/5] Running dynamic simulation...[/]")
+    console.print(f"[cyan]  [3/5] Running ops simulation ({ops_days} days)...[/]")
+    console.print("[cyan]  [4/5] Running what-if analysis...[/]")
+    console.print("[cyan]  [5/5] Running capacity planning...[/]")
+
+    evaluation_data = _run_evaluation(graph, model_name, ops_days, max_scenarios)
+
     # ------------------------------------------------------------------
-    # JSON output
+    # Compare mode
     # ------------------------------------------------------------------
-    if json_output:
-        console.print_json(data=evaluation_data)
+    if compare is not None:
+        graph_b = _load_graph_for_analysis(compare, yaml_file=None)
+        model_name_b = compare.name
+        num_comp_b = len(graph_b.components)
+        num_dep_b = len(graph_b.all_dependency_edges())
+
+        console.print(
+            f"\n[cyan]Starting full evaluation of [bold]{model_name_b}[/bold] "
+            f"({num_comp_b} components, {num_dep_b} dependencies)...[/]\n"
+        )
+        console.print("[cyan]  [1/5] Running static simulation...[/]")
+        console.print("[cyan]  [2/5] Running dynamic simulation...[/]")
+        console.print(f"[cyan]  [3/5] Running ops simulation ({ops_days} days)...[/]")
+        console.print("[cyan]  [4/5] Running what-if analysis...[/]")
+        console.print("[cyan]  [5/5] Running capacity planning...[/]")
+
+        evaluation_data_b = _run_evaluation(graph_b, model_name_b, ops_days, max_scenarios)
+
+        # JSON compare output
+        if json_output:
+            console.print_json(data=_build_comparison_json(evaluation_data, evaluation_data_b))
+            return
+
+        # Print individual reports for both models, then comparison table
+        _print_rich_report(evaluation_data, ops_days)
+        console.print("\n[bold bright_blue]--- Model B ---[/]\n")
+        _print_rich_report(evaluation_data_b, ops_days)
+
+        # Comparison table
+        _print_comparison_table(evaluation_data, evaluation_data_b)
+
+        # HTML export for compare mode is not yet supported
+        if html:
+            _export_html_report(
+                html, evaluation_data, graph,
+                evaluation_data["_raw"]["static_report"],
+                evaluation_data["_raw"]["dyn_report"],
+                evaluation_data["_raw"]["ops_result"],
+                evaluation_data["_raw"]["whatif_results"],
+                evaluation_data["_raw"]["cap_report"],
+            )
+            console.print(f"\n[green]HTML report saved to {html}[/]")
         return
 
     # ------------------------------------------------------------------
-    # Rich console output
+    # Single model mode
     # ------------------------------------------------------------------
+    if json_output:
+        # Strip _raw before JSON output
+        safe_data = {k: v for k, v in evaluation_data.items() if k != "_raw"}
+        console.print_json(data=safe_data)
+        return
+
+    _print_rich_report(evaluation_data, ops_days)
+
+    # HTML export
+    if html:
+        _export_html_report(
+            html, evaluation_data, graph,
+            evaluation_data["_raw"]["static_report"],
+            evaluation_data["_raw"]["dyn_report"],
+            evaluation_data["_raw"]["ops_result"],
+            evaluation_data["_raw"]["whatif_results"],
+            evaluation_data["_raw"]["cap_report"],
+        )
+        console.print(f"\n[green]HTML report saved to {html}[/]")
+
+
+def _print_rich_report(evaluation_data: dict, ops_days: int) -> None:
+    """Print the Rich console output for a single evaluation."""
+    from rich.panel import Panel
+
+    model_name = evaluation_data["model"]
+    num_components = evaluation_data["components"]
+    num_dependencies = evaluation_data["dependencies"]
+    static = evaluation_data["static"]
+    dynamic = evaluation_data["dynamic"]
+    ops = evaluation_data["ops"]
+    capacity = evaluation_data["capacity"]
+    verdict = evaluation_data["verdict"]
+    verdict_color = _verdict_color(verdict)
+
+    raw = evaluation_data["_raw"]
+    static_report = raw["static_report"]
+    whatif_results = raw["whatif_results"]
+    cap_report = raw["cap_report"]
+    ops_result = raw["ops_result"]
+
+    static_total = static["total_scenarios"]
+    total_generated = static["generated_scenarios"]
+    static_critical = static["critical"]
+    static_warning = static["warning"]
+    static_passed = static["passed"]
+
+    dyn_total = dynamic["total_scenarios"]
+    dyn_critical = dynamic["critical"]
+    dyn_warning = dynamic["warning"]
+    dyn_passed = dynamic["passed"]
+    dyn_worst_name = dynamic["worst_scenario"]
+    dyn_worst_severity = dynamic["worst_severity"]
+
+    ops_avg_avail = ops["avg_availability"]
+    ops_total_events = ops["total_events"]
+
+    over_provisioned_count = capacity["over_provisioned_count"]
+    bottleneck_count = capacity["bottleneck_count"]
+    cost_val = capacity["cost_reduction_percent"]
+
     box_width = 60
 
     # Header
@@ -335,23 +680,20 @@ def evaluate(
     whatif_parts = []
     for wr in whatif_results:
         param_short = wr.parameter.replace("_factor", "").replace("_", " ").title()
-        # Check the most extreme value tested
         extreme_val = wr.values[-1]
         extreme_pass = wr.slo_pass[-1] if wr.slo_pass else True
         pass_str = "[green]PASS[/]" if extreme_pass else "[red]FAIL[/]"
         whatif_parts.append(f"{param_short} {extreme_val}x: {pass_str}")
-    # Display 3 per line
     for i in range(0, len(whatif_parts), 3):
         chunk = whatif_parts[i : i + 3]
         console.print(f"     {' | '.join(chunk)}")
 
     # 5. Capacity
     console.print(f"\n  [bold]5. Capacity Planning[/]")
-    if over_provisioned:
-        console.print(f"     Over-provisioned: {len(over_provisioned)} components")
+    if over_provisioned_count:
+        console.print(f"     Over-provisioned: {over_provisioned_count} components")
     else:
         console.print(f"     Over-provisioned: 0 components")
-    cost_val = cap_report.estimated_monthly_cost_increase
     if cost_val < 0:
         console.print(f"     Cost Reduction: [green]{cost_val:.1f}%[/]")
     elif cost_val > 0:
@@ -379,13 +721,6 @@ def evaluate(
         border_style=verdict_color,
         width=box_width,
     ))
-
-    # ------------------------------------------------------------------
-    # HTML export
-    # ------------------------------------------------------------------
-    if html:
-        _export_html_report(html, evaluation_data, graph, static_report, dyn_report, ops_result, whatif_results, cap_report)
-        console.print(f"\n[green]HTML report saved to {html}[/]")
 
 
 def _export_html_report(

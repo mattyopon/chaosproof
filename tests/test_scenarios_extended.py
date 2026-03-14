@@ -357,6 +357,71 @@ def test_external_api_scenarios():
     assert ext_down is not None
 
 
+def test_multi_lb_partition_scenarios():
+    """When multiple LBs exist, per-LB partition scenarios are generated."""
+    comps = {
+        "alb-1": Component(
+            id="alb-1", name="ALB", type=ComponentType.LOAD_BALANCER, host="host-a",
+        ),
+        "nlb-1": Component(
+            id="nlb-1", name="NLB", type=ComponentType.LOAD_BALANCER, host="host-b",
+        ),
+        "app-1": Component(
+            id="app-1", name="API Server", type=ComponentType.APP_SERVER, host="host-c",
+        ),
+        "app-2": Component(
+            id="app-2", name="Worker", type=ComponentType.APP_SERVER, host="host-d",
+        ),
+    }
+    ids = list(comps.keys())
+    scenarios = generate_default_scenarios(ids, components=comps)
+
+    # Per-LB partition: ALB isolated from app tier
+    alb_part = _find_scenario(scenarios, "partition-alb-1-app")
+    assert alb_part is not None
+    assert alb_part.name == "Network partition: ALB <-> App"
+    assert len(alb_part.faults) == 1
+    assert alb_part.faults[0].target_component_id == "alb-1"
+    assert alb_part.faults[0].fault_type == FaultType.COMPONENT_DOWN
+
+    # Per-LB partition: NLB isolated from app tier
+    nlb_part = _find_scenario(scenarios, "partition-nlb-1-app")
+    assert nlb_part is not None
+    assert nlb_part.name == "Network partition: NLB <-> App"
+    assert len(nlb_part.faults) == 1
+    assert nlb_part.faults[0].target_component_id == "nlb-1"
+    assert nlb_part.faults[0].fault_type == FaultType.COMPONENT_DOWN
+
+    # Full partition still present (worst case: all LBs lose connectivity)
+    full_part = _find_scenario(scenarios, "partition-lb-app")
+    assert full_part is not None
+    assert len(full_part.faults) == 2  # one fault per app server
+    for f in full_part.faults:
+        assert f.fault_type == FaultType.NETWORK_PARTITION
+
+
+def test_single_lb_no_per_lb_partition():
+    """With only one LB, per-LB partitions should NOT be generated."""
+    comps = {
+        "lb-1": Component(
+            id="lb-1", name="HAProxy", type=ComponentType.LOAD_BALANCER, host="host-a",
+        ),
+        "app-1": Component(
+            id="app-1", name="API Server", type=ComponentType.APP_SERVER, host="host-b",
+        ),
+    }
+    ids = list(comps.keys())
+    scenarios = generate_default_scenarios(ids, components=comps)
+
+    # No per-LB partition when only one LB
+    per_lb = _find_scenario(scenarios, "partition-lb-1-app")
+    assert per_lb is None
+
+    # Full partition still present
+    full_part = _find_scenario(scenarios, "partition-lb-app")
+    assert full_part is not None
+
+
 # ---------------------------------------------------------------------------
 # generate_dynamic_scenarios — lines 621-829
 # ---------------------------------------------------------------------------

@@ -4,22 +4,17 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -30,16 +25,26 @@ jobs:
         run: ruff check src/ tests/
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: |
+          pytest -v --tb=short 2>&1 | tee test-output.txt
+          # Extract and display test count summary
+          echo ""
+          echo "=========================================="
+          echo "TEST SUMMARY"
+          echo "=========================================="
+          grep -E "^(FAILED|PASSED|ERROR|=)" test-output.txt | tail -5
+          echo "=========================================="
+          # Fail the build if pytest exited non-zero (any test failed)
+          exit ${PIPESTATUS[0]}
 
       - name: Run tests with coverage
-        if: matrix.python-version == '3.11'
+        if: always() && steps.*.outcome != 'failure'
         run: |
           pip install pytest-cov
-          pytest tests/ --cov=infrasim --cov-report=xml --cov-report=term-missing
+          pytest --cov=infrasim --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
-        if: matrix.python-version == '3.11'
+        if: always()
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml

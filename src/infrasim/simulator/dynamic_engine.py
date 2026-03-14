@@ -258,6 +258,20 @@ class DynamicSimulationEngine:
         first_critical_time: int | None = None
         recovery_time: int | None = None
 
+        # Compute likelihood based on direct fault count vs total components.
+        # Scenarios that directly fault a large percentage of components are
+        # unlikely and receive a reduced likelihood factor.
+        # Only apply to graphs with >= 10 components to avoid penalising
+        # small test graphs where compound faults are realistic.
+        total_components = len(self.graph.components)
+        direct_fault_ratio = len(scenario.faults) / max(total_components, 1)
+        if total_components >= 10 and direct_fault_ratio >= 0.9:
+            scenario_likelihood = 0.05
+        elif total_components >= 10 and direct_fault_ratio >= 0.5:
+            scenario_likelihood = 0.3
+        else:
+            scenario_likelihood = 1.0
+
         total_steps = scenario.duration_seconds // scenario.time_step_seconds
         step_sec = scenario.time_step_seconds
 
@@ -294,7 +308,7 @@ class DynamicSimulationEngine:
             result.snapshots.append(snapshot)
 
             # 8. Calculate severity at this step
-            step_severity = self._severity_for_step(comp_states, step_effects)
+            step_severity = self._severity_for_step(comp_states, step_effects, scenario_likelihood)
             if step_severity > peak_severity:
                 peak_severity = step_severity
                 peak_time = t
@@ -882,6 +896,7 @@ class DynamicSimulationEngine:
         self,
         states: dict[str, _ComponentDynamicState],
         effects: list[CascadeEffect],
+        likelihood: float = 1.0,
     ) -> float:
         """Compute the severity score for a single time step.
 
@@ -916,7 +931,7 @@ class DynamicSimulationEngine:
             trigger="time-step",
             effects=merged_effects,
             total_components=total,
-            likelihood=1.0,
+            likelihood=likelihood,
         )
         return chain.severity
 

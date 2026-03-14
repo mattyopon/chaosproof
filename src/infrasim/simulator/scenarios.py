@@ -470,13 +470,71 @@ def generate_default_scenarios(
     # CATEGORY 22: Total infrastructure meltdown
     # =========================================================================
     if len(component_ids) >= 3:
-        # All components fail
+        # 22a: Original "total meltdown" — all components fail simultaneously.
+        # Kept for completeness but with very low likelihood (0.05) since
+        # simultaneous failure of every component is extremely unrealistic.
         scenarios.append(Scenario(
             id="total-meltdown", name="Total infrastructure meltdown",
-            description="Complete failure of all components simultaneously (worst case scenario)",
+            description=(
+                "Complete failure of all components simultaneously (worst case, "
+                "extremely unlikely — simultaneous all-down)"
+            ),
             faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN)
                     for c in component_ids],
         ))
+
+        # 22b: Cascading meltdown — fault the top 2-3 most-depended-upon
+        # components (root causes) and let the cascade engine determine
+        # realistic spread.  This is the realistic meltdown path.
+        if components:
+            # Count how many other components depend on each component
+            dependent_counts: dict[str, int] = {}
+            for cid in component_ids:
+                count = 0
+                for other_id in component_ids:
+                    if other_id == cid:
+                        continue
+                    # Check if other_id depends on cid by looking at
+                    # component types that are typically upstream
+                    # We use a simple heuristic: count references
+                    # in the dependency graph (if available later).
+                    # For now, count based on component type criticality.
+                    pass
+                dependent_counts[cid] = count
+
+            # Rank components by type criticality as a proxy for
+            # "most depended upon" when we don't have graph edges here.
+            # Priority: database > cache > queue > app_server > load_balancer > others
+            _type_rank: dict[str, int] = {
+                "database": 6, "cache": 5, "dns": 5, "queue": 4,
+                "storage": 4, "app_server": 3, "web_server": 3,
+                "load_balancer": 2,
+            }
+            ranked = sorted(
+                component_ids,
+                key=lambda cid: _type_rank.get(
+                    (components[cid].type.value
+                     if hasattr(components[cid].type, "value")
+                     else str(components[cid].type)),
+                    1,
+                ),
+                reverse=True,
+            )
+            # Take top 2-3 root-cause components (min 2, max 3)
+            root_cause_count = min(3, max(2, len(ranked) // 3))
+            root_causes = ranked[:root_cause_count]
+
+            scenarios.append(Scenario(
+                id="cascading-meltdown",
+                name="Cascading meltdown (root-cause)",
+                description=(
+                    f"Critical root-cause components fail "
+                    f"({', '.join(root_causes)}), cascade engine determines "
+                    f"realistic spread through dependency graph"
+                ),
+                faults=[Fault(target_component_id=c, fault_type=FaultType.COMPONENT_DOWN)
+                        for c in root_causes],
+            ))
 
     # =========================================================================
     # CATEGORY 23: Noisy neighbor / resource contention
@@ -556,9 +614,25 @@ def generate_default_scenarios(
         ))
     # LB can't reach app servers
     if lb and app:
+        # When multiple LBs exist (e.g. ALB + NLB), create per-LB partition
+        # scenarios.  A partition that isolates only one LB is lower severity
+        # because the other LB may still route traffic (redundant path).
+        if len(lb) > 1 and components:
+            for lb_id in lb:
+                comp = components.get(lb_id)
+                lb_name = comp.name if comp else lb_id
+                scenarios.append(Scenario(
+                    id=f"partition-{lb_id}-app",
+                    name=f"Network partition: {lb_name} <-> App",
+                    description=f"Network partition isolating {lb_name} from application tier",
+                    faults=[Fault(target_component_id=lb_id,
+                                  fault_type=FaultType.COMPONENT_DOWN,
+                                  parameters={"cause": "lb_app_partition"})],
+                ))
+        # Full partition: ALL load balancers lose connectivity to app tier
         scenarios.append(Scenario(
             id="partition-lb-app", name="Network partition: LB <-> App",
-            description="Network partition between load balancer and application tier",
+            description="Network partition between all load balancers and application tier",
             faults=[Fault(target_component_id=a, fault_type=FaultType.NETWORK_PARTITION,
                           parameters={"cause": "inter_tier_partition"}) for a in app],
         ))

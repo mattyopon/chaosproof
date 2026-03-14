@@ -87,6 +87,18 @@ class SimulationEngine:
             if likelihoods:
                 merged.likelihood = min(likelihoods)
 
+            # Apply a steep likelihood penalty when a scenario directly faults
+            # a very high fraction of components.  Simultaneous all-down events
+            # are extremely unrealistic; the cascade engine should determine
+            # real spread from a small number of root causes instead.
+            if total_components >= 10:
+                directly_faulted = len(scenario.faults)
+                direct_ratio = directly_faulted / total_components
+                if direct_ratio >= 0.9:
+                    merged.likelihood = min(merged.likelihood, 0.05)
+                elif direct_ratio >= 0.5:
+                    merged.likelihood = min(merged.likelihood, 0.3)
+
             for chain in chains:
                 merged.effects.extend(chain.effects)
             risk_score = merged.severity
