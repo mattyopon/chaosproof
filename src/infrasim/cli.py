@@ -89,9 +89,13 @@ def simulate(
 
 def _print_dynamic_results(results: list, con: Console) -> None:
     """Print a summary of dynamic simulation results to the console."""
+    if not results:
+        con.print("\n[yellow]No dynamic scenarios to report.[/]")
+        return
+
     total = len(results)
-    critical = sum(1 for r in results if getattr(r, "peak_severity", "") == "critical")
-    warning = sum(1 for r in results if getattr(r, "peak_severity", "") == "warning")
+    critical = sum(1 for r in results if getattr(r, "is_critical", False))
+    warning = sum(1 for r in results if getattr(r, "is_warning", False))
     passed = total - critical - warning
 
     con.print(f"\n[bold]Dynamic Simulation Results[/]")
@@ -103,18 +107,22 @@ def _print_dynamic_results(results: list, con: Console) -> None:
     )
 
     for r in results:
-        severity = getattr(r, "peak_severity", "passed")
-        if severity not in ("critical", "warning"):
+        is_critical = getattr(r, "is_critical", False)
+        is_warning = getattr(r, "is_warning", False)
+        if not is_critical and not is_warning:
             continue
 
-        color = "red" if severity == "critical" else "yellow"
-        name = getattr(r, "scenario_name", getattr(r, "name", "unknown"))
-        peak_time = getattr(r, "peak_severity_time", None)
+        color = "red" if is_critical else "yellow"
+        label = "CRITICAL" if is_critical else "WARNING"
+        name = getattr(r, "scenario", None)
+        name = getattr(name, "name", "unknown") if name else "unknown"
+        peak_time = getattr(r, "peak_time_seconds", None)
+        peak_sev = getattr(r, "peak_severity", 0.0)
         recovery = getattr(r, "recovery_time_seconds", None)
         autoscale = getattr(r, "autoscaling_events", [])
         failover = getattr(r, "failover_events", [])
 
-        con.print(f"  [{color}]{severity.upper()}[/] {name}")
+        con.print(f"  [{color}]{label}[/] {name} (severity: {peak_sev:.1f})")
         if peak_time is not None:
             con.print(f"    Peak severity at: t={peak_time}s")
         if recovery is not None:
@@ -150,7 +158,9 @@ def dynamic(
         f"duration={duration}s, step={step}s)...[/]"
     )
     engine = DynamicSimulationEngine(graph)
-    results = engine.run_all_dynamic_defaults(duration=duration, step=step)
+    report = engine.run_all_dynamic_defaults(duration=duration, step=step)
+    # report is a DynamicSimulationReport; extract .results list
+    results = getattr(report, "results", report) if not isinstance(report, list) else report
     _print_dynamic_results(results, console)
 
     if html:
@@ -197,6 +207,10 @@ def ops_sim(
 
     if diurnal_peak < 1.0:
         console.print("[red]--diurnal-peak must be >= 1.0[/]")
+        raise typer.Exit(1)
+
+    if deploy_hour < 0 or deploy_hour > 23:
+        console.print("[red]--deploy-hour must be between 0 and 23[/]")
         raise typer.Exit(1)
 
     # Load model
