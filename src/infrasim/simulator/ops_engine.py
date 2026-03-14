@@ -225,6 +225,10 @@ class _OpsComponentState:
     current_replicas: int = 1
     base_replicas: int = 1
 
+    # Instance-level failure tracking: how many replicas are currently down.
+    # A random failure on a multi-replica component only downs 1 instance.
+    instances_down: int = 0
+
     # Degradation accumulators
     leaked_memory_mb: float = 0.0
     filled_disk_gb: float = 0.0
@@ -429,9 +433,37 @@ class SLOTracker:
                 down += 1
         total = len(comp_states)
 
-        # Service-tier availability
+        # Service-tier availability (macro level)
         effective_up = tier_count - tier_down - tier_fractional_down
-        availability = (effective_up / tier_count * 100.0) if tier_count > 0 else 100.0
+        macro_avail = (effective_up / tier_count * 100.0) if tier_count > 0 else 100.0
+
+        # Request-level micro-availability: even when tiers are "up",
+        # failover transitions cause brief request failures.
+        # Model: each DOWN instance causes (failover_time / step_window)
+        # fraction of requests to fail on that instance's share of traffic.
+        micro_penalty = 0.0
+        for comp_id, h in effective_health.items():
+            if h != HealthStatus.DOWN:
+                continue
+            comp = self.graph.get_component(comp_id)
+            if comp is None or comp.replicas < 1:
+                continue
+            if comp.failover.enabled:
+                fo_time = (comp.failover.promotion_time_seconds
+                           + comp.failover.health_check_interval_seconds
+                           * comp.failover.failover_threshold)
+                # This instance handles 1/replicas of traffic
+                instance_share = 1.0 / max(comp.replicas, 1)
+                # Fraction of the timestep where requests fail
+                # Estimate step window from measurement history
+                if len(self._measurements) >= 2:
+                    step_window = time_seconds - self._measurements[-1].time_seconds
+                else:
+                    step_window = 300
+                time_fraction = min(1.0, fo_time / step_window)
+                micro_penalty += instance_share * time_fraction / total * 100.0
+
+        availability = max(0.0, macro_avail - micro_penalty)
 
         # Max utilization across all components
         max_util = max(
@@ -451,7 +483,7 @@ class SLOTracker:
             degraded_count=degraded,
             overloaded_count=overloaded,
             down_count=down,
-            availability_percent=round(availability, 4),
+            availability_percent=round(availability, 10),
             estimated_latency_p99_ms=round(latency_p99, 2),
             error_rate=round(error_rate, 6),
             max_utilization=round(max_util, 2),
@@ -776,20 +808,49 @@ class OpsSimulationEngine:
                 )
 
                 if is_faulted:
-                    # Maintenance/deploy on multi-replica → DEGRADED (rolling update)
+                    # Classify active faults for this component
                     is_only_planned = all(
                         ev.event_type in (OpsEventType.MAINTENANCE, OpsEventType.DEPLOY, OpsEventType.CERT_RENEWAL)
                         for ev in all_events
                         if ev.target_component_id == comp_id
                         and ev.time_seconds <= t < ev.time_seconds + ev.duration_seconds
                     )
-                    if is_only_planned and comp.replicas > 1:
-                        state.current_health = HealthStatus.DEGRADED
-                        state.current_utilization = state.base_utilization * 1.5
+                    has_unplanned = any(
+                        ev.event_type in (OpsEventType.RANDOM_FAILURE, OpsEventType.MEMORY_LEAK_OOM,
+                                          OpsEventType.DISK_FULL, OpsEventType.CONN_POOL_EXHAUSTION)
+                        for ev in all_events
+                        if ev.target_component_id == comp_id
+                        and ev.time_seconds <= t < ev.time_seconds + ev.duration_seconds
+                    )
+
+                    if comp.replicas > 1:
+                        # Instance-level failure: unplanned faults down
+                        # 1 instance, not the whole component.
+                        if has_unplanned:
+                            state.instances_down = min(
+                                state.instances_down + 1, comp.replicas
+                            )
+                        if state.instances_down >= comp.replicas:
+                            # All instances down → component DOWN
+                            state.current_health = HealthStatus.DOWN
+                            state.current_utilization = 0.0
+                        else:
+                            # Partial failure → DEGRADED with load redistribution
+                            surviving = comp.replicas - state.instances_down
+                            load_factor = comp.replicas / surviving
+                            state.current_health = HealthStatus.DEGRADED
+                            state.current_utilization = (
+                                state.base_utilization * load_factor
+                            )
                     else:
+                        # Single replica: any fault = full DOWN
                         state.current_health = HealthStatus.DOWN
                         state.current_utilization = 0.0
                 else:
+                    # No active fault: recover instances
+                    if state.instances_down > 0:
+                        state.instances_down = max(0, state.instances_down - 1)
+
                     # Calculate effective utilization.
                     # base_utilization is already per-replica, so we
                     # scale by traffic and adjust only for *changes*
@@ -1336,6 +1397,37 @@ class OpsSimulationEngine:
                     # Next failure: skip MTTR + exponential wait
                     t_cursor += mttr_seconds + rng.expovariate(
                         1.0 / mtbf_seconds
+                    )
+
+        # --- Correlated failures (AZ / zone outage simulation) ---
+        # Once per 30-day window, simulate an AZ event that simultaneously
+        # affects ~33% of components of the same type for a short duration.
+        if scenario.enable_random_failures and scenario.duration_days >= 14:
+            az_time = int(total_seconds * 0.6)  # occurs at ~60% of sim
+            az_duration = 120  # 2-minute AZ blip
+            comp_by_type: dict[str, list[str]] = {}
+            for cid, comp in self.graph.components.items():
+                comp_by_type.setdefault(comp.type.value, []).append(cid)
+
+            for ctype, cids in comp_by_type.items():
+                if len(cids) < 2:
+                    continue
+                # Affect ~33% of components in this type (at least 1)
+                affected_count = max(1, len(cids) // 3)
+                affected = rng.sample(cids, min(affected_count, len(cids)))
+                for cid in affected:
+                    events.append(
+                        OpsEvent(
+                            time_seconds=az_time,
+                            event_type=OpsEventType.RANDOM_FAILURE,
+                            target_component_id=cid,
+                            duration_seconds=az_duration,
+                            description=(
+                                f"AZ correlated failure: {cid} "
+                                f"(zone outage affecting {len(affected)}/{len(cids)} "
+                                f"{ctype} components, {az_duration}s)"
+                            ),
+                        )
                     )
 
         # --- Maintenance windows (tier-aware staged) ---
