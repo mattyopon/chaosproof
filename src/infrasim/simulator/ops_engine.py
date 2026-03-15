@@ -1396,8 +1396,13 @@ class OpsSimulationEngine:
                 if mttr_minutes <= 0:
                     mttr_minutes = _DEFAULT_MTTR_MINUTES.get(comp_type, 30.0)
 
+                # Add mean acknowledge time from the operational team config.
+                # Total recovery = acknowledge time + repair time.
+                ack_minutes = comp.team.mean_acknowledge_time_minutes
+                total_recovery_minutes = mttr_minutes + ack_minutes
+
                 mtbf_seconds = mtbf_hours * 3600.0
-                mttr_seconds = mttr_minutes * 60.0
+                mttr_seconds = total_recovery_minutes * 60.0
 
                 # Generate failures using exponential distribution
                 t_cursor = rng.expovariate(1.0 / mtbf_seconds)
@@ -1412,7 +1417,8 @@ class OpsSimulationEngine:
                                 f"Random failure of {comp_id} at "
                                 f"t={int(t_cursor)}s "
                                 f"(MTBF={mtbf_hours}h, "
-                                f"MTTR={mttr_minutes}min)"
+                                f"MTTR={mttr_minutes}min, "
+                                f"ack={ack_minutes}min)"
                             ),
                         )
                     )

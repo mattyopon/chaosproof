@@ -291,7 +291,7 @@ class TestCostProfileEnhancements:
 
     def test_default_recovery_team_size(self):
         cost = CostProfile()
-        assert cost.recovery_team_size == 2
+        assert cost.recovery_team_size == 0  # 0 = use engine default
 
     def test_default_data_loss_cost(self):
         cost = CostProfile()

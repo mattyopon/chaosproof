@@ -8,7 +8,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from .components import Component, ComponentType, Dependency
+from .components import SCHEMA_VERSION, Component, ComponentType, Dependency
 
 
 class InfraGraph:
@@ -342,6 +342,7 @@ class InfraGraph:
 
     def to_dict(self) -> dict:
         return {
+            "schema_version": SCHEMA_VERSION,
             "components": [c.model_dump() for c in self._components.values()],
             "dependencies": [
                 self._graph.edges[e]["dependency"].model_dump()
@@ -355,10 +356,25 @@ class InfraGraph:
 
     @classmethod
     def load(cls, path: Path) -> InfraGraph:
+        import logging
+
+        _logger = logging.getLogger(__name__)
         data = json.loads(path.read_text())
+        # Handle missing schema_version gracefully
+        file_version = data.get("schema_version")
+        if file_version is None:
+            _logger.warning(
+                "Model uses schema v1.0, migrating to v%s", SCHEMA_VERSION
+            )
+        elif file_version != SCHEMA_VERSION:
+            _logger.warning(
+                "Model uses schema v%s, migrating to v%s",
+                file_version,
+                SCHEMA_VERSION,
+            )
         graph = cls()
-        for c in data["components"]:
+        for c in data.get("components", []):
             graph.add_component(Component(**c))
-        for d in data["dependencies"]:
+        for d in data.get("dependencies", []):
             graph.add_dependency(Dependency(**d))
         return graph

@@ -352,8 +352,33 @@ class ComplianceEngine:
     # PCI DSS
     # ------------------------------------------------------------------
 
+    def _has_pci_scope(self) -> bool:
+        """Check if any component is tagged as PCI scope."""
+        return any(
+            comp.compliance_tags.pci_scope
+            for comp in self.graph.components.values()
+        )
+
+    def _has_pii_data(self) -> bool:
+        """Check if any component is tagged as containing PII."""
+        return any(
+            comp.compliance_tags.contains_pii
+            for comp in self.graph.components.values()
+        )
+
+    def _has_audit_logging_tags(self) -> bool:
+        """Check if any component has audit_logging compliance tag."""
+        return any(
+            comp.compliance_tags.audit_logging
+            for comp in self.graph.components.values()
+        )
+
     def check_pci_dss(self) -> ComplianceReport:
-        """Check PCI DSS Requirements 6 (secure systems) and 10 (tracking/monitoring)."""
+        """Check PCI DSS Requirements 6 (secure systems) and 10 (tracking/monitoring).
+
+        When ``compliance_tags.pci_scope`` is True on any component, additional
+        PCI-specific checks are generated for those components.
+        """
         checks: list[ComplianceCheck] = []
 
         # Req-6.1 - Establish a process to identify security vulnerabilities
@@ -447,6 +472,36 @@ class ComplianceEngine:
             evidence=f"Monitoring component for log review: {has_mon}",
             recommendation="" if has_mon else "Deploy monitoring to enable regular log review.",
         ))
+
+        # --- PCI scope-specific checks (from compliance_tags) ---
+        pci_components = [
+            c for c in self.graph.components.values()
+            if c.compliance_tags.pci_scope
+        ]
+        if pci_components:
+            # Req-3.4 - Render PAN unreadable: all PCI-scope components need encryption at rest
+            all_encrypted = all(c.security.encryption_at_rest for c in pci_components)
+            pci_enc_ids = [c.id for c in pci_components if not c.security.encryption_at_rest]
+            checks.append(ComplianceCheck(
+                framework="pci_dss",
+                control_id="Req-3.4",
+                description="Render PAN unreadable (encryption at rest for PCI-scope components)",
+                status="pass" if all_encrypted else "fail",
+                evidence=f"PCI-scope components without encryption_at_rest: {pci_enc_ids}",
+                recommendation="" if all_encrypted else f"Enable encryption at rest on PCI-scope components: {', '.join(pci_enc_ids)}",
+            ))
+
+            # Req-1.3 - Prohibit direct public access to cardholder data
+            all_segmented = all(c.security.network_segmented for c in pci_components)
+            pci_seg_ids = [c.id for c in pci_components if not c.security.network_segmented]
+            checks.append(ComplianceCheck(
+                framework="pci_dss",
+                control_id="Req-1.3",
+                description="Prohibit direct public access to cardholder data environment",
+                status="pass" if all_segmented else "fail",
+                evidence=f"PCI-scope components without network segmentation: {pci_seg_ids}",
+                recommendation="" if all_segmented else f"Enable network segmentation for PCI-scope components: {', '.join(pci_seg_ids)}",
+            ))
 
         return self._build_report("pci_dss", checks)
 
@@ -583,6 +638,54 @@ class ComplianceEngine:
             evidence=f"Components without redundancy: {no_redundancy}. Failover: {has_fo}",
             recommendation="" if improve_status == "pass" else "Ensure all critical components have redundancy and failover.",
         ))
+
+        # --- Compliance tag-driven checks ---
+
+        # PR.DS-1 - Data-at-rest protection for PII components (GDPR/privacy)
+        pii_components = [
+            c for c in self.graph.components.values()
+            if c.compliance_tags.contains_pii
+        ]
+        if pii_components:
+            all_enc_rest = all(c.security.encryption_at_rest for c in pii_components)
+            all_enc_transit = all(c.security.encryption_in_transit for c in pii_components)
+            pii_ids_no_enc = [c.id for c in pii_components
+                              if not c.security.encryption_at_rest or not c.security.encryption_in_transit]
+            if all_enc_rest and all_enc_transit:
+                pii_status = "pass"
+            elif all_enc_rest or all_enc_transit:
+                pii_status = "partial"
+            else:
+                pii_status = "fail"
+            checks.append(ComplianceCheck(
+                framework="nist_csf",
+                control_id="PR.DS-1",
+                description="Data-at-rest is protected (PII/GDPR compliance)",
+                status=pii_status,
+                evidence=f"PII components without full encryption: {pii_ids_no_enc}",
+                recommendation="" if pii_status == "pass" else f"Enable encryption at rest and in transit for PII components: {', '.join(pii_ids_no_enc)}",
+            ))
+
+        # DE.AE-3 - Audit logging: use compliance_tags.audit_logging
+        audit_components = list(self.graph.components.values())
+        if audit_components:
+            audit_tagged = [c for c in audit_components if c.compliance_tags.audit_logging]
+            has_audit_tags = len(audit_tagged) > 0
+            # Pass if either monitoring exists OR audit_logging tags are set
+            if has_mon and has_audit_tags:
+                audit_status = "pass"
+            elif has_mon or has_audit_tags:
+                audit_status = "partial"
+            else:
+                audit_status = "fail"
+            checks.append(ComplianceCheck(
+                framework="nist_csf",
+                control_id="DE.AE-3",
+                description="Event data aggregated and correlated (audit logging)",
+                status=audit_status,
+                evidence=f"Monitoring: {has_mon}. Components with audit_logging tag: {len(audit_tagged)}/{len(audit_components)}",
+                recommendation="" if audit_status == "pass" else "Enable audit logging on components and deploy centralized monitoring.",
+            ))
 
         return self._build_report("nist_csf", checks)
 

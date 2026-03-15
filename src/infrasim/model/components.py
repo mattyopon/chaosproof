@@ -5,6 +5,8 @@ from __future__ import annotations
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 
+SCHEMA_VERSION = "3.0"
+
 
 class ComponentType(str, Enum):
     LOAD_BALANCER = "load_balancer"
@@ -168,7 +170,7 @@ class CostProfile(BaseModel):
     monthly_contract_value: float = 0.0
     customer_ltv: float = 0.0
     churn_rate_per_hour_outage: float = 0.001
-    recovery_team_size: int = 2
+    recovery_team_size: int = 0  # 0 = use engine default
     data_loss_cost_per_gb: float = 0.0
 
 

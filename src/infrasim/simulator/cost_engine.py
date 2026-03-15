@@ -208,15 +208,17 @@ class CostImpactEngine:
         effects: list,
         downtime_minutes: float,
     ) -> float:
-        """Calculate revenue loss across affected components."""
+        """Calculate revenue loss across affected components.
+
+        Includes direct revenue loss plus reputation/churn cost derived from
+        ``customer_ltv`` and ``churn_rate_per_hour_outage``.
+        """
         total_loss = 0.0
         for effect in effects:
             comp = self.graph.get_component(effect.component_id)
             if comp is None:
                 continue
             rpm = comp.cost_profile.revenue_per_minute
-            if rpm <= 0:
-                continue
 
             # Scale loss by health status.
             if effect.health == HealthStatus.DOWN:
@@ -228,7 +230,16 @@ class CostImpactEngine:
             else:
                 factor = 0.0
 
-            total_loss += rpm * downtime_minutes * factor
+            # Direct revenue loss.
+            if rpm > 0:
+                total_loss += rpm * downtime_minutes * factor
+
+            # Reputation / churn cost: customer_ltv * churn_rate * outage_hours.
+            ltv = comp.cost_profile.customer_ltv
+            churn = comp.cost_profile.churn_rate_per_hour_outage
+            if ltv > 0 and churn > 0 and factor > 0:
+                outage_hours = downtime_minutes / 60.0
+                total_loss += ltv * churn * outage_hours * factor
 
         return total_loss
 
@@ -241,6 +252,9 @@ class CostImpactEngine:
 
         SLA penalty is triggered when downtime exceeds the allowed monthly
         error budget derived from the component's SLO targets.
+
+        When ``monthly_contract_value`` is set, it is used as the base for
+        the SLA credit calculation instead of ``revenue_per_minute * MONTHLY_MINUTES``.
         """
         total_penalty = 0.0
         for effect in effects:
@@ -251,7 +265,11 @@ class CostImpactEngine:
                 continue
             sla_pct = comp.cost_profile.sla_credit_percent
             rpm = comp.cost_profile.revenue_per_minute
-            if sla_pct <= 0 or rpm <= 0:
+            mcv = comp.cost_profile.monthly_contract_value
+            if sla_pct <= 0:
+                continue
+            # Need at least one revenue source to compute a penalty.
+            if rpm <= 0 and mcv <= 0:
                 continue
 
             # Check if downtime would breach the SLO.
@@ -264,8 +282,12 @@ class CostImpactEngine:
             # Allowed downtime per month in minutes.
             allowed_downtime = MONTHLY_MINUTES * (1.0 - slo_target / 100.0)
             if downtime_minutes > allowed_downtime:
-                monthly_revenue = rpm * MONTHLY_MINUTES
-                total_penalty += monthly_revenue * (sla_pct / 100.0)
+                # Prefer monthly_contract_value if set; otherwise derive from rpm.
+                if mcv > 0:
+                    base_value = mcv
+                else:
+                    base_value = rpm * MONTHLY_MINUTES
+                total_penalty += base_value * (sla_pct / 100.0)
 
         return total_penalty
 
@@ -274,12 +296,18 @@ class CostImpactEngine:
         effects: list,
         downtime_minutes: float,
     ) -> float:
-        """Calculate recovery cost based on engineer time and per-component rates."""
+        """Calculate recovery cost based on engineer time and per-component rates.
+
+        When a component specifies ``recovery_team_size``, that value is used
+        as the number of engineers for that component's cost contribution
+        instead of the engine-level ``num_engineers`` default.
+        """
         if downtime_minutes <= 0:
             return 0.0
 
         # Use the maximum recovery_engineer_cost across affected DOWN components.
         max_hourly_cost = 0.0
+        max_team_size = 0
         affected_down = 0
         for effect in effects:
             if effect.health != HealthStatus.DOWN:
@@ -292,6 +320,11 @@ class CostImpactEngine:
                 max_hourly_cost,
                 comp.cost_profile.recovery_engineer_cost,
             )
+            # Use recovery_team_size from the component's cost profile when set.
+            if comp.cost_profile.recovery_team_size > 0:
+                max_team_size = max(
+                    max_team_size, comp.cost_profile.recovery_team_size,
+                )
 
         if affected_down == 0:
             return 0.0
@@ -300,5 +333,8 @@ class CostImpactEngine:
         if max_hourly_cost <= 0:
             max_hourly_cost = 100.0
 
+        # Prefer per-component team size if available, else engine default.
+        team_size = max_team_size if max_team_size > 0 else self.num_engineers
+
         mttr_hours = downtime_minutes / 60.0
-        return max_hourly_cost * mttr_hours * self.num_engineers
+        return max_hourly_cost * mttr_hours * team_size

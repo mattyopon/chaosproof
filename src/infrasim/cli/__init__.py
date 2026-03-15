@@ -14,6 +14,7 @@ from infrasim.cli.main import (  # noqa: F401 — re-export
 # commands get registered on the shared ``app`` instance.
 import infrasim.cli.admin  # noqa: F401
 import infrasim.cli.backtest  # noqa: F401
+import infrasim.cli.config_cmd  # noqa: F401
 import infrasim.cli.analyze  # noqa: F401
 import infrasim.cli.daemon_cmd  # noqa: F401
 import infrasim.cli.diff_cmd  # noqa: F401
