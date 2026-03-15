@@ -359,13 +359,18 @@ def _load_graph_for_analysis(
         from infrasim.model.loader import load_yaml
 
         if not yaml_file.exists():
-            console.print(f"[red]YAML file not found: {yaml_file}[/]")
+            console.print(f"[red]Model file not found: {yaml_file}[/]")
+            console.print("[dim]Try: infrasim scan --aws  (auto-discover)[/]")
+            console.print("[dim]Or:  infrasim quickstart  (interactive builder)[/]")
+            console.print("[dim]Or:  infrasim demo        (demo infrastructure)[/]")
             raise typer.Exit(1)
         return load_yaml(yaml_file)
 
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
-        console.print("Run [cyan]chaosproof scan[/] or [cyan]chaosproof load[/] first.")
+        console.print("[dim]Try: infrasim scan --aws  (auto-discover)[/]")
+        console.print("[dim]Or:  infrasim quickstart  (interactive builder)[/]")
+        console.print("[dim]Or:  infrasim demo        (demo infrastructure)[/]")
         raise typer.Exit(1)
 
     if str(model).endswith((".yaml", ".yml")):

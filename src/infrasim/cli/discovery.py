@@ -50,7 +50,10 @@ def scan(
             scanner = AWSScanner(region=region, profile=profile)
             result = scanner.scan()
         except RuntimeError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]AWS credentials not found.[/]")
+            console.print(f"[dim]Try: aws configure[/]")
+            console.print(f"[dim]Or: export AWS_PROFILE=myprofile[/]")
+            console.print(f"[dim]Error detail: {exc}[/]")
             raise typer.Exit(1)
 
         graph = result.graph
@@ -189,6 +192,9 @@ def show(
     """Show infrastructure model summary."""
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
+        console.print("[dim]Try: infrasim scan --aws  (auto-discover)[/]")
+        console.print("[dim]Or:  infrasim quickstart  (interactive builder)[/]")
+        console.print("[dim]Or:  infrasim demo        (demo infrastructure)[/]")
         raise typer.Exit(1)
 
     graph = InfraGraph.load(model)

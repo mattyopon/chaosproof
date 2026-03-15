@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
 
 from infrasim.model.components import (
+    SCHEMA_VERSION,
     AutoScalingConfig,
     CacheWarmingConfig,
     Capacity,
@@ -30,6 +32,23 @@ from infrasim.model.components import (
     SLOTarget,
 )
 from infrasim.model.graph import InfraGraph
+
+logger = logging.getLogger(__name__)
+
+
+def _check_schema_version(raw: dict) -> None:
+    """Check schema_version in the YAML data and log a warning if outdated."""
+    version = raw.get("schema_version")
+    if version is None:
+        logger.warning(
+            "Model uses schema v1.0, migrating to v%s", SCHEMA_VERSION
+        )
+        raw["schema_version"] = SCHEMA_VERSION
+    elif version != SCHEMA_VERSION:
+        logger.warning(
+            "Model uses schema v%s, migrating to v%s", version, SCHEMA_VERSION
+        )
+        raw["schema_version"] = SCHEMA_VERSION
 
 
 def load_yaml(path: Path | str) -> InfraGraph:
@@ -57,6 +76,8 @@ def load_yaml(path: Path | str) -> InfraGraph:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"Expected a YAML mapping at the top level, got {type(raw).__name__}")
+
+    _check_schema_version(raw)
 
     graph = InfraGraph()
 

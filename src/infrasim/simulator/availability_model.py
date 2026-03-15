@@ -394,6 +394,11 @@ def compute_five_layer_model(
     # Adjusted by on-call coverage: lower coverage means longer effective
     # response time because incidents during uncovered hours wait until
     # an engineer is available.
+    #
+    # Per-component team configs (runbook_coverage_percent, automation_percent)
+    # reduce the effective response time:
+    #   - runbook_coverage reduces response time by up to 30%
+    #   - automation reduces MTTR by up to 50%
     # =====================================================================
     hours_per_year = 8760.0
     mean_response_hours = mean_response_minutes / 60.0
@@ -403,6 +408,24 @@ def compute_five_layer_model(
     coverage_fraction = max(0.01, min(1.0, oncall_coverage_percent / 100.0))
     effective_response_hours = mean_response_hours / coverage_fraction
 
+    # Apply team operational readiness from component configs.
+    # Average runbook_coverage_percent and automation_percent across all
+    # components to derive a system-wide operational efficiency factor.
+    if graph.components:
+        avg_runbook = sum(
+            c.team.runbook_coverage_percent for c in graph.components.values()
+        ) / len(graph.components)
+        avg_automation = sum(
+            c.team.automation_percent for c in graph.components.values()
+        ) / len(graph.components)
+
+        # Runbook coverage reduces effective response time by up to 30%.
+        runbook_factor = 1.0 - 0.3 * (avg_runbook / 100.0)
+        # Automation reduces MTTR by up to 50%.
+        automation_factor = 1.0 - 0.5 * (avg_automation / 100.0)
+
+        effective_response_hours *= runbook_factor * automation_factor
+
     # Total downtime fraction from incident response
     operational_unavail = (incidents_per_year * effective_response_hours) / hours_per_year
     operational_avail = max(0.0, min(1.0, 1.0 - operational_unavail))
@@ -411,7 +434,7 @@ def compute_five_layer_model(
         availability=operational_avail,
         nines=_to_nines(operational_avail),
         annual_downtime_seconds=_annual_downtime(operational_avail),
-        description="Operational limit: incident response + on-call coverage",
+        description="Operational limit: incident response + on-call coverage + team readiness",
         details={
             "incidents_per_year": incidents_per_year,
             "mean_response_minutes": mean_response_minutes,

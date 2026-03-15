@@ -261,13 +261,21 @@ def test_five_layer_backward_compat():
 
 
 def test_layer4_operational_default():
-    """Default operational params: 12 incidents/year, 30min response, 100% coverage."""
+    """Default operational params: 12 incidents/year, 30min response, 100% coverage.
+
+    Team readiness factors (runbook_coverage=50%, automation=20% defaults):
+      runbook_factor = 1.0 - 0.3 * 0.5 = 0.85
+      automation_factor = 1.0 - 0.5 * 0.2 = 0.90
+      combined = 0.85 * 0.90 = 0.765
+    """
     graph = _simple_graph()
     result = compute_five_layer_model(graph)
-    # 12 incidents * 0.5 hours / 8760 hours = 0.000685
-    # So availability ~= 0.999315
+    # Base: 12 incidents * 0.5 hours / 8760 hours, reduced by team factors.
+    # runbook_factor = 0.85, automation_factor = 0.90
+    team_factor = (1.0 - 0.3 * 0.5) * (1.0 - 0.5 * 0.2)
+    expected = 1.0 - (12.0 * 0.5 * team_factor / 8760.0)
     assert result.layer4_operational.availability == pytest.approx(
-        1.0 - (12.0 * 0.5 / 8760.0), abs=0.0001
+        expected, abs=0.0001
     )
     assert result.layer4_operational.nines > 2.0
 

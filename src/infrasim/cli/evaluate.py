@@ -8,10 +8,13 @@ analysis, and capacity planning.
 from __future__ import annotations
 
 import json as json_lib
+import logging
 import sys
 from pathlib import Path
 
 import typer
+
+from infrasim.features import is_enabled
 
 from infrasim.cli.main import (
     DEFAULT_MODEL_PATH,
@@ -35,11 +38,16 @@ def _run_evaluation(
     ops_days: int = 7,
     max_scenarios: int = 0,
 ) -> dict:
-    """Run all 5 simulation engines on a graph and return evaluation data.
+    """Run all simulation engines on a graph and return evaluation data.
+
+    Each engine is wrapped with a feature flag check and exception handler
+    so that a single engine failure does not abort the entire evaluation.
 
     Returns a dict with keys: model, components, dependencies, static,
     dynamic, ops, whatif, capacity, verdict.
     """
+    _logger = logging.getLogger(__name__)
+
     num_components = len(graph.components)
     num_dependencies = len(graph.all_dependency_edges())
 
@@ -49,201 +57,302 @@ def _run_evaluation(
         "dependencies": num_dependencies,
     }
 
+    # Track variables needed for verdict
+    static_critical = 0
+    static_warning = 0
+    dyn_critical = 0
+    dyn_warning = 0
+
+    # Raw objects for Rich/HTML rendering
+    raw: dict = {"graph": graph}
+
     # ------------------------------------------------------------------
     # 1. Static Simulation
     # ------------------------------------------------------------------
-    from infrasim.simulator.engine import SimulationEngine
+    if is_enabled("cascade_engine"):
+        try:
+            from infrasim.simulator.engine import SimulationEngine
 
-    static_engine = SimulationEngine(graph)
-    static_report = static_engine.run_all_defaults()
+            static_engine = SimulationEngine(graph)
+            static_report = static_engine.run_all_defaults()
 
-    total_generated = len(static_report.results)
-    static_total = len(static_report.results)
-    static_critical = len(static_report.critical_findings)
-    static_warning = len(static_report.warnings)
-    static_passed = len(static_report.passed)
+            total_generated = len(static_report.results)
+            static_total = len(static_report.results)
+            static_critical = len(static_report.critical_findings)
+            static_warning = len(static_report.warnings)
+            static_passed = len(static_report.passed)
 
-    evaluation_data["static"] = {
-        "resilience_score": round(static_report.resilience_score, 1),
-        "total_scenarios": static_total,
-        "generated_scenarios": total_generated,
-        "critical": static_critical,
-        "warning": static_warning,
-        "passed": static_passed,
-    }
+            evaluation_data["static"] = {
+                "resilience_score": round(static_report.resilience_score, 1),
+                "total_scenarios": static_total,
+                "generated_scenarios": total_generated,
+                "critical": static_critical,
+                "warning": static_warning,
+                "passed": static_passed,
+            }
+            raw["static_report"] = static_report
+        except Exception as e:
+            _logger.warning("Static simulation engine failed: %s", e)
+            evaluation_data["static"] = {"error": str(e)}
+    else:
+        evaluation_data["static"] = {"disabled": True}
+
+    # Ensure static has defaults for verdict
+    if "resilience_score" not in evaluation_data.get("static", {}):
+        evaluation_data["static"].setdefault("resilience_score", 0)
+        evaluation_data["static"].setdefault("total_scenarios", 0)
+        evaluation_data["static"].setdefault("generated_scenarios", 0)
+        evaluation_data["static"].setdefault("critical", 0)
+        evaluation_data["static"].setdefault("warning", 0)
+        evaluation_data["static"].setdefault("passed", 0)
 
     # ------------------------------------------------------------------
     # 2. Dynamic Simulation
     # ------------------------------------------------------------------
-    from infrasim.simulator.dynamic_engine import DynamicSimulationEngine
+    if is_enabled("dynamic_engine"):
+        try:
+            from infrasim.simulator.dynamic_engine import DynamicSimulationEngine
 
-    dyn_engine = DynamicSimulationEngine(graph)
-    dyn_report = dyn_engine.run_all_dynamic_defaults()
+            dyn_engine = DynamicSimulationEngine(graph)
+            dyn_report = dyn_engine.run_all_dynamic_defaults()
 
-    dyn_results = dyn_report.results
-    dyn_total = len(dyn_results)
-    dyn_critical = len(dyn_report.critical_findings)
-    dyn_warning = len(dyn_report.warnings)
-    dyn_passed = len(dyn_report.passed)
+            dyn_results = dyn_report.results
+            dyn_total = len(dyn_results)
+            dyn_critical = len(dyn_report.critical_findings)
+            dyn_warning = len(dyn_report.warnings)
+            dyn_passed = len(dyn_report.passed)
 
-    dyn_worst_name = None
-    dyn_worst_severity = 0.0
-    for r in dyn_results:
-        if r.peak_severity > dyn_worst_severity:
-            dyn_worst_severity = r.peak_severity
-            dyn_worst_name = r.scenario.name
+            dyn_worst_name = None
+            dyn_worst_severity = 0.0
+            for r in dyn_results:
+                if r.peak_severity > dyn_worst_severity:
+                    dyn_worst_severity = r.peak_severity
+                    dyn_worst_name = r.scenario.name
 
-    evaluation_data["dynamic"] = {
-        "total_scenarios": dyn_total,
-        "critical": dyn_critical,
-        "warning": dyn_warning,
-        "passed": dyn_passed,
-        "worst_scenario": dyn_worst_name,
-        "worst_severity": dyn_worst_severity,
-    }
+            evaluation_data["dynamic"] = {
+                "total_scenarios": dyn_total,
+                "critical": dyn_critical,
+                "warning": dyn_warning,
+                "passed": dyn_passed,
+                "worst_scenario": dyn_worst_name,
+                "worst_severity": dyn_worst_severity,
+            }
+            raw["dyn_report"] = dyn_report
+        except Exception as e:
+            _logger.warning("Dynamic engine failed: %s", e)
+            evaluation_data["dynamic"] = {"error": str(e)}
+    else:
+        evaluation_data["dynamic"] = {"disabled": True}
+
+    # Ensure dynamic has defaults for verdict
+    if "total_scenarios" not in evaluation_data.get("dynamic", {}):
+        evaluation_data["dynamic"].setdefault("total_scenarios", 0)
+        evaluation_data["dynamic"].setdefault("critical", 0)
+        evaluation_data["dynamic"].setdefault("warning", 0)
+        evaluation_data["dynamic"].setdefault("passed", 0)
+        evaluation_data["dynamic"].setdefault("worst_scenario", None)
+        evaluation_data["dynamic"].setdefault("worst_severity", 0.0)
 
     # ------------------------------------------------------------------
     # 3. Ops Simulation
     # ------------------------------------------------------------------
-    from infrasim.model.components import SLOTarget
-    from infrasim.simulator.ops_engine import OpsScenario, OpsSimulationEngine
-    from infrasim.simulator.traffic import create_diurnal_weekly
+    if is_enabled("ops_engine"):
+        try:
+            from infrasim.model.components import SLOTarget
+            from infrasim.simulator.ops_engine import OpsScenario, OpsSimulationEngine
+            from infrasim.simulator.traffic import create_diurnal_weekly
 
-    component_ids = list(graph.components.keys())
-    deploy_targets: list[str] = []
-    for comp_id, comp in graph.components.items():
-        if comp.type.value in ("app_server", "web_server"):
-            deploy_targets.append(comp_id)
-    if not deploy_targets:
-        deploy_targets = component_ids[:2] if len(component_ids) >= 2 else list(component_ids)
+            component_ids = list(graph.components.keys())
+            deploy_targets: list[str] = []
+            for comp_id, comp in graph.components.items():
+                if comp.type.value in ("app_server", "web_server"):
+                    deploy_targets.append(comp_id)
+            if not deploy_targets:
+                deploy_targets = component_ids[:2] if len(component_ids) >= 2 else list(component_ids)
 
-    scheduled_deploys = []
-    for dow in [1, 3]:  # Tuesday, Thursday
-        for comp_id in deploy_targets:
-            scheduled_deploys.append({
-                "component_id": comp_id,
-                "day_of_week": dow,
-                "hour": 14,
-                "downtime_seconds": 30,
-            })
+            scheduled_deploys = []
+            for dow in [1, 3]:  # Tuesday, Thursday
+                for comp_id in deploy_targets:
+                    scheduled_deploys.append({
+                        "component_id": comp_id,
+                        "day_of_week": dow,
+                        "hour": 14,
+                        "downtime_seconds": 30,
+                    })
 
-    ops_scenario = OpsScenario(
-        id=f"evaluate-ops-{ops_days}d",
-        name=f"Full operations ({ops_days}d)",
-        duration_days=ops_days,
-        traffic_patterns=[
-            create_diurnal_weekly(
-                peak=2.5, duration=ops_days * 86400, weekend_factor=0.6,
-            ),
-        ],
-        scheduled_deploys=scheduled_deploys,
-        enable_random_failures=True,
-        enable_degradation=True,
-        enable_maintenance=True,
-    )
+            ops_scenario = OpsScenario(
+                id=f"evaluate-ops-{ops_days}d",
+                name=f"Full operations ({ops_days}d)",
+                duration_days=ops_days,
+                traffic_patterns=[
+                    create_diurnal_weekly(
+                        peak=2.5, duration=ops_days * 86400, weekend_factor=0.6,
+                    ),
+                ],
+                scheduled_deploys=scheduled_deploys,
+                enable_random_failures=True,
+                enable_degradation=True,
+                enable_maintenance=True,
+            )
 
-    ops_engine = OpsSimulationEngine(graph)
-    ops_result = ops_engine.run_ops_scenario(ops_scenario)
+            ops_engine = OpsSimulationEngine(graph)
+            ops_result = ops_engine.run_ops_scenario(ops_scenario)
 
-    ops_avg_avail = _compute_avg_availability(ops_result.sli_timeline)
-    ops_total_events = len(ops_result.events)
+            ops_avg_avail = _compute_avg_availability(ops_result.sli_timeline)
+            ops_total_events = len(ops_result.events)
 
-    evaluation_data["ops"] = {
-        "duration_days": ops_days,
-        "avg_availability": round(ops_avg_avail, 4),
-        "min_availability": round(ops_result.min_availability, 2),
-        "total_downtime_seconds": round(ops_result.total_downtime_seconds, 1),
-        "total_events": ops_total_events,
-        "total_deploys": ops_result.total_deploys,
-        "total_failures": ops_result.total_failures,
-        "total_degradation_events": ops_result.total_degradation_events,
-        "peak_utilization": round(ops_result.peak_utilization, 1),
-    }
+            evaluation_data["ops"] = {
+                "duration_days": ops_days,
+                "avg_availability": round(ops_avg_avail, 4),
+                "min_availability": round(ops_result.min_availability, 2),
+                "total_downtime_seconds": round(ops_result.total_downtime_seconds, 1),
+                "total_events": ops_total_events,
+                "total_deploys": ops_result.total_deploys,
+                "total_failures": ops_result.total_failures,
+                "total_degradation_events": ops_result.total_degradation_events,
+                "peak_utilization": round(ops_result.peak_utilization, 1),
+            }
+            raw["ops_result"] = ops_result
+        except Exception as e:
+            _logger.warning("Ops engine failed: %s", e)
+            evaluation_data["ops"] = {"error": str(e)}
+    else:
+        evaluation_data["ops"] = {"disabled": True}
+
+    # Ensure ops has defaults for rendering
+    if "avg_availability" not in evaluation_data.get("ops", {}):
+        evaluation_data["ops"].setdefault("duration_days", ops_days)
+        evaluation_data["ops"].setdefault("avg_availability", 100.0)
+        evaluation_data["ops"].setdefault("min_availability", 100.0)
+        evaluation_data["ops"].setdefault("total_downtime_seconds", 0.0)
+        evaluation_data["ops"].setdefault("total_events", 0)
+        evaluation_data["ops"].setdefault("total_deploys", 0)
+        evaluation_data["ops"].setdefault("total_failures", 0)
+        evaluation_data["ops"].setdefault("total_degradation_events", 0)
+        evaluation_data["ops"].setdefault("peak_utilization", 0.0)
 
     # ------------------------------------------------------------------
     # 4. What-If Analysis
     # ------------------------------------------------------------------
-    from infrasim.simulator.whatif_engine import WhatIfEngine
+    whatif_results = []
+    if is_enabled("whatif_engine"):
+        try:
+            from infrasim.simulator.whatif_engine import WhatIfEngine
 
-    whatif_engine = WhatIfEngine(graph)
-    whatif_results = whatif_engine.run_default_whatifs()
+            whatif_engine = WhatIfEngine(graph)
+            whatif_results = whatif_engine.run_default_whatifs()
 
-    evaluation_data["whatif"] = {
-        "parameters_tested": len(whatif_results),
-        "results": {
-            wr.parameter: {
-                "values": wr.values,
-                "slo_pass": wr.slo_pass,
-                "breakpoint": wr.breakpoint_value,
+            evaluation_data["whatif"] = {
+                "parameters_tested": len(whatif_results),
+                "results": {
+                    wr.parameter: {
+                        "values": wr.values,
+                        "slo_pass": wr.slo_pass,
+                        "breakpoint": wr.breakpoint_value,
+                    }
+                    for wr in whatif_results
+                },
             }
-            for wr in whatif_results
-        },
-    }
+            raw["whatif_results"] = whatif_results
+        except Exception as e:
+            _logger.warning("What-If engine failed: %s", e)
+            evaluation_data["whatif"] = {"error": str(e)}
+    else:
+        evaluation_data["whatif"] = {"disabled": True}
+
+    if "parameters_tested" not in evaluation_data.get("whatif", {}):
+        evaluation_data["whatif"].setdefault("parameters_tested", 0)
+        evaluation_data["whatif"].setdefault("results", {})
 
     # ------------------------------------------------------------------
     # 5. Capacity Planning
     # ------------------------------------------------------------------
-    from infrasim.simulator.capacity_engine import CapacityPlanningEngine
+    if is_enabled("capacity_engine"):
+        try:
+            from infrasim.simulator.capacity_engine import CapacityPlanningEngine
 
-    cap_engine = CapacityPlanningEngine(graph)
-    cap_report = cap_engine.forecast(monthly_growth_rate=0.10, slo_target=99.9)
+            cap_engine = CapacityPlanningEngine(graph)
+            cap_report = cap_engine.forecast(monthly_growth_rate=0.10, slo_target=99.9)
 
-    over_provisioned = [
-        f for f in cap_report.forecasts
-        if f.recommended_replicas_3m < f.current_replicas
-    ]
-    bottleneck_count = len(cap_report.bottleneck_components)
+            over_provisioned = [
+                f for f in cap_report.forecasts
+                if f.recommended_replicas_3m < f.current_replicas
+            ]
+            bottleneck_count = len(cap_report.bottleneck_components)
 
-    evaluation_data["capacity"] = {
-        "over_provisioned_count": len(over_provisioned),
-        "cost_reduction_percent": round(cap_report.estimated_monthly_cost_increase, 1),
-        "bottleneck_count": bottleneck_count,
-        "bottleneck_components": cap_report.bottleneck_components[:5],
-        "error_budget_status": cap_report.error_budget.status,
-    }
+            evaluation_data["capacity"] = {
+                "over_provisioned_count": len(over_provisioned),
+                "cost_reduction_percent": round(cap_report.estimated_monthly_cost_increase, 1),
+                "bottleneck_count": bottleneck_count,
+                "bottleneck_components": cap_report.bottleneck_components[:5],
+                "error_budget_status": cap_report.error_budget.status,
+            }
+            raw["cap_report"] = cap_report
+        except Exception as e:
+            _logger.warning("Capacity engine failed: %s", e)
+            evaluation_data["capacity"] = {"error": str(e)}
+    else:
+        evaluation_data["capacity"] = {"disabled": True}
+
+    if "over_provisioned_count" not in evaluation_data.get("capacity", {}):
+        evaluation_data["capacity"].setdefault("over_provisioned_count", 0)
+        evaluation_data["capacity"].setdefault("cost_reduction_percent", 0.0)
+        evaluation_data["capacity"].setdefault("bottleneck_count", 0)
+        evaluation_data["capacity"].setdefault("bottleneck_components", [])
+        evaluation_data["capacity"].setdefault("error_budget_status", "unknown")
 
     # ------------------------------------------------------------------
     # 6. 5-Layer Availability Limit Model
     # ------------------------------------------------------------------
-    from infrasim.simulator.availability_model import compute_five_layer_model
+    try:
+        from infrasim.simulator.availability_model import compute_five_layer_model
 
-    five_layer = compute_five_layer_model(graph)
-    evaluation_data["availability_limits"] = {
-        "layer1_software": {
-            "nines": round(five_layer.layer1_software.nines, 2),
-            "availability_percent": round(five_layer.layer1_software.availability * 100, 6),
-            "annual_downtime_seconds": round(five_layer.layer1_software.annual_downtime_seconds, 0),
-            "description": five_layer.layer1_software.description,
-        },
-        "layer2_hardware": {
-            "nines": round(five_layer.layer2_hardware.nines, 2),
-            "availability_percent": round(five_layer.layer2_hardware.availability * 100, 6),
-            "annual_downtime_seconds": round(five_layer.layer2_hardware.annual_downtime_seconds, 0),
-            "description": five_layer.layer2_hardware.description,
-        },
-        "layer3_theoretical": {
-            "nines": round(five_layer.layer3_theoretical.nines, 2),
-            "availability_percent": round(five_layer.layer3_theoretical.availability * 100, 6),
-            "annual_downtime_seconds": round(five_layer.layer3_theoretical.annual_downtime_seconds, 0),
-            "description": five_layer.layer3_theoretical.description,
-        },
-        "layer4_operational": {
-            "nines": round(five_layer.layer4_operational.nines, 2),
-            "availability_percent": round(five_layer.layer4_operational.availability * 100, 6),
-            "annual_downtime_seconds": round(five_layer.layer4_operational.annual_downtime_seconds, 0),
-            "description": five_layer.layer4_operational.description,
-        },
-        "layer5_external": {
-            "nines": round(five_layer.layer5_external.nines, 2),
-            "availability_percent": round(five_layer.layer5_external.availability * 100, 6),
-            "annual_downtime_seconds": round(five_layer.layer5_external.annual_downtime_seconds, 0),
-            "description": five_layer.layer5_external.description,
-        },
-    }
+        five_layer = compute_five_layer_model(graph)
+        evaluation_data["availability_limits"] = {
+            "layer1_software": {
+                "nines": round(five_layer.layer1_software.nines, 2),
+                "availability_percent": round(five_layer.layer1_software.availability * 100, 6),
+                "annual_downtime_seconds": round(five_layer.layer1_software.annual_downtime_seconds, 0),
+                "description": five_layer.layer1_software.description,
+            },
+            "layer2_hardware": {
+                "nines": round(five_layer.layer2_hardware.nines, 2),
+                "availability_percent": round(five_layer.layer2_hardware.availability * 100, 6),
+                "annual_downtime_seconds": round(five_layer.layer2_hardware.annual_downtime_seconds, 0),
+                "description": five_layer.layer2_hardware.description,
+            },
+            "layer3_theoretical": {
+                "nines": round(five_layer.layer3_theoretical.nines, 2),
+                "availability_percent": round(five_layer.layer3_theoretical.availability * 100, 6),
+                "annual_downtime_seconds": round(five_layer.layer3_theoretical.annual_downtime_seconds, 0),
+                "description": five_layer.layer3_theoretical.description,
+            },
+            "layer4_operational": {
+                "nines": round(five_layer.layer4_operational.nines, 2),
+                "availability_percent": round(five_layer.layer4_operational.availability * 100, 6),
+                "annual_downtime_seconds": round(five_layer.layer4_operational.annual_downtime_seconds, 0),
+                "description": five_layer.layer4_operational.description,
+            },
+            "layer5_external": {
+                "nines": round(five_layer.layer5_external.nines, 2),
+                "availability_percent": round(five_layer.layer5_external.availability * 100, 6),
+                "annual_downtime_seconds": round(five_layer.layer5_external.annual_downtime_seconds, 0),
+                "description": five_layer.layer5_external.description,
+            },
+        }
+        raw["five_layer"] = five_layer
+    except Exception as e:
+        _logger.warning("5-Layer availability model failed: %s", e)
+        evaluation_data["availability_limits"] = {"error": str(e)}
 
     # ------------------------------------------------------------------
     # Determine overall verdict
     # ------------------------------------------------------------------
+    static_critical = evaluation_data.get("static", {}).get("critical", 0)
+    static_warning = evaluation_data.get("static", {}).get("warning", 0)
+    dyn_critical = evaluation_data.get("dynamic", {}).get("critical", 0)
+    dyn_warning = evaluation_data.get("dynamic", {}).get("warning", 0)
+
     if dyn_critical > 0 or static_critical > 0:
         verdict = "NEEDS ATTENTION"
     elif dyn_warning > 0 or static_warning > 0:
@@ -254,15 +363,14 @@ def _run_evaluation(
     evaluation_data["verdict"] = verdict
 
     # Attach raw objects for Rich/HTML rendering (not serialised)
-    evaluation_data["_raw"] = {
-        "static_report": static_report,
-        "dyn_report": dyn_report,
-        "ops_result": ops_result,
-        "whatif_results": whatif_results,
-        "cap_report": cap_report,
-        "graph": graph,
-        "five_layer": five_layer,
-    }
+    # Use .get() defaults so rendering code works even if an engine failed
+    raw.setdefault("static_report", None)
+    raw.setdefault("dyn_report", None)
+    raw.setdefault("ops_result", None)
+    raw.setdefault("whatif_results", whatif_results)
+    raw.setdefault("cap_report", None)
+    raw.setdefault("five_layer", None)
+    evaluation_data["_raw"] = raw
 
     return evaluation_data
 
