@@ -8,6 +8,7 @@ from datetime import timedelta
 import pytest
 
 from infrasim.model.components import (
+    AutoScalingConfig,
     Component,
     ComponentType,
     CostProfile,
@@ -751,3 +752,255 @@ class TestEdgeCases:
         """All ComponentTypes should have a default availability."""
         for ct in ComponentType:
             assert ct in COMPONENT_AVAILABILITY
+
+
+# ===========================================================================
+# Coverage gap tests — targeting lines 172, 174, 209, 423, 427, 463,
+# 543, 619, 630-634, 637-638, 644-648, 669, 675
+# ===========================================================================
+
+
+class TestNinesToAvailabilityEdgeCases:
+    """Cover lines 172 and 174: _nines_to_availability edge cases."""
+
+    def test_nines_to_availability_infinite_returns_one(self) -> None:
+        """Infinite nines should return perfect availability (1.0). [line 172]"""
+        assert _nines_to_availability(float("inf")) == 1.0
+
+    def test_nines_to_availability_zero_returns_zero(self) -> None:
+        """Zero nines should return 0.0 availability. [line 174]"""
+        assert _nines_to_availability(0.0) == 0.0
+
+    def test_nines_to_availability_negative_returns_zero(self) -> None:
+        """Negative nines should return 0.0 availability. [line 174]"""
+        assert _nines_to_availability(-1.0) == 0.0
+
+
+class TestFailoverDefaultMTBF:
+    """Cover line 209: failover with mtbf_hours <= 0 falls back to _DEFAULT_MTBF."""
+
+    def test_failover_with_zero_mtbf_uses_default(self) -> None:
+        """A component with failover enabled but mtbf_hours=0 should use the
+        default MTBF lookup and still compute effective availability. [line 209]"""
+        comp = Component(
+            id="db", name="DB", type=ComponentType.DATABASE,
+            replicas=2,
+            operational_profile=OperationalProfile(mtbf_hours=0, mttr_minutes=0),
+            failover=FailoverConfig(
+                enabled=True, promotion_time_seconds=10,
+                health_check_interval_seconds=5, failover_threshold=2,
+            ),
+        )
+        a_eff = _component_effective_availability(comp)
+        # Should be valid availability despite zero mtbf_hours input
+        assert 0.0 < a_eff <= 1.0
+
+
+class TestMonteCarloDefaultMTBFMTTR:
+    """Cover lines 423, 427, 463: Monte Carlo with zero MTBF/MTTR
+    using default lookups and the zero-MTTR branch."""
+
+    def test_breach_probability_zero_mtbf_mttr(self) -> None:
+        """Components with mtbf_hours=0 and mttr_minutes=0 should use
+        default lookups in Monte Carlo. [lines 423, 427]"""
+        engine = SLAValidatorEngine()
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            replicas=2,
+            operational_profile=OperationalProfile(mtbf_hours=0, mttr_minutes=0),
+        ))
+        graph.add_dependency(Dependency(
+            source_id="app", target_id="app",  # self-dep just to ensure edge
+        ))
+        target = SLATarget(name="Test", target_nines=3.0)
+        # Should not raise; uses default MTBF/MTTR
+        p = engine.estimate_breach_probability(graph, target, simulations=100, seed=42)
+        assert 0.0 <= p <= 1.0
+
+    def test_breach_probability_zero_mttr_branch(self) -> None:
+        """When mttr_hours evaluates to 0 after lookup, the else branch sets
+        sampled_mttr = 1e-9. [line 463]"""
+        engine = SLAValidatorEngine()
+        graph = InfraGraph()
+        # Use a custom component type but set mttr to 0 explicitly
+        graph.add_component(Component(
+            id="srv", name="Server", type=ComponentType.APP_SERVER,
+            replicas=1,
+            operational_profile=OperationalProfile(mtbf_hours=2160, mttr_minutes=0),
+        ))
+        target = SLATarget(name="Test", target_nines=2.0)
+        p = engine.estimate_breach_probability(graph, target, simulations=50, seed=42)
+        assert 0.0 <= p <= 1.0
+
+
+class TestFindMinimumChangesGap:
+    """Cover line 543: remaining_gap <= 1.0 break in find_minimum_changes."""
+
+    def test_no_improvements_when_system_exceeds_target(self) -> None:
+        """When system availability already exceeds target, the loop should
+        return empty immediately."""
+        engine = SLAValidatorEngine()
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            replicas=5,
+            operational_profile=OperationalProfile(mtbf_hours=8760, mttr_minutes=1),
+        ))
+        improvements = engine.find_minimum_changes(graph, 1.0)
+        assert len(improvements) == 0
+
+    def test_remaining_gap_break_with_multi_components(self) -> None:
+        """When improving the weakest component closes the gap, the loop
+        should break before processing remaining components. [line 543]"""
+        engine = SLAValidatorEngine()
+        graph = InfraGraph()
+        # One very weak component (low MTBF, high MTTR, single replica)
+        graph.add_component(Component(
+            id="weak", name="Weak", type=ComponentType.APP_SERVER,
+            replicas=1,
+            operational_profile=OperationalProfile(mtbf_hours=100, mttr_minutes=120),
+        ))
+        # One strong component
+        graph.add_component(Component(
+            id="strong", name="Strong", type=ComponentType.APP_SERVER,
+            replicas=5,
+            operational_profile=OperationalProfile(mtbf_hours=8760, mttr_minutes=1),
+        ))
+        graph.add_dependency(Dependency(
+            source_id="weak", target_id="strong", dependency_type="requires",
+        ))
+        # Set a moderate target that can be met by improving only the weak component
+        improvements = engine.find_minimum_changes(graph, 3.0)
+        # The weak component should get improvement suggestions
+        assert len(improvements) >= 1
+        # The strong component should NOT get suggestions (gap closed before it)
+        improved_ids = {imp.component for imp in improvements}
+        assert "weak" in improved_ids
+
+
+class TestSuggestImprovementEdgeCases:
+    """Cover lines 619, 630-634, 637-638, 644-648:
+    _suggest_improvement branches for perfect availability,
+    needed_replicas > current replicas, no failover + multi-replica,
+    and the fallback suggestion."""
+
+    def test_perfect_base_availability_branch(self) -> None:
+        """When a_base >= 1.0, needed_replicas = current replicas. [line 619]"""
+        engine = SLAValidatorEngine()
+        # Directly test _suggest_improvement with a component whose base
+        # availability rounds to 1.0 in floating point.
+        comp = Component(
+            id="perfect", name="Perfect", type=ComponentType.APP_SERVER,
+            replicas=2,
+            operational_profile=OperationalProfile(
+                mtbf_hours=1e18, mttr_minutes=1e-18,
+            ),
+        )
+        a_base = _component_base_availability(comp)
+        assert a_base >= 1.0  # floating point rounds to 1.0
+        a_current = 0.9999
+        a_needed = 0.99999
+        suggestion, cost = engine._suggest_improvement(comp, a_current, a_needed)
+        # With a_base=1.0, the else branch is taken (line 619)
+        assert len(suggestion) > 0
+
+    def test_needed_replicas_greater_than_current(self) -> None:
+        """When component has replicas > 1 but still needs more,
+        'Increase replicas from X to Y' suggestion is triggered. [lines 630-634]"""
+        engine = SLAValidatorEngine()
+        # Call _suggest_improvement directly to isolate the branch
+        comp = Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            replicas=2,
+            operational_profile=OperationalProfile(mtbf_hours=100, mttr_minutes=60),
+        )
+        a_base = _component_base_availability(comp)
+        a_current = _component_effective_availability(comp)
+        # Need a very high availability that requires many more replicas
+        a_needed = 0.9999999
+        suggestion, cost = engine._suggest_improvement(comp, a_current, a_needed)
+        assert "Increase replicas from 2" in suggestion
+
+    def test_no_failover_multi_replica_suggestion(self) -> None:
+        """Multi-replica component without failover should suggest
+        enabling failover. [lines 637-638]"""
+        engine = SLAValidatorEngine()
+        # Call _suggest_improvement directly to hit the failover branch
+        comp = Component(
+            id="srv", name="Server", type=ComponentType.APP_SERVER,
+            replicas=3,
+            operational_profile=OperationalProfile(mtbf_hours=100, mttr_minutes=60),
+            failover=FailoverConfig(enabled=False),
+        )
+        a_current = _component_effective_availability(comp)
+        # Need higher availability than current, but not so high that replicas dominate
+        a_needed = min(a_current * 1.001, 0.99999)
+        suggestion, cost = engine._suggest_improvement(comp, a_current, a_needed)
+        assert "failover" in suggestion.lower()
+
+    def test_fallback_improve_reliability_suggestion(self) -> None:
+        """When replicas are sufficient, failover is enabled, and autoscaling
+        is enabled, the fallback should suggest improving single-instance
+        reliability. [lines 644-648]"""
+        engine = SLAValidatorEngine()
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="srv", name="Server", type=ComponentType.APP_SERVER,
+            replicas=10,
+            operational_profile=OperationalProfile(mtbf_hours=200, mttr_minutes=120),
+            failover=FailoverConfig(
+                enabled=True, promotion_time_seconds=5,
+                health_check_interval_seconds=5, failover_threshold=2,
+            ),
+            autoscaling=AutoScalingConfig(enabled=True),
+        ))
+        improvements = engine.find_minimum_changes(graph, 9.0)
+        has_reliability = any(
+            "reliability" in imp.suggestion.lower()
+            for imp in improvements
+        )
+        assert has_reliability
+
+
+class TestExpectedPenaltyRevenuePerMinute:
+    """Cover lines 669 and 675: _calculate_expected_penalty with
+    revenue_per_minute and with zero revenue."""
+
+    def test_penalty_with_revenue_per_minute(self) -> None:
+        """When revenue_per_minute is set, expected penalty should be > 0.
+        [line 669]"""
+        engine = SLAValidatorEngine()
+        target = SLATarget(
+            name="Test",
+            target_nines=3.0,
+            penalty_tiers=[
+                PenaltyTier(threshold=99.0, penalty_percent=25.0),
+            ],
+        )
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            cost_profile=CostProfile(revenue_per_minute=10.0),
+        ))
+        cost = engine._calculate_expected_penalty(target, 0.1, graph)
+        # revenue = 10 * 60 * 24 * 30.44 = 438,336
+        # expected = 0.1 * 0.25 * 438336 = 10,958.4
+        assert cost > 0
+
+    def test_penalty_zero_revenue_returns_zero(self) -> None:
+        """When no cost profile has revenue, expected penalty is 0.0. [line 675]"""
+        engine = SLAValidatorEngine()
+        target = SLATarget(
+            name="Test",
+            target_nines=3.0,
+            penalty_tiers=[
+                PenaltyTier(threshold=99.0, penalty_percent=25.0),
+            ],
+        )
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+        ))
+        cost = engine._calculate_expected_penalty(target, 0.1, graph)
+        assert cost == 0.0

@@ -1090,6 +1090,21 @@ class TestComponentDiversityZeroTotal:
         trait = engine._trait_component_diversity(graph)
         assert trait.value == 0.0
 
+    def test_component_diversity_zero_total_via_mock(self):
+        """Force Counter to return empty to hit the total==0 guard (line 803-806)."""
+        from unittest.mock import patch
+        from collections import Counter
+
+        engine = ChaosGenomeEngine()
+        graph = InfraGraph()
+        graph.add_component(Component(
+            id="a", name="A", type=ComponentType.APP_SERVER, replicas=2,
+        ))
+        # Mock Counter to return an empty counter so total == 0
+        with patch("infrasim.simulator.chaos_genome.Counter", return_value=Counter()):
+            trait = engine._trait_component_diversity(graph)
+        assert trait.value == 0.0
+
 
 class TestMinReplicasThreeOrMore:
     """Test min_replicas trait with 3+ replicas (line 850)."""

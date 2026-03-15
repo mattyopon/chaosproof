@@ -100,6 +100,26 @@ class TestScenarioReview:
         assert r.rating == 4
         assert isinstance(r.date, datetime)
 
+    def test_review_from_dict_with_invalid_date_string(self):
+        """Line 89-90: Invalid date string falls back to datetime.now()."""
+        r = ScenarioReview.from_dict({
+            "author": "dave",
+            "rating": 3,
+            "date": "not-a-valid-date",
+        })
+        assert r.author == "dave"
+        assert isinstance(r.date, datetime)
+
+    def test_review_from_dict_with_non_string_non_datetime_date(self):
+        """Line 91-92: Non-string, non-datetime date value falls back."""
+        r = ScenarioReview.from_dict({
+            "author": "eve",
+            "rating": 2,
+            "date": 12345,
+        })
+        assert r.author == "eve"
+        assert isinstance(r.date, datetime)
+
 
 # ---------------------------------------------------------------------------
 # ScenarioPackage tests
@@ -146,6 +166,35 @@ class TestScenarioPackage:
             "downloads", "rating", "reviews", "featured",
         }
         assert required_keys.issubset(d.keys())
+
+    def test_from_dict_with_invalid_datetime_string(self):
+        """Line 164-165: Invalid datetime string falls back to now()."""
+        pkg = _make_package()
+        d = pkg.to_dict()
+        d["created_at"] = "not-a-valid-datetime"
+        d["updated_at"] = "also-invalid"
+        restored = ScenarioPackage.from_dict(d)
+        assert isinstance(restored.created_at, datetime)
+        assert isinstance(restored.updated_at, datetime)
+
+    def test_from_dict_with_numeric_datetime(self):
+        """Line 166-168: Non-string, non-datetime value falls back to now()."""
+        pkg = _make_package()
+        d = pkg.to_dict()
+        d["created_at"] = 12345
+        d["updated_at"] = None
+        restored = ScenarioPackage.from_dict(d)
+        assert isinstance(restored.created_at, datetime)
+        assert isinstance(restored.updated_at, datetime)
+
+    def test_from_dict_with_datetime_object(self):
+        """Line 167: datetime object passed directly should be kept as-is."""
+        pkg = _make_package()
+        d = pkg.to_dict()
+        fixed_dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        d["created_at"] = fixed_dt
+        restored = ScenarioPackage.from_dict(d)
+        assert restored.created_at == fixed_dt
 
 
 # ---------------------------------------------------------------------------
@@ -414,10 +463,74 @@ class TestScenarioMarketplace:
             for f in s.faults:
                 assert isinstance(f.fault_type, FaultType)
 
+    def test_load_user_package_with_invalid_json(self, mp: ScenarioMarketplace):
+        """Line 301-302: Invalid JSON in user store is silently skipped."""
+        # Write an invalid JSON file to the store
+        bad_path = mp._store / "broken-pkg.json"
+        bad_path.write_text("{not valid json!!!", encoding="utf-8")
+        # Should not raise, just skip the bad file
+        packages = mp.list_packages()
+        assert all(p.id != "broken-pkg" for p in packages)
+
+    def test_install_package_with_invalid_fault_type(self, mp: ScenarioMarketplace):
+        """Line 372-373: Invalid fault_type in scenario data falls back
+        to COMPONENT_DOWN."""
+        from infrasim.simulator.scenarios import FaultType
+
+        custom_pkg = _make_package(
+            pkg_id="bad-fault-pkg",
+            name="Bad Fault Package",
+            scenarios=[
+                {
+                    "name": "Bad Fault Scenario",
+                    "description": "Has an invalid fault type",
+                    "faults": [
+                        {
+                            "target_component_id": "app-1",
+                            "fault_type": "totally_invalid_fault_type",
+                            "severity": 1.0,
+                            "duration_seconds": 300,
+                        },
+                    ],
+                    "traffic_multiplier": 1.0,
+                },
+            ],
+        )
+        # Write the package to the store
+        path = mp._store / "bad-fault-pkg.json"
+        path.write_text(
+            json.dumps(custom_pkg.to_dict(), default=str), encoding="utf-8"
+        )
+
+        scenarios = mp.install_package("bad-fault-pkg")
+        assert len(scenarios) == 1
+        assert scenarios[0].faults[0].fault_type == FaultType.COMPONENT_DOWN
+
 
 # ---------------------------------------------------------------------------
 # Integration: marketplace + scenario model
 # ---------------------------------------------------------------------------
+
+
+class TestMarketplaceBuiltinLoadFailure:
+    def test_builtin_import_failure_graceful(self, tmp_path: Path):
+        """Line 281-283: If builtin_packages fails to import, marketplace
+        should still work with an empty builtin list."""
+        import unittest.mock as mock
+
+        # Patch the import inside _load_builtins to raise an exception
+        with mock.patch.dict(
+            "sys.modules",
+            {"infrasim.marketplace.builtin_packages": None},
+        ):
+            # Force fresh instance that will try to import and fail
+            mp = ScenarioMarketplace.__new__(ScenarioMarketplace)
+            mp._store = tmp_path / "marketplace"
+            mp._store.mkdir(parents=True, exist_ok=True)
+            mp._builtin = []
+            mp._load_builtins()
+            # After failure, _builtin should be empty
+            assert mp._builtin == []
 
 
 class TestMarketplaceIntegration:

@@ -153,6 +153,61 @@ class TestBacktestEngine:
         assert results[0].precision == pytest.approx(1.0)
         assert results[0].recall == pytest.approx(1.0)
 
+    def test_backtest_summary(self):
+        from infrasim.simulator.backtest_engine import BacktestEngine, RealIncident
+
+        graph = _demo_graph()
+        engine = BacktestEngine(graph)
+
+        affected = graph.get_all_affected("postgres")
+        incidents = [
+            RealIncident(
+                incident_id="INC-S1",
+                timestamp="2024-01-20T10:00:00Z",
+                failed_component="postgres",
+                actual_affected_components=sorted(affected),
+                actual_downtime_minutes=30.0,
+                actual_severity="high",
+            ),
+        ]
+        results = engine.run_backtest(incidents)
+        summary = engine.summary(results)
+        assert summary["total_incidents"] == 1
+        assert "avg_precision" in summary
+        assert "avg_recall" in summary
+        assert "avg_f1" in summary
+        assert len(summary["results"]) == 1
+        assert summary["results"][0]["incident_id"] == "INC-S1"
+
+    def test_backtest_summary_empty(self):
+        from infrasim.simulator.backtest_engine import BacktestEngine
+
+        graph = _demo_graph()
+        engine = BacktestEngine(graph)
+        summary = engine.summary([])
+        assert summary["total_incidents"] == 0
+        assert summary["avg_f1"] == 0.0
+
+    def test_backtest_load_incidents(self, tmp_path):
+        from infrasim.simulator.backtest_engine import BacktestEngine, RealIncident
+
+        data = [
+            {
+                "incident_id": "INC-LOAD",
+                "timestamp": "2024-06-01T00:00:00Z",
+                "failed_component": "api",
+                "actual_affected_components": ["web"],
+                "actual_downtime_minutes": 15.0,
+                "actual_severity": "medium",
+            }
+        ]
+        p = tmp_path / "incidents.json"
+        p.write_text(json.dumps(data))
+        incidents = BacktestEngine.load_incidents(p)
+        assert len(incidents) == 1
+        assert incidents[0].incident_id == "INC-LOAD"
+        assert incidents[0].actual_downtime_minutes == 15.0
+
 
 # ===================================================================
 # 2. FinancialRiskEngine

@@ -324,3 +324,22 @@ class TestDigitalTwinInternals:
         graph = _build_simple_graph()
         twin = DigitalTwin(graph)
         assert twin._predict_availability([]) == 99.99
+
+    def test_get_current_metrics_unknown_component(self):
+        """When the component does not exist in the graph and no history, return {}."""
+        graph = _build_simple_graph()
+        twin = DigitalTwin(graph)
+        result = twin._get_current_metrics("nonexistent")
+        assert result == {}
+
+    def test_compute_trend_same_timestamps(self):
+        """When all timestamps are identical, dt_minutes <= 0 so return {}."""
+        graph = _build_simple_graph()
+        twin = DigitalTwin(graph)
+        t = time.time()
+        twin._history = [
+            {"timestamp": t, "metrics": {"app": {"cpu_percent": 50.0}}},
+            {"timestamp": t, "metrics": {"app": {"cpu_percent": 60.0}}},
+        ]
+        trend = twin._compute_trend("app")
+        assert trend == {}

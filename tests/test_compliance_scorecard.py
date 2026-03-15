@@ -459,3 +459,54 @@ class TestEdgeCases:
         scorecard = engine.assess_single(g, Framework.PCI_DSS)
         net = next(c for c in scorecard.controls if c.control_id == "1.1")
         assert net.score == 100
+
+
+# ---------------------------------------------------------------------------
+# Coverage: third-party scoring gaps (lines 682, 696-697)
+# ---------------------------------------------------------------------------
+
+
+class TestThirdPartyGaps:
+    def test_external_api_with_poor_security_triggers_gaps(self):
+        """When external APIs have poor security, gaps and recommendations
+        should be generated (lines 696-697)."""
+        engine = ComplianceScorecardEngine()
+        g = InfraGraph()
+        # External API with no security features at all
+        g.add_component(_comp(
+            "ext", "Weak External API", ComponentType.EXTERNAL_API,
+        ))
+        scorecard = engine.assess_single(g, Framework.DORA)
+        tp = next(c for c in scorecard.controls if c.control_id == "Art.28")
+        assert tp.score < 80
+        assert len(tp.gaps) > 0
+        assert len(tp.recommendations) > 0
+        assert any("third-party" in gap.lower() for gap in tp.gaps)
+
+    def test_external_api_partial_security(self):
+        """External API with some but not all features."""
+        engine = ComplianceScorecardEngine()
+        g = InfraGraph()
+        g.add_component(_comp(
+            "ext", "Partial API", ComponentType.EXTERNAL_API,
+            failover=True,  # only failover, no rate-limit, no encryption
+        ))
+        scorecard = engine.assess_single(g, Framework.DORA)
+        tp = next(c for c in scorecard.controls if c.control_id == "Art.28")
+        # failover = 30 points, total = 30/100 < 80
+        assert tp.score < 80
+
+    def test_external_api_with_replicas(self):
+        """Line 682: External API with replicas > 1 should get 20 extra points."""
+        engine = ComplianceScorecardEngine()
+        g = InfraGraph()
+        c = _comp(
+            "ext", "Replicated External API", ComponentType.EXTERNAL_API,
+            failover=True, rate_limit=True, encrypt_transit=True,
+        )
+        c.replicas = 2  # triggers line 682
+        g.add_component(c)
+        scorecard = engine.assess_single(g, Framework.DORA)
+        tp = next(c for c in scorecard.controls if c.control_id == "Art.28")
+        # failover(30) + replicas(20) + rate_limit(25) + encryption(25) = 100
+        assert tp.score == 100
