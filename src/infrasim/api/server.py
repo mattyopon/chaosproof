@@ -1120,6 +1120,54 @@ async def api_compliance_check(
 
 
 # ---------------------------------------------------------------------------
+# Slack Bot endpoint
+# ---------------------------------------------------------------------------
+
+@app.post("/api/slack/commands", response_class=JSONResponse)
+async def slack_command_handler(request: Request):
+    """Handle Slack slash commands for ChaosProof.
+
+    Expected form data from Slack:
+        text: "simulate", "score", "trend", "help"
+        user_id: Slack user ID
+        channel_id: Slack channel ID
+    """
+    try:
+        # Slack sends form-encoded data
+        try:
+            form = await request.form()
+            text = form.get("text", "help")
+            user_id = form.get("user_id", "")
+            channel_id = form.get("channel_id", "")
+        except Exception:
+            # Fallback to JSON body (for testing / non-Slack callers)
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+            text = body.get("text", "help")
+            user_id = body.get("user_id", "")
+            channel_id = body.get("channel_id", "")
+
+        from infrasim.integrations.slack_bot import ChaosProofSlackBot, parse_slack_command
+
+        # Use the currently loaded graph's model path if available
+        model_path = _model_path
+
+        bot = ChaosProofSlackBot(model_path=model_path)
+        command = parse_slack_command(str(text), user_id=str(user_id), channel_id=str(channel_id))
+        response = bot.handle_command(command)
+
+        return JSONResponse(response.to_dict())
+    except Exception as exc:
+        logger.error("Slack command handler error: %s", exc, exc_info=True)
+        return JSONResponse(
+            {"text": f"Internal error: {exc}", "response_type": "ephemeral"},
+            status_code=500,
+        )
+
+
+# ---------------------------------------------------------------------------
 # API versioning — mount v1 prefix (backward-compatible dual-mount)
 # ---------------------------------------------------------------------------
 

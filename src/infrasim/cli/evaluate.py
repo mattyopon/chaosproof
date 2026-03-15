@@ -669,6 +669,9 @@ def evaluate(
 
     evaluation_data = _run_evaluation(graph, model_name, ops_days, max_scenarios)
 
+    # Auto-record to history
+    _auto_record_history(graph, evaluation_data)
+
     # ------------------------------------------------------------------
     # Compare mode
     # ------------------------------------------------------------------
@@ -1076,3 +1079,16 @@ th {{ background: #f8f9fa; }}
 </html>"""
 
     path.write_text(html_content, encoding="utf-8")
+
+
+def _auto_record_history(graph: object, evaluation_data: dict) -> None:
+    """Auto-record evaluation results to history tracker (best-effort)."""
+    try:
+        from infrasim.history import HistoryTracker
+
+        raw = evaluation_data.get("_raw", {})
+        static_report = raw.get("static_report")
+        tracker = HistoryTracker()
+        tracker.record(graph, report=static_report)
+    except Exception:
+        pass  # History recording is best-effort, never breaks the CLI

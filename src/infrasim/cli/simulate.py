@@ -236,6 +236,9 @@ def simulate(
     engine = SimulationEngine(graph)
     report = engine.run_all_defaults(max_scenarios=max_scenarios)
 
+    # Auto-record to history
+    _auto_record_history(graph, report)
+
     if json_output:
         console.print_json(data=_static_report_to_json(report))
         return
@@ -404,3 +407,14 @@ def dynamic(
 
         save_html_report(results, graph, html)
         console.print(f"\n[green]HTML report saved to {html}[/]")
+
+
+def _auto_record_history(graph: object, report: object) -> None:
+    """Auto-record simulation results to history tracker (best-effort)."""
+    try:
+        from infrasim.history import HistoryTracker
+
+        tracker = HistoryTracker()
+        tracker.record(graph, report=report)
+    except Exception:
+        pass  # History recording is best-effort, never breaks the CLI
