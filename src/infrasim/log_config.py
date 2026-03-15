@@ -1,11 +1,11 @@
-"""Structured logging configuration for FaultZero."""
+"""Structured logging configuration for FaultRay."""
 
 import logging
 import sys
 
 
 def setup_logging(level: str = "WARNING", json_format: bool = False) -> None:
-    """Configure structured logging for FaultZero.
+    """Configure structured logging for FaultRay.
 
     Args:
         level: Log level string (DEBUG, INFO, WARNING, ERROR, CRITICAL).

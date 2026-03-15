@@ -1,16 +1,16 @@
 services:
   # Web dashboard mode
-  faultzero:
+  faultray:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - FAULTZERO_DB_PATH=/data/faultzero.db
-      - FAULTZERO_CORS_ORIGINS=*
+      - FAULTRAY_DB_PATH=/data/faultray.db
+      - FAULTRAY_CORS_ORIGINS=*
     volumes:
-      - faultzero-data:/data
+      - faultray-data:/data
       - ./examples:/app/examples:ro
-    command: ["faultzero", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["faultray", "serve", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
       interval: 30s
@@ -23,11 +23,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - FAULTZERO_DB_PATH=/data/faultzero.db
-      - FAULTZERO_CORS_ORIGINS=*
+      - FAULTRAY_DB_PATH=/data/faultray.db
+      - FAULTRAY_CORS_ORIGINS=*
     volumes:
-      - faultzero-data:/data
-    command: ["faultzero", "demo", "--web"]
+      - faultray-data:/data
+    command: ["faultray", "demo", "--web"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
       interval: 30s
@@ -40,13 +40,13 @@ services:
   cli:
     build: .
     volumes:
-      - faultzero-data:/data
+      - faultray-data:/data
       - ./examples:/app/examples
       - ./reports:/app/reports
-    entrypoint: ["faultzero"]
+    entrypoint: ["faultray"]
     command: ["--help"]
     profiles:
       - cli
 
 volumes:
-  faultzero-data:
+  faultray-data:

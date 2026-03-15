@@ -1,34 +1,34 @@
 # Terraform Integration
 
-FaultZero can import infrastructure models directly from Terraform configuration files and state, enabling resilience evaluation before deployment.
+FaultRay can import infrastructure models directly from Terraform configuration files and state, enabling resilience evaluation before deployment.
 
 ## Setup
 
-No additional dependencies are required. Terraform integration is included in the base FaultZero installation.
+No additional dependencies are required. Terraform integration is included in the base FaultRay installation.
 
 ## Import from Terraform files
 
 ### HCL configuration files
 
 ```bash
-faultzero tf-import --dir ./terraform --output tf-model.json
+faultray tf-import --dir ./terraform --output tf-model.json
 ```
 
 ### Terraform state
 
 ```bash
-faultzero tf-import --state terraform.tfstate --output tf-model.json
+faultray tf-import --state terraform.tfstate --output tf-model.json
 ```
 
 ### Remote state (S3)
 
 ```bash
-faultzero tf-import --state s3://my-bucket/terraform.tfstate --output tf-model.json
+faultray tf-import --state s3://my-bucket/terraform.tfstate --output tf-model.json
 ```
 
 ## Supported Resources
 
-FaultZero parses the following Terraform resource types:
+FaultRay parses the following Terraform resource types:
 
 | Provider | Resources |
 |----------|-----------|
@@ -45,7 +45,7 @@ Gate Terraform applies on resilience score:
 # In your CI pipeline
 resource "null_resource" "resilience_check" {
   provisioner "local-exec" {
-    command = "faultzero tf-import --dir . --output /tmp/model.json && faultzero evaluate -m /tmp/model.json --threshold 70"
+    command = "faultray tf-import --dir . --output /tmp/model.json && faultray evaluate -m /tmp/model.json --threshold 70"
   }
 }
 ```
@@ -57,11 +57,11 @@ resource "null_resource" "resilience_check" {
 terraform plan -out=tfplan
 
 # Import current + planned state
-faultzero tf-import --dir . --output current.json
-faultzero tf-import --plan tfplan --output planned.json
+faultray tf-import --dir . --output current.json
+faultray tf-import --plan tfplan --output planned.json
 
 # Compare resilience impact
-faultzero diff current.json planned.json --only-regressions
+faultray diff current.json planned.json --only-regressions
 ```
 
 If regressions are detected, the diff command exits with code 2, allowing CI/CD pipelines to block the apply.

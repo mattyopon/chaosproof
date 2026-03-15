@@ -1,6 +1,6 @@
 # Compliance
 
-FaultZero provides compliance mapping and reporting for regulatory frameworks, helping organizations demonstrate infrastructure resilience to auditors.
+FaultRay provides compliance mapping and reporting for regulatory frameworks, helping organizations demonstrate infrastructure resilience to auditors.
 
 ## Supported Frameworks
 
@@ -16,13 +16,13 @@ FaultZero provides compliance mapping and reporting for regulatory frameworks, h
 ## Generating Compliance Reports
 
 ```bash
-faultzero simulate -m model.json --compliance soc2 --output compliance-report.html
+faultray simulate -m model.json --compliance soc2 --output compliance-report.html
 ```
 
 ### Multiple frameworks
 
 ```bash
-faultzero simulate -m model.json --compliance soc2,iso27001,nist --output report.html
+faultray simulate -m model.json --compliance soc2,iso27001,nist --output report.html
 ```
 
 ## Report Contents
@@ -57,7 +57,7 @@ assert report.a1_2_satisfied  # Recovery objectives
 Integrate compliance checks into your CI/CD pipeline to maintain continuous compliance:
 
 ```bash
-faultzero evaluate -m model.json --compliance soc2 --threshold 80
+faultray evaluate -m model.json --compliance soc2 --threshold 80
 ```
 
 This ensures every infrastructure change meets compliance requirements before deployment.

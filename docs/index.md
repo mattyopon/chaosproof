@@ -1,12 +1,12 @@
-# FaultZero
+# FaultRay
 
 > Zero-risk infrastructure chaos simulation. Prove your availability ceiling mathematically.
 
-## What is FaultZero?
+## What is FaultRay?
 
-FaultZero simulates infrastructure failures without touching production. It builds a mathematical model of your infrastructure and runs thousands of failure scenarios to identify single points of failure, cascade risks, and availability ceilings — all without any real-world impact.
+FaultRay simulates infrastructure failures without touching production. It builds a mathematical model of your infrastructure and runs thousands of failure scenarios to identify single points of failure, cascade risks, and availability ceilings — all without any real-world impact.
 
-Unlike traditional chaos engineering tools that inject real faults into live systems, FaultZero operates entirely on a virtual model. This means you can evaluate resilience during design reviews, CI/CD pipelines, and pre-deployment checks.
+Unlike traditional chaos engineering tools that inject real faults into live systems, FaultRay operates entirely on a virtual model. This means you can evaluate resilience during design reviews, CI/CD pipelines, and pre-deployment checks.
 
 ## Key Features
 
@@ -22,8 +22,8 @@ Unlike traditional chaos engineering tools that inject real faults into live sys
 ## Quick Start
 
 ```bash
-pip install faultzero
-faultzero quickstart
+pip install faultray
+faultray quickstart
 ```
 
 This generates a sample infrastructure model and runs a basic simulation, producing a resilience report in seconds.
@@ -44,7 +44,7 @@ This generates a sample infrastructure model and runs a basic simulation, produc
 
 ## Next Steps
 
-- [Installation](getting-started/installation.md) — Install FaultZero in your environment
+- [Installation](getting-started/installation.md) — Install FaultRay in your environment
 - [Quick Start](getting-started/quickstart.md) — Get up and running in 5 minutes
 - [How It Works](concepts/how-it-works.md) — Understand the simulation engine
 - [CLI Reference](cli/commands.md) — Full command-line documentation

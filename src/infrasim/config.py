@@ -1,4 +1,4 @@
-"""FaultZero configuration management."""
+"""FaultRay configuration management."""
 from __future__ import annotations
 
 import logging
@@ -9,11 +9,11 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path.home() / ".faultzero" / "config.yaml"
+DEFAULT_CONFIG_PATH = Path.home() / ".faultray" / "config.yaml"
 
 
 @dataclass
-class FaultZeroConfig:
+class FaultRayConfig:
     simulation: dict = field(default_factory=lambda: {
         "max_scenarios": 2000,
         "checkpoint_interval": 100,
@@ -24,7 +24,7 @@ class FaultZeroConfig:
     })
     daemon: dict = field(default_factory=lambda: {
         "default_interval_seconds": 3600,
-        "log_directory": str(Path.home() / ".faultzero" / "logs"),
+        "log_directory": str(Path.home() / ".faultray" / "logs"),
     })
     notifications: dict = field(default_factory=lambda: {
         "slack_webhook": "",
@@ -39,21 +39,21 @@ class FaultZeroConfig:
     })
 
 
-def load_config(path: Path | None = None) -> FaultZeroConfig:
+def load_config(path: Path | None = None) -> FaultRayConfig:
     """Load config from YAML file. Returns defaults if file doesn't exist."""
     config_path = path or DEFAULT_CONFIG_PATH
     if config_path.exists():
         with open(config_path) as f:
             data = yaml.safe_load(f) or {}
-        config = FaultZeroConfig()
+        config = FaultRayConfig()
         for key, value in data.items():
             if hasattr(config, key) and isinstance(value, dict):
                 getattr(config, key).update(value)
         return config
-    return FaultZeroConfig()
+    return FaultRayConfig()
 
 
-def save_config(config: FaultZeroConfig, path: Path | None = None) -> None:
+def save_config(config: FaultRayConfig, path: Path | None = None) -> None:
     """Save config to YAML file."""
     config_path = path or DEFAULT_CONFIG_PATH
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ def save_config(config: FaultZeroConfig, path: Path | None = None) -> None:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
 
-def set_nested_value(config: FaultZeroConfig, key_path: str, value: str) -> None:
+def set_nested_value(config: FaultRayConfig, key_path: str, value: str) -> None:
     """Set a nested config value using dot notation (e.g. 'simulation.max_scenarios').
 
     Attempts to parse the value as int, then float, then keeps as string.
@@ -103,10 +103,10 @@ def set_nested_value(config: FaultZeroConfig, key_path: str, value: str) -> None
 
 
 # Global config instance
-_config: FaultZeroConfig | None = None
+_config: FaultRayConfig | None = None
 
 
-def get_config() -> FaultZeroConfig:
+def get_config() -> FaultRayConfig:
     global _config
     if _config is None:
         _config = load_config()

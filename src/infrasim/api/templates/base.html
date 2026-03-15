@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}FaultZero{% endblock %}</title>
+    <title>{% block title %}FaultRay{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#58a6ff">
@@ -37,7 +37,7 @@
                         </svg>
                     </div>
                     <div class="logo-info">
-                        <span class="logo-text">FaultZero</span>
+                        <span class="logo-text">FaultRay</span>
                         <span class="logo-tagline">Chaos Engineering</span>
                     </div>
                 </div>
@@ -94,8 +94,8 @@
                 </li>
 
                 <!-- Simulation submenu -->
-                <li x-data="{ open: {% if active_page in ['simulation', 'security', 'cost'] %}true{% else %}false{% endif %} }">
-                    <button @click="open = !open" class="nav-link nav-link-toggle {% if active_page in ['simulation', 'security', 'cost'] %}active{% endif %}" type="button">
+                <li x-data="{ open: {% if active_page in ['simulation', 'security', 'cost', 'blast_radius'] %}true{% else %}false{% endif %} }">
+                    <button @click="open = !open" class="nav-link nav-link-toggle {% if active_page in ['simulation', 'security', 'cost', 'blast_radius'] %}active{% endif %}" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                         </svg>
@@ -108,6 +108,11 @@
                         <li>
                             <a href="/simulation" class="nav-link nav-link-sub {% if active_page == 'simulation' %}active{% endif %}">
                                 <span>Chaos Test</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/blast-radius" class="nav-link nav-link-sub {% if active_page == 'blast_radius' %}active{% endif %}">
+                                <span>Blast Radius</span>
                             </a>
                         </li>
                         <li>
@@ -212,7 +217,7 @@
                         <div class="empty-state-pulse"></div>
                     </div>
                     <h2>No Infrastructure Loaded</h2>
-                    <p>Load the demo infrastructure to explore FaultZero's chaos engineering capabilities, or import your own system topology.</p>
+                    <p>Load the demo infrastructure to explore FaultRay's chaos engineering capabilities, or import your own system topology.</p>
                     <div class="empty-state-actions">
                         <a href="/demo" class="btn btn-accent">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

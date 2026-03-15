@@ -1,4 +1,4 @@
-"""Tests for the FaultZero public Python SDK surface."""
+"""Tests for the FaultRay public Python SDK surface."""
 
 from __future__ import annotations
 

@@ -64,28 +64,28 @@ def ops_sim(
 
     Examples:
         # Run with all default scenarios
-        faultzero ops-sim infra.yaml --defaults
+        faultray ops-sim infra.yaml --defaults
 
         # Custom 14-day simulation
-        faultzero ops-sim --yaml infra.yaml --days 14
+        faultray ops-sim --yaml infra.yaml --days 14
 
         # Fine-grained time steps
-        faultzero ops-sim infra.yaml --step 1min --days 3
+        faultray ops-sim infra.yaml --step 1min --days 3
 
         # Customize traffic pattern
-        faultzero ops-sim infra.yaml --diurnal-peak 5.0 --weekend-factor 0.4
+        faultray ops-sim infra.yaml --diurnal-peak 5.0 --weekend-factor 0.4
 
         # Custom deploy schedule
-        faultzero ops-sim infra.yaml --deploy-days mon,wed,fri --deploy-hour 10
+        faultray ops-sim infra.yaml --deploy-days mon,wed,fri --deploy-hour 10
 
         # Disable random failures for deterministic output
-        faultzero ops-sim infra.yaml --no-random-failures --no-degradation
+        faultray ops-sim infra.yaml --no-random-failures --no-degradation
 
         # Add traffic growth
-        faultzero ops-sim infra.yaml --growth 0.15
+        faultray ops-sim infra.yaml --growth 0.15
 
         # JSON output
-        faultzero ops-sim infra.yaml --json
+        faultray ops-sim infra.yaml --json
     """
     yaml_file = yaml_pos or yaml_file
     from infrasim.model.components import SLOTarget
@@ -262,16 +262,16 @@ def whatif(
 
     Examples:
         # Run all default what-if analyses
-        faultzero whatif infra.yaml --defaults
+        faultray whatif infra.yaml --defaults
 
         # Sweep a single parameter
-        faultzero whatif infra.yaml --parameter mttr_factor --values 0.5,1.0,2.0,5.0
+        faultray whatif infra.yaml --parameter mttr_factor --values 0.5,1.0,2.0,5.0
 
         # Multi-parameter what-if
-        faultzero whatif infra.yaml --multi "mttr_factor=2.0,traffic_factor=3.0"
+        faultray whatif infra.yaml --multi "mttr_factor=2.0,traffic_factor=3.0"
 
         # Run default multi-parameter combinations
-        faultzero whatif infra.yaml --multi defaults
+        faultray whatif infra.yaml --multi defaults
     """
     resolved_yaml = yaml_pos or yaml_file
     try:
@@ -349,19 +349,19 @@ def capacity(
 
     Examples:
         # Basic capacity forecast
-        faultzero capacity infra.yaml
+        faultray capacity infra.yaml
 
         # Custom growth rate (20% monthly)
-        faultzero capacity infra.yaml --growth 0.20
+        faultray capacity infra.yaml --growth 0.20
 
         # Stricter SLO target
-        faultzero capacity infra.yaml --slo 99.99
+        faultray capacity infra.yaml --slo 99.99
 
         # Include ops simulation for actual burn rate
-        faultzero capacity infra.yaml --simulate
+        faultray capacity infra.yaml --simulate
 
         # Use JSON model
-        faultzero capacity --model model.json
+        faultray capacity --model model.json
     """
     resolved_yaml = yaml_pos or yaml_file
 
@@ -511,13 +511,13 @@ def advise(
 
     Examples:
         # Get recommendations from YAML
-        faultzero advise infra.yaml
+        faultray advise infra.yaml
 
         # JSON output for integration
-        faultzero advise infra.yaml --json
+        faultray advise infra.yaml --json
 
         # Use a JSON model
-        faultzero advise --model model.json
+        faultray advise --model model.json
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -620,19 +620,19 @@ def monte_carlo_cmd(
 
     Examples:
         # Default 10,000 trials
-        faultzero monte-carlo infra.yaml
+        faultray monte-carlo infra.yaml
 
         # More trials for higher precision
-        faultzero monte-carlo infra.yaml --trials 100000
+        faultray monte-carlo infra.yaml --trials 100000
 
         # Custom random seed
-        faultzero monte-carlo infra.yaml --seed 123
+        faultray monte-carlo infra.yaml --seed 123
 
         # JSON output
-        faultzero monte-carlo infra.yaml --json
+        faultray monte-carlo infra.yaml --json
 
         # Use JSON model
-        faultzero monte-carlo --model model.json
+        faultray monte-carlo --model model.json
     """
     resolved_yaml = yaml_pos or yaml_file
     graph = _load_graph_for_analysis(model, resolved_yaml)
@@ -712,16 +712,16 @@ def cost(
 
     Examples:
         # Cost analysis from YAML
-        faultzero cost infra.yaml
+        faultray cost infra.yaml
 
         # Show top 20 scenarios
-        faultzero cost infra.yaml --top 20
+        faultray cost infra.yaml --top 20
 
         # JSON output
-        faultzero cost infra.yaml --json
+        faultray cost infra.yaml --json
 
         # Use JSON model
-        faultzero cost --model model.json
+        faultray cost --model model.json
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -828,16 +828,16 @@ def compliance(
 
     Examples:
         # Check SOC 2 compliance
-        faultzero compliance infra.yaml --framework soc2
+        faultray compliance infra.yaml --framework soc2
 
         # Check all frameworks
-        faultzero compliance infra.yaml --all
+        faultray compliance infra.yaml --all
 
         # Check PCI DSS compliance
-        faultzero compliance infra.yaml --framework pci_dss
+        faultray compliance infra.yaml --framework pci_dss
 
         # JSON output
-        faultzero compliance infra.yaml --json --all
+        faultray compliance infra.yaml --json --all
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -955,19 +955,19 @@ def dr(
 
     Examples:
         # Run all DR scenarios
-        faultzero dr infra.yaml --all
+        faultray dr infra.yaml --all
 
         # Simulate AZ failure
-        faultzero dr infra.yaml --scenario az-failure --az us-east-1a
+        faultray dr infra.yaml --scenario az-failure --az us-east-1a
 
         # Simulate region failure
-        faultzero dr infra.yaml --scenario region-failure --region us-east-1
+        faultray dr infra.yaml --scenario region-failure --region us-east-1
 
         # Simulate network partition between regions
-        faultzero dr infra.yaml --scenario network-partition --region-a us-east-1 --region-b eu-west-1
+        faultray dr infra.yaml --scenario network-partition --region-a us-east-1 --region-b eu-west-1
 
         # JSON output
-        faultzero dr infra.yaml --json --all
+        faultray dr infra.yaml --json --all
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -1073,13 +1073,13 @@ def security(
 
     Examples:
         # Run all attack simulations
-        faultzero security infra.yaml
+        faultray security infra.yaml
 
         # JSON output
-        faultzero security infra.yaml --json
+        faultray security infra.yaml --json
 
         # Use JSON model
-        faultzero security --model model.json
+        faultray security --model model.json
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -1204,19 +1204,19 @@ def fix(
 
     Examples:
         # Generate remediation code
-        faultzero fix infra.yaml
+        faultray fix infra.yaml
 
         # Set target resilience score
-        faultzero fix infra.yaml --target-score 95
+        faultray fix infra.yaml --target-score 95
 
         # Preview changes without writing files
-        faultzero fix infra.yaml --dry-run
+        faultray fix infra.yaml --dry-run
 
         # Output plan as JSON
-        faultzero fix infra.yaml --json
+        faultray fix infra.yaml --json
 
         # Custom output directory
-        faultzero fix infra.yaml --output ./my-remediation/
+        faultray fix infra.yaml --output ./my-remediation/
     """
     import json as json_lib
 
@@ -1262,7 +1262,7 @@ def fix(
         f"[bold]Phases:[/] {plan.total_phases}  [bold]Files:[/] {len(plan.files)}"
     )
     console.print()
-    console.print(Panel(summary_text, title="[bold]FaultZero Remediation Plan[/]", border_style=score_color))
+    console.print(Panel(summary_text, title="[bold]FaultRay Remediation Plan[/]", border_style=score_color))
 
     # Files table
     table = Table(title="Remediation Files", show_header=True)

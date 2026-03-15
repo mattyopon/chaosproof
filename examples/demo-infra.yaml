@@ -1,7 +1,7 @@
-# FaultZero - Example infrastructure definition
+# FaultRay - Example infrastructure definition
 #
 # Load with:
-#   faultzero load examples/demo-infra.yaml
+#   faultray load examples/demo-infra.yaml
 #
 # This describes a typical web application stack:
 #   nginx (load balancer) -> app servers -> PostgreSQL + Redis + RabbitMQ

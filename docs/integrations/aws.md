@@ -1,13 +1,13 @@
 # AWS Integration
 
-FaultZero can automatically scan your AWS infrastructure and build a resilience model from live resources.
+FaultRay can automatically scan your AWS infrastructure and build a resilience model from live resources.
 
 ## Setup
 
 Install the AWS extras:
 
 ```bash
-pip install "faultzero[aws]"
+pip install "faultray[aws]"
 ```
 
 Ensure AWS credentials are configured:
@@ -23,24 +23,24 @@ export AWS_PROFILE=my-profile
 ### Full account scan
 
 ```bash
-faultzero scan --provider aws --output aws-infra.json
+faultray scan --provider aws --output aws-infra.json
 ```
 
 ### Region-specific scan
 
 ```bash
-faultzero scan --provider aws --region us-east-1 --output us-east.json
+faultray scan --provider aws --region us-east-1 --output us-east.json
 ```
 
 ### Using a named profile
 
 ```bash
-faultzero scan --provider aws --profile production --output prod.json
+faultray scan --provider aws --profile production --output prod.json
 ```
 
 ## Supported Services
 
-FaultZero scans the following AWS services:
+FaultRay scans the following AWS services:
 
 | Service | Component Type | Details |
 |---------|---------------|---------|

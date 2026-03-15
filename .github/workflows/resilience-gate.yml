@@ -1,0 +1,195 @@
+name: ChaosProof Resilience Gate
+on:
+  pull_request:
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+      - '**/*.tf'
+      - '**/infrastructure/**'
+      - 'examples/**'
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      min_score:
+        description: 'Minimum resilience score (0-100)'
+        required: false
+        default: '60'
+        type: string
+      infrastructure_file:
+        description: 'Path to infrastructure YAML file'
+        required: false
+        default: 'examples/demo-infra.yaml'
+        type: string
+
+env:
+  MIN_SCORE: '60'
+  MAX_CRITICAL: '0'
+  INFRA_FILE: 'examples/demo-infra.yaml'
+
+jobs:
+  resilience-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install FaultRay
+        run: |
+          pip install -e .
+
+      - name: Run Resilience Analysis
+        id: resilience
+        run: |
+          set -euo pipefail
+
+          # Use workflow_dispatch inputs if available, otherwise use env defaults
+          INFRA_FILE="${{ github.event.inputs.infrastructure_file || env.INFRA_FILE }}"
+          MIN_SCORE="${{ github.event.inputs.min_score || env.MIN_SCORE }}"
+
+          # Verify infrastructure file exists
+          if [ ! -f "$INFRA_FILE" ]; then
+            echo "::error::Infrastructure file not found: $INFRA_FILE"
+            exit 1
+          fi
+
+          # Run FaultRay simulation
+          faultray analyze "$INFRA_FILE" --json > results.json 2>/dev/null || \
+            faultray simulate --model "$INFRA_FILE" --json > results.json
+
+          # Extract metrics
+          SCORE=$(python3 -c "import json; print(json.load(open('results.json')).get('resilience_score', 0))")
+          CRITICAL=$(python3 -c "import json; print(json.load(open('results.json')).get('critical', 0))")
+          WARNING=$(python3 -c "import json; print(json.load(open('results.json')).get('warning', 0))")
+          PASSED=$(python3 -c "import json; print(json.load(open('results.json')).get('passed', 0))")
+
+          # Set outputs
+          echo "resilience_score=$SCORE" >> $GITHUB_OUTPUT
+          echo "critical_count=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "warning_count=$WARNING" >> $GITHUB_OUTPUT
+          echo "passed_count=$PASSED" >> $GITHUB_OUTPUT
+
+          # Check thresholds
+          FAILED=0
+
+          if [ "$(echo "$SCORE < $MIN_SCORE" | bc -l)" -eq 1 ]; then
+            echo "::error::Resilience score $SCORE is below minimum $MIN_SCORE"
+            FAILED=1
+          fi
+
+          if [ "$CRITICAL" -gt ${{ env.MAX_CRITICAL }} ]; then
+            echo "::error::$CRITICAL critical findings exceed maximum ${{ env.MAX_CRITICAL }}"
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+          echo "Resilience gate passed: score=$SCORE, critical=$CRITICAL"
+
+      - name: Run SLA Validation
+        if: always()
+        run: |
+          INFRA_FILE="${{ github.event.inputs.infrastructure_file || env.INFRA_FILE }}"
+          faultray sla-validate "$INFRA_FILE" --target 99.9 --json > sla-results.json 2>/dev/null || true
+          if [ -f sla-results.json ]; then
+            echo "SLA Validation Results:"
+            cat sla-results.json
+          fi
+
+      - name: Generate SARIF Report
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 -c "
+          import json
+          from infrasim.ci.sarif_exporter import SARIFExporter
+          results = json.load(open('results.json'))
+          sarif = SARIFExporter.from_json_results(results)
+          with open('results.sarif', 'w') as f:
+              json.dump(sarif, f, indent=2)
+          " || echo "SARIF generation skipped"
+
+      - name: Post PR Comment
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let results;
+            try {
+              results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            } catch (e) {
+              console.log('No results file found, skipping PR comment');
+              return;
+            }
+            const score = results.resilience_score || 0;
+            const critical = results.critical || 0;
+            const warning = results.warning || 0;
+            const passed = results.passed || 0;
+            const total = results.total_scenarios || 0;
+
+            const scoreEmoji = score >= 80 ? '\u2705' : score >= 60 ? '\u26a0\ufe0f' : '\u274c';
+            const statusText = critical === 0 ? 'PASSED' : 'FAILED';
+            const statusEmoji = critical === 0 ? '\u2705' : '\u274c';
+
+            const body = `## ${statusEmoji} ChaosProof Resilience Gate: ${statusText}
+
+            | Metric | Value |
+            |--------|-------|
+            | ${scoreEmoji} Resilience Score | **${score}/100** |
+            | Critical Findings | ${critical} |
+            | Warnings | ${warning} |
+            | Passed Scenarios | ${passed}/${total} |
+
+            ---
+            *Generated by [FaultRay](https://github.com/faultray/faultray) Resilience Gate*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.body.includes('ChaosProof Resilience Gate')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Upload SARIF
+        if: always() && hashFiles('results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+      - name: Upload Baseline Artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: resilience-baseline
+          path: results.json
+          retention-days: 90

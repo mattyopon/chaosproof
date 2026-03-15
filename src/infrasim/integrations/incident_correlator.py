@@ -1,4 +1,4 @@
-"""Incident Correlation — map real incidents to FaultZero scenarios.
+"""Incident Correlation — map real incidents to FaultRay scenarios.
 
 Validates simulation accuracy by comparing real-world incidents against
 predicted failure scenarios.
@@ -61,7 +61,7 @@ class CorrelationReport:
 
 
 class IncidentCorrelator:
-    """Correlates real incidents with FaultZero simulation scenarios.
+    """Correlates real incidents with FaultRay simulation scenarios.
 
     Given an InfraGraph and a simulation report, this class can determine
     which real-world incidents were predicted by the simulation and which
@@ -330,7 +330,7 @@ class IncidentCorrelator:
         # General recommendation if many unpredicted
         if len(unpredicted) > 3:
             recommendations.append(
-                "Consider running FaultZero with feed-generated scenarios "
+                "Consider running FaultRay with feed-generated scenarios "
                 "(--include-feeds) for broader coverage"
             )
 

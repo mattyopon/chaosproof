@@ -123,7 +123,7 @@ class TestSarifExport:
 
         run = data["runs"][0]
         assert "tool" in run
-        assert run["tool"]["driver"]["name"] == "FaultZero"
+        assert run["tool"]["driver"]["name"] == "FaultRay"
         assert "rules" in run["tool"]["driver"]
         assert "results" in run
 

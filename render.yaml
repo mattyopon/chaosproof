@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: faultzero-demo
+    name: faultray-demo
     runtime: docker
     plan: free
     healthCheckPath: /

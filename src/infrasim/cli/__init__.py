@@ -28,5 +28,13 @@ import infrasim.cli.simulate  # noqa: F401
 import infrasim.cli.history_cmd  # noqa: F401
 import infrasim.cli.auto_fix  # noqa: F401
 import infrasim.cli.tf_check  # noqa: F401
+import infrasim.cli.nl_command  # noqa: F401
+import infrasim.cli.genome  # noqa: F401
+import infrasim.cli.sla_cmd  # noqa: F401
+import infrasim.cli.marketplace_cmd  # noqa: F401
+import infrasim.cli.dna_cmd  # noqa: F401
+import infrasim.cli.supply_chain_cmd  # noqa: F401
+import infrasim.cli.autoscale_cmd  # noqa: F401
+import infrasim.cli.replay_cmd  # noqa: F401
 
 __all__ = ["app", "_print_dynamic_results"]

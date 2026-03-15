@@ -24,13 +24,13 @@ def predict(
 
     Examples:
         # Default 90-day prediction
-        faultzero predict infra.yaml
+        faultray predict infra.yaml
 
         # Predict over 180 days
-        faultzero predict infra.yaml --horizon 180
+        faultray predict infra.yaml --horizon 180
 
         # JSON output
-        faultzero predict infra.yaml --json
+        faultray predict infra.yaml --json
     """
     from infrasim.model.loader import load_yaml
     from infrasim.simulator.predictive_engine import PredictiveEngine
@@ -120,10 +120,10 @@ def markov(
 
     Examples:
         # Run Markov analysis
-        faultzero markov infra.yaml
+        faultray markov infra.yaml
 
         # JSON output
-        faultzero markov infra.yaml --json
+        faultray markov infra.yaml --json
     """
     from infrasim.model.loader import load_yaml
     from infrasim.simulator.markov_model import compute_system_markov
@@ -186,10 +186,10 @@ def bayesian(
 
     Examples:
         # Run Bayesian analysis
-        faultzero bayesian infra.yaml
+        faultray bayesian infra.yaml
 
         # JSON output
-        faultzero bayesian infra.yaml --json
+        faultray bayesian infra.yaml --json
     """
     from infrasim.model.loader import load_yaml
     from infrasim.simulator.bayesian_model import BayesianEngine
@@ -250,10 +250,10 @@ def gameday(
 
     Examples:
         # Run a game day exercise
-        faultzero gameday infra.yaml --plan gameday-plan.yaml
+        faultray gameday infra.yaml --plan gameday-plan.yaml
 
         # JSON output
-        faultzero gameday infra.yaml --plan gameday-plan.yaml --json
+        faultray gameday infra.yaml --plan gameday-plan.yaml --json
     """
     import yaml
 

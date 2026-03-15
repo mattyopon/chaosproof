@@ -45,28 +45,28 @@ def scan(
 
     Examples:
         # Auto-discover AWS infrastructure
-        faultzero scan --aws --region us-east-1
+        faultray scan --aws --region us-east-1
 
         # Scan AWS with a named profile
-        faultzero scan --aws --profile prod --region ap-northeast-1
+        faultray scan --aws --profile prod --region ap-northeast-1
 
         # Scan Kubernetes cluster
-        faultzero scan --k8s --context prod --namespace default
+        faultray scan --k8s --context prod --namespace default
 
         # Scan GCP project
-        faultzero scan --gcp --project my-project
+        faultray scan --gcp --project my-project
 
         # Scan Azure subscription
-        faultzero scan --azure --subscription SUB_ID --resource-group my-rg
+        faultray scan --azure --subscription SUB_ID --resource-group my-rg
 
         # Discover from Prometheus
-        faultzero scan --prometheus-url http://localhost:9090
+        faultray scan --prometheus-url http://localhost:9090
 
         # Local system scan with custom output
-        faultzero scan --output model.json
+        faultray scan --output model.json
 
         # Scan and export as YAML
-        faultzero scan --aws --save-yaml infra.yaml
+        faultray scan --aws --save-yaml infra.yaml
     """
     if aws:
         from infrasim.discovery.aws_scanner import AWSScanner
@@ -195,10 +195,10 @@ def load(
 
     Examples:
         # Load from YAML
-        faultzero load infra.yaml
+        faultray load infra.yaml
 
         # Load and save to custom output path
-        faultzero load infra.yaml --output custom-model.json
+        faultray load infra.yaml --output custom-model.json
     """
     from infrasim.model.loader import load_yaml
 
@@ -227,10 +227,10 @@ def show(
 
     Examples:
         # Show default model
-        faultzero show
+        faultray show
 
         # Show a specific model file
-        faultzero show --model my-model.json
+        faultray show --model my-model.json
     """
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
@@ -273,16 +273,16 @@ def tf_import(
 
     Examples:
         # Import from Terraform state file
-        faultzero tf-import --state terraform.tfstate
+        faultray tf-import --state terraform.tfstate
 
         # Import by running terraform show in a directory
-        faultzero tf-import --dir ./terraform/
+        faultray tf-import --dir ./terraform/
 
         # Import from current directory
-        faultzero tf-import
+        faultray tf-import
 
         # Import and save to custom output
-        faultzero tf-import --state terraform.tfstate -o my-model.json
+        faultray tf-import --state terraform.tfstate -o my-model.json
     """
     from infrasim.discovery.terraform import load_hcl_directory, load_tf_state_cmd, load_tf_state_file
 
@@ -324,16 +324,16 @@ def calibrate(
 
     Examples:
         # Calibrate from Prometheus
-        faultzero calibrate --prometheus http://prometheus:9090
+        faultray calibrate --prometheus http://prometheus:9090
 
         # Calibrate from AWS CloudWatch
-        faultzero calibrate --cloudwatch --region us-east-1
+        faultray calibrate --cloudwatch --region us-east-1
 
         # Calibrate and save to a new file
-        faultzero calibrate --prometheus http://prometheus:9090 -o calibrated.json
+        faultray calibrate --prometheus http://prometheus:9090 -o calibrated.json
 
         # Calibrate a YAML model
-        faultzero calibrate --yaml infra.yaml --prometheus http://prometheus:9090
+        faultray calibrate --yaml infra.yaml --prometheus http://prometheus:9090
     """
     from rich.table import Table
 
@@ -402,13 +402,13 @@ def tf_plan(
     Examples:
         # Analyze a Terraform plan file
         terraform plan -out=plan.out
-        faultzero tf-plan plan.out
+        faultray tf-plan plan.out
 
         # Analyze with HTML report
-        faultzero tf-plan plan.out --html impact-report.html
+        faultray tf-plan plan.out --html impact-report.html
 
         # Specify Terraform directory
-        faultzero tf-plan plan.out --dir ./terraform/
+        faultray tf-plan plan.out --dir ./terraform/
     """
     from infrasim.discovery.terraform import load_tf_plan_cmd
 

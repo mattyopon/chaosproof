@@ -1,7 +1,7 @@
-"""IaC remediation code generator for FaultZero.
+"""IaC remediation code generator for FaultRay.
 
 Generates Terraform and Kubernetes code that fixes infrastructure issues
-found by FaultZero's analysis engines.  Remediations are organized into
+found by FaultRay's analysis engines.  Remediations are organized into
 three phases (critical SPOF elimination, security hardening, disaster
 recovery) and include cost estimates and expected resilience score impact.
 """
@@ -589,7 +589,7 @@ REMEDIATION_RULES: list[_RemediationRule] = [
 # ---------------------------------------------------------------------------
 
 class IaCGenerator:
-    """Generate Terraform/Kubernetes remediation code from FaultZero analysis.
+    """Generate Terraform/Kubernetes remediation code from FaultRay analysis.
 
     The generator inspects every component in the infrastructure graph,
     checks each remediation rule, and produces templated IaC code for any
@@ -793,7 +793,7 @@ class IaCGenerator:
     ) -> str:
         """Generate a README.md summarizing the remediation plan."""
         lines: list[str] = []
-        lines.append("# FaultZero Remediation Plan")
+        lines.append("# FaultRay Remediation Plan")
         lines.append("")
         lines.append("Auto-generated IaC remediation code for improving infrastructure resilience.")
         lines.append("")

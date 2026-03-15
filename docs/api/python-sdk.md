@@ -1,11 +1,11 @@
 # Python SDK
 
-The FaultZero Python SDK provides a programmatic interface for building models, running simulations, and analyzing results.
+The FaultRay Python SDK provides a programmatic interface for building models, running simulations, and analyzing results.
 
 ## Installation
 
 ```bash
-pip install faultzero
+pip install faultray
 ```
 
 ## Quick Start

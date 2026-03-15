@@ -1,15 +1,15 @@
-# FaultZero 商用化改善 ハンドオフプロンプト v2
+# FaultRay 商用化改善 ハンドオフプロンプト v2
 
-> **目的**: FaultZeroを商用プロダクトとして成立させるための機能追加
+> **目的**: FaultRayを商用プロダクトとして成立させるための機能追加
 > **規模**: L（大規模） — 7エンジン追加 + 可用性モデル拡張 + レポート拡張 + API追加 + プラグイン拡張
 > **作成日**: 2026-03-15
-> **前版**: HANDOFF_FAULTZERO_IMPROVEMENTS.md（特許分析ベース。本版は商用化観点で再構成）
+> **前版**: HANDOFF_FAULTRAY_IMPROVEMENTS.md（特許分析ベース。本版は商用化観点で再構成）
 
 ---
 
 ## プロンプト（以下をそのまま別セッションのエージェントに渡す）
 
-FaultZero（旧InfraSim）の商用化に向けた大規模機能追加を実装してください。
+FaultRay（旧InfraSim）の商用化に向けた大規模機能追加を実装してください。
 
 **プロダクトポジショニング**: "Infrastructure Resilience Intelligence"
 — 本番環境に一切触れずに、インフラの障害耐性を数学的に証明するシミュレーションプラットフォーム
@@ -103,7 +103,7 @@ P2 (推奨):   Predictive Engine → Game Day Engine → Chaos Advisor Engine
 ### 1-1. Security Resilience Engine（セキュリティ耐性エンジン）【P0 — 最重要】
 **ファイル**: `src/infrasim/simulator/security_engine.py`（新規）
 
-**なぜ最優先か**: FaultZeroの独自ポジション＝「脆弱性を見つける」のではなく「脆弱性が悪用されたときにインフラがどう壊れるかをシミュレーションする」。既存のセキュリティツール（Snyk/Qualys/Tenable）と競合せず、補完する立場。
+**なぜ最優先か**: FaultRayの独自ポジション＝「脆弱性を見つける」のではなく「脆弱性が悪用されたときにインフラがどう壊れるかをシミュレーションする」。既存のセキュリティツール（Snyk/Qualys/Tenable）と競合せず、補完する立場。
 
 **実装要件**:
 
@@ -298,7 +298,7 @@ class ComplianceResult:
     grade: str                # A/B/C/D/F
 ```
 
-#### c) FaultZeroシミュレーション結果からの自動マッピング
+#### c) FaultRayシミュレーション結果からの自動マッピング
 - Resilience Score → DORA Art.11（ICTリスク管理フレームワーク）
 - カスケード分析結果 → DORA Art.26（主要ICTサードパーティリスク）
 - 可用性モデル → SOC2 A1.2（可用性コミットメント）
@@ -615,7 +615,7 @@ app.include_router(insurance_router, prefix="/api/v1/insurance")
 ### 4-1. SOC 2 Type II レポート
 - Trust Service Criteria（TSC）5原則へのマッピング
 - CC6（論理的・物理的アクセス制御）, CC7（システム運用）, CC8（変更管理）
-- FaultZeroシミュレーション結果 → 各Criteriaの充足判定
+- FaultRayシミュレーション結果 → 各Criteriaの充足判定
 
 ### 4-2. ISO 27001 レポート
 - Annex A管理策（114項目）との対応表

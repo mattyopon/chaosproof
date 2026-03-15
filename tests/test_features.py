@@ -1,4 +1,4 @@
-"""Tests for FaultZero feature flags."""
+"""Tests for FaultRay feature flags."""
 
 import pytest
 

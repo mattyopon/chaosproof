@@ -1,13 +1,13 @@
 # Kubernetes Integration
 
-FaultZero can scan Kubernetes clusters to model workload resilience, pod distribution, and service dependencies.
+FaultRay can scan Kubernetes clusters to model workload resilience, pod distribution, and service dependencies.
 
 ## Setup
 
 Install the Kubernetes extras:
 
 ```bash
-pip install "faultzero[k8s]"
+pip install "faultray[k8s]"
 ```
 
 Ensure `kubectl` is configured and has access to your cluster:
@@ -21,24 +21,24 @@ kubectl cluster-info
 ### Current context
 
 ```bash
-faultzero scan --provider k8s --output k8s-infra.json
+faultray scan --provider k8s --output k8s-infra.json
 ```
 
 ### Specific namespace
 
 ```bash
-faultzero scan --provider k8s --namespace production --output k8s.json
+faultray scan --provider k8s --namespace production --output k8s.json
 ```
 
 ### Specific kubeconfig
 
 ```bash
-faultzero scan --provider k8s --kubeconfig ~/.kube/prod-config --output k8s.json
+faultray scan --provider k8s --kubeconfig ~/.kube/prod-config --output k8s.json
 ```
 
 ## What gets scanned
 
-FaultZero analyzes the following Kubernetes resources:
+FaultRay analyzes the following Kubernetes resources:
 
 | Resource | What is modeled |
 |----------|----------------|
@@ -54,7 +54,7 @@ FaultZero analyzes the following Kubernetes resources:
 
 ## Resilience Checks
 
-FaultZero evaluates Kubernetes-specific resilience factors:
+FaultRay evaluates Kubernetes-specific resilience factors:
 
 - **Pod anti-affinity** — Are replicas spread across nodes/AZs?
 - **PodDisruptionBudget** — Are disruption budgets defined?

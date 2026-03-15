@@ -1,4 +1,4 @@
-"""GraphQL-like API for FaultZero — zero external dependencies.
+"""GraphQL-like API for FaultRay — zero external dependencies.
 
 Provides a ``/graphql`` POST endpoint that accepts simplified GraphQL queries
 and returns JSON responses.  No ``strawberry-graphql`` or other GraphQL library

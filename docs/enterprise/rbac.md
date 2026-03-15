@@ -1,10 +1,10 @@
 # RBAC (Role-Based Access Control)
 
-FaultZero supports role-based access control for multi-team environments, controlling who can view models, run simulations, and modify configurations.
+FaultRay supports role-based access control for multi-team environments, controlling who can view models, run simulations, and modify configurations.
 
 ## Overview
 
-RBAC in FaultZero follows a role-permission model where users are assigned roles that grant specific permissions across resources.
+RBAC in FaultRay follows a role-permission model where users are assigned roles that grant specific permissions across resources.
 
 ## Roles
 
@@ -62,7 +62,7 @@ rbac:
 
 ```bash
 # Create an API key with a specific role
-faultzero auth create-key --role engineer --name "CI Pipeline"
+faultray auth create-key --role engineer --name "CI Pipeline"
 
 # Output: API key with assigned permissions
 ```
@@ -73,7 +73,7 @@ faultzero auth create-key --role engineer --name "CI Pipeline"
 auth:
   provider: oidc
   issuer: https://auth.example.com
-  client_id: faultzero-app
+  client_id: faultray-app
   role_mapping:
     "admin-group": admin
     "sre-team": engineer
@@ -105,5 +105,5 @@ All RBAC-controlled actions are logged with:
 - Result (allowed/denied)
 
 ```bash
-faultzero auth audit-log --last 24h
+faultray auth audit-log --last 24h
 ```

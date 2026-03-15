@@ -1,4 +1,4 @@
-"""Datadog integration for FaultZero -- events and custom metrics."""
+"""Datadog integration for FaultRay -- events and custom metrics."""
 
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ class DatadogClient:
                     "title": title,
                     "text": text,
                     "alert_type": alert_type,
-                    "tags": tags or ["source:faultzero"],
-                    "source_type_name": "faultzero",
+                    "tags": tags or ["source:faultray"],
+                    "source_type_name": "faultray",
                 },
                 timeout=10.0,
             )
@@ -65,23 +65,23 @@ class DatadogClient:
     ) -> dict:
         """Submit custom metrics to Datadog (POST /api/v2/series)."""
         now = int(time.time())
-        metric_tags = tags or ["source:faultzero"]
+        metric_tags = tags or ["source:faultray"]
 
         series = [
             {
-                "metric": "faultzero.resilience_score",
+                "metric": "faultray.resilience_score",
                 "type": 3,  # gauge
                 "points": [{"timestamp": now, "value": resilience_score}],
                 "tags": metric_tags,
             },
             {
-                "metric": "faultzero.security_score",
+                "metric": "faultray.security_score",
                 "type": 3,
                 "points": [{"timestamp": now, "value": security_score}],
                 "tags": metric_tags,
             },
             {
-                "metric": "faultzero.risk_exposure",
+                "metric": "faultray.risk_exposure",
                 "type": 3,
                 "points": [{"timestamp": now, "value": risk_exposure}],
                 "tags": metric_tags,

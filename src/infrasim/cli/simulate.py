@@ -165,40 +165,40 @@ def simulate(
 
     Examples:
         # Basic simulation
-        faultzero simulate
+        faultray simulate
 
         # Simulate with a specific model
-        faultzero simulate --model my-model.json
+        faultray simulate --model my-model.json
 
         # Run dynamic time-stepped simulation
-        faultzero simulate --dynamic
+        faultray simulate --dynamic
 
         # Run with AI analysis
-        faultzero simulate --analyze
+        faultray simulate --analyze
 
         # Export HTML report
-        faultzero simulate --html report.html
+        faultray simulate --html report.html
 
         # Export Markdown report
-        faultzero simulate --md report.md
+        faultray simulate --md report.md
 
         # JSON output for CI/CD pipelines
-        faultzero simulate --json
+        faultray simulate --json
 
         # Limit scenario count
-        faultzero simulate --max-scenarios 50
+        faultray simulate --max-scenarios 50
 
         # Save baseline for regression detection
-        faultzero simulate --save-baseline baseline.json
+        faultray simulate --save-baseline baseline.json
 
         # Compare against a baseline
-        faultzero simulate --baseline baseline.json
+        faultray simulate --baseline baseline.json
 
         # Load custom plugins
-        faultzero simulate --plugins-dir ./my-plugins/
+        faultray simulate --plugins-dir ./my-plugins/
 
         # Send notifications on completion
-        faultzero simulate --slack-webhook https://hooks.slack.com/...
+        faultray simulate --slack-webhook https://hooks.slack.com/...
     """
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
@@ -355,19 +355,19 @@ def dynamic(
 
     Examples:
         # Run dynamic simulation with defaults
-        faultzero dynamic
+        faultray dynamic
 
         # Custom duration and step interval
-        faultzero dynamic --duration 600 --step 10
+        faultray dynamic --duration 600 --step 10
 
         # Export HTML report
-        faultzero dynamic --html dynamic-report.html
+        faultray dynamic --html dynamic-report.html
 
         # JSON output
-        faultzero dynamic --json
+        faultray dynamic --json
 
         # Use a specific model
-        faultzero dynamic --model my-model.json
+        faultray dynamic --model my-model.json
     """
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")

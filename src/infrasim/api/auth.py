@@ -1,4 +1,4 @@
-"""API key authentication and RBAC for FaultZero."""
+"""API key authentication and RBAC for FaultRay."""
 
 from __future__ import annotations
 

@@ -31,7 +31,7 @@ def tf_check(
     """Analyze a Terraform plan for resilience impact.
 
     Parses the terraform plan, builds before/after infrastructure graphs,
-    runs FaultZero simulation on both, and compares resilience scores.
+    runs FaultRay simulation on both, and compares resilience scores.
 
     Examples:
         # Basic analysis
@@ -46,7 +46,7 @@ def tf_check(
         # JSON output for CI/CD
         infrasim tf-check plan.json --json
     """
-    from infrasim.integrations.terraform_provider import TerraformFaultZeroProvider
+    from infrasim.integrations.terraform_provider import TerraformFaultRayProvider
 
     if not plan_file.exists():
         console.print(f"[red]Plan file not found: {plan_file}[/]")
@@ -55,7 +55,7 @@ def tf_check(
     if not json_output:
         console.print(f"[cyan]Analyzing Terraform plan: {plan_file}...[/]")
 
-    provider = TerraformFaultZeroProvider()
+    provider = TerraformFaultRayProvider()
 
     try:
         analysis = provider.analyze_plan(plan_file)
@@ -173,10 +173,10 @@ def correlate(
     ),
     json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
 ) -> None:
-    """Correlate real incidents with FaultZero simulation scenarios.
+    """Correlate real incidents with FaultRay simulation scenarios.
 
     Validates simulation accuracy by checking which real incidents were
-    predicted by FaultZero's chaos scenarios.
+    predicted by FaultRay's chaos scenarios.
 
     Examples:
         # From CSV file
@@ -282,7 +282,7 @@ def _print_tf_analysis(analysis) -> None:
     console.print()
     console.print(Panel(
         summary,
-        title="[bold]FaultZero Terraform Check[/]",
+        title="[bold]FaultRay Terraform Check[/]",
         border_style=rec_color,
     ))
 

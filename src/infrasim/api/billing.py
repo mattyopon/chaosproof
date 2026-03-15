@@ -1,4 +1,4 @@
-"""Billing foundation -- pricing tiers and usage tracking for FaultZero SaaS."""
+"""Billing foundation -- pricing tiers and usage tracking for FaultRay SaaS."""
 
 from __future__ import annotations
 

@@ -35,7 +35,7 @@ class TestVSCodeExtension:
     def test_package_json_valid(self):
         pkg = ROOT / "vscode-extension" / "package.json"
         data = json.loads(pkg.read_text())
-        assert data["name"] == "faultzero-vscode"
+        assert data["name"] == "faultray-vscode"
         assert "main" in data
         assert "contributes" in data
         assert len(data["contributes"]["commands"]) >= 3

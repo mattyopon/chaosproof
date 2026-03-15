@@ -1,4 +1,4 @@
-"""Backtest CLI command -- validate FaultZero predictions against real incidents."""
+"""Backtest CLI command -- validate FaultRay predictions against real incidents."""
 
 from __future__ import annotations
 
@@ -33,17 +33,17 @@ def backtest(
         help="Load from YAML instead (overrides infra_file).",
     ),
 ) -> None:
-    """Validate FaultZero predictions against real incidents.
+    """Validate FaultRay predictions against real incidents.
 
     Examples:
         # Run backtest with incidents file
-        faultzero backtest infra.yaml --incidents incidents.json
+        faultray backtest infra.yaml --incidents incidents.json
 
         # JSON output
-        faultzero backtest infra.yaml --incidents incidents.json --json
+        faultray backtest infra.yaml --incidents incidents.json --json
 
         # Use YAML override
-        faultzero backtest model.json --yaml infra.yaml --incidents incidents.json
+        faultray backtest model.json --yaml infra.yaml --incidents incidents.json
     """
     from infrasim.simulator.backtest_engine import BacktestEngine
 
@@ -67,7 +67,7 @@ def backtest(
     # Rich table output
     console.print()
     console.print(
-        f"[bold]FaultZero Backtest Results[/]  "
+        f"[bold]FaultRay Backtest Results[/]  "
         f"({summary['total_incidents']} incidents)"
     )
     console.print()

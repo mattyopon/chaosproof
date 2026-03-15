@@ -23,13 +23,13 @@ def feed_update(
 
     Examples:
         # Update feeds with default settings
-        faultzero feed-update
+        faultray feed-update
 
         # Use a specific model for component-aware scenarios
-        faultzero feed-update --model my-model.json
+        faultray feed-update --model my-model.json
 
         # Custom HTTP timeout
-        faultzero feed-update --timeout 30
+        faultray feed-update --timeout 30
     """
     from infrasim.feeds.analyzer import analyze_articles, incidents_to_scenarios
     from infrasim.feeds.fetcher import fetch_all_feeds
@@ -122,7 +122,7 @@ def feed_list() -> None:
 
     Examples:
         # List all stored feed scenarios
-        faultzero feed-list
+        faultray feed-list
     """
     from infrasim.feeds.store import get_store_stats, load_store_raw
 
@@ -182,7 +182,7 @@ def feed_sources() -> None:
 
     Examples:
         # List all configured feed sources
-        faultzero feed-sources
+        faultray feed-sources
     """
     from infrasim.feeds.sources import DEFAULT_SOURCES
 
@@ -215,7 +215,7 @@ def feed_clear() -> None:
 
     Examples:
         # Clear the feed scenario store
-        faultzero feed-clear
+        faultray feed-clear
     """
     from infrasim.feeds.store import clear_store, get_store_stats
 

@@ -1,13 +1,13 @@
 # Azure Integration
 
-FaultZero integrates with Microsoft Azure to scan and model your Azure infrastructure.
+FaultRay integrates with Microsoft Azure to scan and model your Azure infrastructure.
 
 ## Setup
 
 Install the Azure extras:
 
 ```bash
-pip install "faultzero[azure]"
+pip install "faultray[azure]"
 ```
 
 Authenticate with Azure:
@@ -26,13 +26,13 @@ export AZURE_SUBSCRIPTION_ID=...
 ### Full subscription scan
 
 ```bash
-faultzero scan --provider azure --output azure-infra.json
+faultray scan --provider azure --output azure-infra.json
 ```
 
 ### Specific resource group
 
 ```bash
-faultzero scan --provider azure --resource-group my-rg --output azure.json
+faultray scan --provider azure --resource-group my-rg --output azure.json
 ```
 
 ## Supported Services

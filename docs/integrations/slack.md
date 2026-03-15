@@ -1,6 +1,6 @@
 # Slack Integration
 
-FaultZero can send simulation results and alerts to Slack channels via webhooks or the Slack Bot integration.
+FaultRay can send simulation results and alerts to Slack channels via webhooks or the Slack Bot integration.
 
 ## Webhook Setup
 
@@ -11,10 +11,10 @@ FaultZero can send simulation results and alerts to Slack channels via webhooks 
 3. Create a new webhook and select a channel
 4. Copy the webhook URL
 
-### 2. Configure FaultZero
+### 2. Configure FaultRay
 
 ```bash
-export FAULTZERO_SLACK_WEBHOOK="https://hooks.slack.com/services/T.../B.../..."
+export FAULTRAY_SLACK_WEBHOOK="https://hooks.slack.com/services/T.../B.../..."
 ```
 
 Or in your configuration file:
@@ -32,7 +32,7 @@ notifications:
 ### 3. Send results to Slack
 
 ```bash
-faultzero simulate -m model.json --notify slack
+faultray simulate -m model.json --notify slack
 ```
 
 ## Notification Types
@@ -46,7 +46,7 @@ faultzero simulate -m model.json --notify slack
 
 ## Message Format
 
-FaultZero sends rich Slack messages with:
+FaultRay sends rich Slack messages with:
 
 - Resilience score with color-coded status
 - Number of critical/warning findings
@@ -55,16 +55,16 @@ FaultZero sends rich Slack messages with:
 
 ## Slack Bot (Advanced)
 
-For interactive features, install the FaultZero Slack Bot:
+For interactive features, install the FaultRay Slack Bot:
 
 ```bash
-faultzero slack-bot install --token xoxb-YOUR-BOT-TOKEN
+faultray slack-bot install --token xoxb-YOUR-BOT-TOKEN
 ```
 
 Bot commands:
 
 | Command | Description |
 |---------|-------------|
-| `/faultzero scan` | Trigger an infrastructure scan |
-| `/faultzero score` | Show current resilience score |
-| `/faultzero report` | Generate and share a report |
+| `/faultray scan` | Trigger an infrastructure scan |
+| `/faultray score` | Show current resilience score |
+| `/faultray report` | Generate and share a report |

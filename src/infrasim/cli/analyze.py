@@ -24,10 +24,10 @@ def analyze(
 
     Examples:
         # Run AI analysis on YAML model
-        faultzero analyze infra.yaml
+        faultray analyze infra.yaml
 
         # JSON output
-        faultzero analyze infra.yaml --json
+        faultray analyze infra.yaml --json
     """
     import json as json_mod
 
@@ -72,10 +72,10 @@ def dora_report(
 
     Examples:
         # Generate DORA report
-        faultzero dora-report infra.yaml
+        faultray dora-report infra.yaml
 
         # Custom output path
-        faultzero dora-report infra.yaml --output my-dora-report.html
+        faultray dora-report infra.yaml --output my-dora-report.html
     """
     from infrasim.ai.analyzer import InfraSimAnalyzer
     from infrasim.model.loader import load_yaml
@@ -115,13 +115,13 @@ def executive(
 
     Examples:
         # Generate executive summary
-        faultzero executive infra.yaml
+        faultray executive infra.yaml
 
         # Export as HTML
-        faultzero executive infra.yaml --html executive-summary.html
+        faultray executive infra.yaml --html executive-summary.html
 
         # JSON output
-        faultzero executive infra.yaml --json
+        faultray executive infra.yaml --json
     """
     import dataclasses
     import json as json_mod

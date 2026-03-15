@@ -1,4 +1,4 @@
-"""Tests for FaultZeroDaemon (continuous monitoring)."""
+"""Tests for FaultRayDaemon (continuous monitoring)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrasim.daemon import FaultZeroDaemon
+from infrasim.daemon import FaultRayDaemon
 
 
 @pytest.fixture
@@ -29,24 +29,24 @@ def model_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def daemon(model_file: Path, tmp_path: Path) -> FaultZeroDaemon:
+def daemon(model_file: Path, tmp_path: Path) -> FaultRayDaemon:
     """Create a daemon instance with short interval for testing."""
-    return FaultZeroDaemon(
+    return FaultRayDaemon(
         model_path=model_file,
         interval_seconds=1,
         results_dir=tmp_path / "results",
     )
 
 
-class TestFaultZeroDaemon:
-    def test_init(self, daemon: FaultZeroDaemon, model_file: Path):
+class TestFaultRayDaemon:
+    def test_init(self, daemon: FaultRayDaemon, model_file: Path):
         """Daemon should initialize with correct attributes."""
         assert daemon.model_path == model_file
         assert daemon.interval == 1
         assert daemon.running is False
         assert daemon.scan_count == 0
 
-    def test_run_scan(self, daemon: FaultZeroDaemon):
+    def test_run_scan(self, daemon: FaultRayDaemon):
         """_run_scan() should execute simulation and return a result dict."""
         result = daemon._run_scan()
         assert result is not None
@@ -57,7 +57,7 @@ class TestFaultZeroDaemon:
 
     def test_run_scan_missing_model(self, tmp_path: Path):
         """_run_scan() should return None if model file is missing."""
-        daemon = FaultZeroDaemon(
+        daemon = FaultRayDaemon(
             model_path=tmp_path / "nonexistent.json",
             interval_seconds=1,
             results_dir=tmp_path / "results",
@@ -65,7 +65,7 @@ class TestFaultZeroDaemon:
         result = daemon._run_scan()
         assert result is None
 
-    def test_save_and_load_result(self, daemon: FaultZeroDaemon):
+    def test_save_and_load_result(self, daemon: FaultRayDaemon):
         """_save_result() should persist results that can be loaded later."""
         result = {"resilience_score": 85.0, "critical_count": 1}
         daemon._save_result(result)
@@ -76,12 +76,12 @@ class TestFaultZeroDaemon:
         loaded = json.loads(latest_path.read_text())
         assert loaded["resilience_score"] == 85.0
 
-    def test_has_regression_no_previous(self, daemon: FaultZeroDaemon):
+    def test_has_regression_no_previous(self, daemon: FaultRayDaemon):
         """_has_regression() should return False when there's no previous result."""
         result = daemon._run_scan()
         assert daemon._has_regression(result) is False
 
-    def test_has_regression_detected(self, daemon: FaultZeroDaemon):
+    def test_has_regression_detected(self, daemon: FaultRayDaemon):
         """_has_regression() should detect score drops."""
         daemon._previous_result = {
             "resilience_score": 90.0,
@@ -96,19 +96,19 @@ class TestFaultZeroDaemon:
         }
         assert daemon._has_regression(result) is True
 
-    def test_stop(self, daemon: FaultZeroDaemon):
+    def test_stop(self, daemon: FaultRayDaemon):
         """stop() should set running to False."""
         daemon._running = True
         daemon.stop()
         assert daemon.running is False
 
-    def test_handle_signal(self, daemon: FaultZeroDaemon):
+    def test_handle_signal(self, daemon: FaultRayDaemon):
         """Signal handler should stop the daemon."""
         daemon._running = True
         daemon._handle_signal(signal.SIGINT, None)
         assert daemon.running is False
 
-    def test_start_runs_and_stops(self, daemon: FaultZeroDaemon):
+    def test_start_runs_and_stops(self, daemon: FaultRayDaemon):
         """start() should run scans and respond to stop."""
         scan_count = 0
 
@@ -126,7 +126,7 @@ class TestFaultZeroDaemon:
         assert daemon.scan_count >= 1
         assert daemon.running is False
 
-    def test_notify_called_on_regression(self, daemon: FaultZeroDaemon):
+    def test_notify_called_on_regression(self, daemon: FaultRayDaemon):
         """Notification should be triggered when regression is detected."""
         with patch.object(daemon, "_notify") as mock_notify:
             daemon._previous_result = {
@@ -163,7 +163,7 @@ class TestFaultZeroDaemon:
         latest = results_dir / "latest.json"
         latest.write_text(json.dumps({"resilience_score": 88.0, "results": []}))
 
-        daemon = FaultZeroDaemon(
+        daemon = FaultRayDaemon(
             model_path=model_file,
             interval_seconds=1,
             results_dir=results_dir,

@@ -21,10 +21,10 @@ def diff_command(
 
     Examples:
         # Compare two result files
-        faultzero diff before.json after.json
+        faultray diff before.json after.json
 
         # JSON output for CI/CD
-        faultzero diff before.json after.json --json
+        faultray diff before.json after.json --json
     """
     if not before.exists():
         console.print(f"[red]File not found: {before}[/]")

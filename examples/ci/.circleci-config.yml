@@ -1,4 +1,4 @@
-# CircleCI template for FaultZero chaos simulation
+# CircleCI template for FaultRay chaos simulation
 # Copy this file to your repository as .circleci/config.yml
 
 version: 2.1
@@ -9,19 +9,19 @@ executors:
       - image: cimg/python:3.12
 
 jobs:
-  faultzero:
+  faultray:
     executor: python
     steps:
       - checkout
 
       - run:
-          name: Install FaultZero
-          command: pip install faultzero
+          name: Install FaultRay
+          command: pip install faultray
 
       - run:
           name: Run Chaos Simulation
           command: |
-            faultzero simulate --model infra.yaml --json > results.json
+            faultray simulate --model infra.yaml --json > results.json
             cat results.json
 
       - run:
@@ -40,7 +40,7 @@ jobs:
           name: Baseline Comparison
           command: |
             if [ -f baseline.json ]; then
-              faultzero simulate --model infra.yaml --baseline baseline.json
+              faultray simulate --model infra.yaml --baseline baseline.json
             else
               echo "No baseline.json found — skipping comparison."
             fi
@@ -48,10 +48,10 @@ jobs:
 
       - store_artifacts:
           path: results.json
-          destination: faultzero-results
+          destination: faultray-results
 
 workflows:
   version: 2
   test-and-chaos:
     jobs:
-      - faultzero
+      - faultray

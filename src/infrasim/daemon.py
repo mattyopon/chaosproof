@@ -11,7 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-class FaultZeroDaemon:
+class FaultRayDaemon:
     """Continuously scan an infrastructure model on a fixed interval.
 
     On each tick the daemon:
@@ -31,7 +31,7 @@ class FaultZeroDaemon:
     ) -> None:
         self.model_path = Path(model_path)
         self.interval = interval_seconds
-        self.results_dir = results_dir or (Path.home() / ".faultzero" / "daemon")
+        self.results_dir = results_dir or (Path.home() / ".faultray" / "daemon")
         self.results_dir.mkdir(parents=True, exist_ok=True)
         self.notification_config = notification_config or {}
         self._running = False
@@ -56,7 +56,7 @@ class FaultZeroDaemon:
         signal.signal(signal.SIGTERM, self._handle_signal)
 
         logger.info(
-            "FaultZero daemon started: model=%s interval=%ds",
+            "FaultRay daemon started: model=%s interval=%ds",
             self.model_path,
             self.interval,
         )
@@ -79,7 +79,7 @@ class FaultZeroDaemon:
     def stop(self) -> None:
         """Signal the daemon to stop."""
         self._running = False
-        logger.info("FaultZero daemon stopping.")
+        logger.info("FaultRay daemon stopping.")
 
     @property
     def running(self) -> bool:

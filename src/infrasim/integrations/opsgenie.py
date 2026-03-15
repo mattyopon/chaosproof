@@ -1,4 +1,4 @@
-"""OpsGenie alert integration for FaultZero."""
+"""OpsGenie alert integration for FaultRay."""
 
 from __future__ import annotations
 
@@ -39,9 +39,9 @@ class OpsGenieClient:
                     "message": message,
                     "description": description,
                     "priority": priority,
-                    "tags": tags or ["faultzero"],
+                    "tags": tags or ["faultray"],
                     "details": details or {},
-                    "source": "FaultZero",
+                    "source": "FaultRay",
                 },
                 timeout=10.0,
             )
@@ -54,7 +54,7 @@ class OpsGenieClient:
             resp = await client.post(
                 f"{self.base_url}/v2/alerts/{alert_id}/close",
                 headers=self._headers(),
-                json={"note": note or "Closed by FaultZero"},
+                json={"note": note or "Closed by FaultRay"},
                 timeout=10.0,
             )
             resp.raise_for_status()

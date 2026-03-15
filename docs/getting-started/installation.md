@@ -1,11 +1,11 @@
 # Installation
 
-FaultZero can be installed via pip, Docker, or from source.
+FaultRay can be installed via pip, Docker, or from source.
 
 ## pip
 
 ```bash
-pip install faultzero
+pip install faultray
 ```
 
 ## With cloud scanning support
@@ -13,16 +13,16 @@ pip install faultzero
 Install optional dependencies for cloud provider integration:
 
 ```bash
-pip install "faultzero[aws]"          # AWS support
-pip install "faultzero[gcp]"          # GCP support
-pip install "faultzero[k8s]"          # Kubernetes support
-pip install "faultzero[azure]"        # Azure support
-pip install "faultzero[all-clouds]"   # Everything
+pip install "faultray[aws]"          # AWS support
+pip install "faultray[gcp]"          # GCP support
+pip install "faultray[k8s]"          # Kubernetes support
+pip install "faultray[azure]"        # Azure support
+pip install "faultray[all-clouds]"   # Everything
 ```
 
 ## Docker
 
-Run FaultZero using the official Docker image:
+Run FaultRay using the official Docker image:
 
 ```bash
 docker compose up web
@@ -31,8 +31,8 @@ docker compose up web
 Or pull the image directly:
 
 ```bash
-docker pull ghcr.io/mattyopon/faultzero:latest
-docker run -p 8000:8000 ghcr.io/mattyopon/faultzero:latest
+docker pull ghcr.io/mattyopon/faultray:latest
+docker run -p 8000:8000 ghcr.io/mattyopon/faultray:latest
 ```
 
 ## From source
@@ -51,8 +51,8 @@ pip install -e ".[dev]"
 ## Verify installation
 
 ```bash
-faultzero --version
-faultzero --help
+faultray --version
+faultray --help
 ```
 
-You should see the FaultZero version number and a list of available commands.
+You should see the FaultRay version number and a list of available commands.

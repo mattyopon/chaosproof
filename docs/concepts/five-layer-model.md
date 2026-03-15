@@ -1,6 +1,6 @@
 # 5-Layer Model
 
-FaultZero organizes infrastructure components into five logical layers, each representing a distinct tier of the technology stack.
+FaultRay organizes infrastructure components into five logical layers, each representing a distinct tier of the technology stack.
 
 ## Layer Overview
 
@@ -73,8 +73,8 @@ The edge layer handles content delivery and DDoS protection.
 
 ## Cross-Layer Analysis
 
-FaultZero evaluates failure impact across layers. A Layer 1 (database) failure might cascade through Layer 2 (application) and ultimately affect Layer 5 (CDN cache invalidation). The simulation engine traces these cross-layer dependencies to calculate true impact.
+FaultRay evaluates failure impact across layers. A Layer 1 (database) failure might cascade through Layer 2 (application) and ultimately affect Layer 5 (CDN cache invalidation). The simulation engine traces these cross-layer dependencies to calculate true impact.
 
 ```bash
-faultzero simulate -m model.json --cascade-depth 5
+faultray simulate -m model.json --cascade-depth 5
 ```

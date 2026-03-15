@@ -19,7 +19,7 @@ from infrasim.cli.main import (
 def auto_fix(
     model: Path = typer.Argument(
         None,
-        help="Model file path (JSON or YAML). Defaults to faultzero-model.json.",
+        help="Model file path (JSON or YAML). Defaults to faultray-model.json.",
     ),
     target_score: float = typer.Option(
         90.0, "--target-score", "-t", help="Target resilience score (0-100)"
@@ -42,16 +42,16 @@ def auto_fix(
 
     Examples:
         # Preview remediation plan (dry-run, safe)
-        faultzero auto-fix model.yaml --target-score 90
+        faultray auto-fix model.yaml --target-score 90
 
         # Apply remediations (writes files to disk)
-        faultzero auto-fix model.yaml --target-score 90 --apply
+        faultray auto-fix model.yaml --target-score 90 --apply
 
         # JSON output for automation
-        faultzero auto-fix model.yaml --json
+        faultray auto-fix model.yaml --json
 
         # Custom output directory
-        faultzero auto-fix model.yaml --apply --output ./fixes/
+        faultray auto-fix model.yaml --apply --output ./fixes/
     """
     from rich.panel import Panel
     from rich.table import Table
@@ -147,5 +147,5 @@ def auto_fix(
     if dry_run and result.files_generated > 0:
         console.print(
             f"\n[dim]To apply these changes, run:[/]\n"
-            f"  faultzero auto-fix {resolved_model} --target-score {target_score:.0f} --apply\n"
+            f"  faultray auto-fix {resolved_model} --target-score {target_score:.0f} --apply\n"
         )

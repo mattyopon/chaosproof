@@ -1,8 +1,8 @@
-# FaultZero - E-Commerce Platform Infrastructure
+# FaultRay - E-Commerce Platform Infrastructure
 #
 # PCI DSS compliant e-commerce system
 # Load with:
-#   faultzero load examples/ecommerce-platform.yaml
+#   faultray load examples/ecommerce-platform.yaml
 #
 # Architecture:
 #   CloudFront -> WAF -> ALB -> Web Frontend (x2) + Cart API (x2) + Payment API (x2)

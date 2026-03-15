@@ -1,4 +1,4 @@
-"""Tests for FaultZero configuration management."""
+"""Tests for FaultRay configuration management."""
 
 import tempfile
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from infrasim.config import (
-    FaultZeroConfig,
+    FaultRayConfig,
     load_config,
     save_config,
     set_nested_value,
@@ -25,8 +25,8 @@ def _reset_global_config():
 
 
 def test_default_config_values():
-    """FaultZeroConfig should have sensible defaults."""
-    config = FaultZeroConfig()
+    """FaultRayConfig should have sensible defaults."""
+    config = FaultRayConfig()
     assert config.simulation["max_scenarios"] == 2000
     assert config.simulation["checkpoint_interval"] == 100
     assert config.cost_model["default_engineers"] == 2
@@ -39,7 +39,7 @@ def test_default_config_values():
 
 def test_load_config_returns_defaults_when_file_missing():
     """load_config should return defaults when the config file doesn't exist."""
-    config = load_config(Path("/tmp/nonexistent-faultzero-config.yaml"))
+    config = load_config(Path("/tmp/nonexistent-faultray-config.yaml"))
     assert config.simulation["max_scenarios"] == 2000
     assert config.ui["language"] == "en"
 
@@ -48,7 +48,7 @@ def test_save_and_load_config():
     """Config should round-trip through save and load."""
     with tempfile.TemporaryDirectory() as tmp:
         config_path = Path(tmp) / "config.yaml"
-        config = FaultZeroConfig()
+        config = FaultRayConfig()
         config.simulation["max_scenarios"] = 5000
         config.ui["language"] = "ja"
 
@@ -66,7 +66,7 @@ def test_save_config_creates_parent_dirs():
     """save_config should create parent directories if they don't exist."""
     with tempfile.TemporaryDirectory() as tmp:
         config_path = Path(tmp) / "subdir" / "deep" / "config.yaml"
-        config = FaultZeroConfig()
+        config = FaultRayConfig()
         save_config(config, config_path)
         assert config_path.exists()
 
@@ -87,7 +87,7 @@ def test_load_config_partial_yaml():
 
 def test_set_nested_value_int():
     """set_nested_value should parse integers correctly."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     set_nested_value(config, "simulation.max_scenarios", "5000")
     assert config.simulation["max_scenarios"] == 5000
     assert isinstance(config.simulation["max_scenarios"], int)
@@ -95,7 +95,7 @@ def test_set_nested_value_int():
 
 def test_set_nested_value_float():
     """set_nested_value should parse floats correctly."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     set_nested_value(config, "cost_model.engineer_hourly_rate", "150.5")
     assert config.cost_model["engineer_hourly_rate"] == 150.5
     assert isinstance(config.cost_model["engineer_hourly_rate"], float)
@@ -103,21 +103,21 @@ def test_set_nested_value_float():
 
 def test_set_nested_value_string():
     """set_nested_value should keep string values as strings."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     set_nested_value(config, "notifications.slack_webhook", "https://hooks.example.com/xyz")
     assert config.notifications["slack_webhook"] == "https://hooks.example.com/xyz"
 
 
 def test_set_nested_value_invalid_section():
     """set_nested_value should raise ValueError for unknown section."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     with pytest.raises(ValueError, match="Unknown config section"):
         set_nested_value(config, "nonexistent.key", "value")
 
 
 def test_set_nested_value_invalid_key_path():
     """set_nested_value should raise ValueError for invalid key path format."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     with pytest.raises(ValueError, match="Invalid key path"):
         set_nested_value(config, "noperiod", "value")
 
@@ -141,6 +141,6 @@ def test_load_config_empty_file():
 
 def test_set_nested_value_new_key():
     """set_nested_value should allow setting keys that don't exist in defaults."""
-    config = FaultZeroConfig()
+    config = FaultRayConfig()
     set_nested_value(config, "simulation.custom_key", "hello")
     assert config.simulation["custom_key"] == "hello"

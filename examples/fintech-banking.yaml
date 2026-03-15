@@ -1,8 +1,8 @@
-# FaultZero - Fintech Banking Infrastructure
+# FaultRay - Fintech Banking Infrastructure
 #
 # DORA (Digital Operational Resilience Act) compliant banking system
 # Load with:
-#   faultzero load examples/fintech-banking.yaml
+#   faultray load examples/fintech-banking.yaml
 #
 # Architecture:
 #   CloudFront CDN -> WAF -> API Gateway -> Core Banking APIs (x3)

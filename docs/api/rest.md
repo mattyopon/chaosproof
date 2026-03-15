@@ -1,6 +1,6 @@
 # REST API
 
-FaultZero provides a REST API for programmatic access to simulation and scoring features.
+FaultRay provides a REST API for programmatic access to simulation and scoring features.
 
 ## Base URL
 

@@ -1,17 +1,17 @@
-# Contributing to FaultZero
+# Contributing to FaultRay
 
-Thank you for your interest in contributing to FaultZero!
+Thank you for your interest in contributing to FaultRay!
 
-# FaultZero へのコントリビューション
+# FaultRay へのコントリビューション
 
-FaultZero への貢献に興味を持っていただきありがとうございます！
+FaultRay への貢献に興味を持っていただきありがとうございます！
 
 ## Quick Start / クイックスタート
 
 ```bash
 # Clone the repository
 git clone https://github.com/mattyopon/infrasim.git
-cd faultzero
+cd faultray
 
 # Create virtual environment
 python -m venv .venv
@@ -28,7 +28,7 @@ pytest tests/ -v
 ruff check src/ tests/
 
 # Run the demo
-faultzero demo
+faultray demo
 ```
 
 ## Development Guidelines / 開発ガイドライン
@@ -46,7 +46,7 @@ faultzero demo
 
 ### Commit Messages
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
-- Include version bump in feat/fix commits (e.g., `feat: FaultZero vX.Y - description`)
+- Include version bump in feat/fix commits (e.g., `feat: FaultRay vX.Y - description`)
 
 ### Pull Requests
 1. Fork the repository

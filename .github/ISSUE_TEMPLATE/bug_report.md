@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in FaultZero
+about: Report a bug in FaultRay
 labels: bug
 ---
 
@@ -20,5 +20,5 @@ What actually happens.
 ## Environment
 - OS:
 - Python version:
-- FaultZero version:
+- FaultRay version:
 - Installation method (pip/docker/source):

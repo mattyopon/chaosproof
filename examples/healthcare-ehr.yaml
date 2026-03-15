@@ -1,8 +1,8 @@
-# FaultZero - Healthcare EHR Infrastructure
+# FaultRay - Healthcare EHR Infrastructure
 #
 # HIPAA compliant Electronic Health Record system
 # Load with:
-#   faultzero load examples/healthcare-ehr.yaml
+#   faultray load examples/healthcare-ehr.yaml
 #
 # Architecture:
 #   API Gateway -> Auth Service -> Patient API (x2)

@@ -12,20 +12,20 @@ from infrasim.reporter.report import print_infrastructure_summary, print_simulat
 from infrasim.simulator.engine import SimulationEngine
 
 app = typer.Typer(
-    name="faultzero",
-    help="FaultZero — Zero-risk infrastructure chaos engineering simulator",
+    name="faultray",
+    help="FaultRay — Zero-risk infrastructure chaos engineering simulator",
     no_args_is_help=True,
 )
 console = Console()
 
-DEFAULT_MODEL_PATH = Path("faultzero-model.json")
+DEFAULT_MODEL_PATH = Path("faultray-model.json")
 
 
 def _version_callback(value: bool) -> None:
     if value:
         from infrasim import __version__
 
-        print(f"FaultZero v{__version__}")
+        print(f"FaultRay v{__version__}")
         raise typer.Exit()
 
 
@@ -44,7 +44,7 @@ def main(
         help="Enable debug logging (DEBUG level).",
     ),
 ) -> None:
-    """FaultZero — Zero-risk infrastructure chaos engineering simulator."""
+    """FaultRay — Zero-risk infrastructure chaos engineering simulator."""
     if debug or verbose:
         from infrasim.log_config import setup_logging
 
@@ -212,7 +212,7 @@ def _print_ops_results(result: "OpsSimulationResult", con: Console) -> None:  # 
     con.print()
     con.print(Panel(
         summary_text,
-        title="[bold]FaultZero Operational Simulation Report[/]",
+        title="[bold]FaultRay Operational Simulation Report[/]",
         border_style=avail_color,
     ))
 

@@ -1,4 +1,4 @@
-"""FastAPI web dashboard for FaultZero."""
+"""FastAPI web dashboard for FaultRay."""
 
 from __future__ import annotations
 
@@ -67,18 +67,18 @@ async def lifespan(application: FastAPI):
     from infrasim.api.database import init_db
     try:
         await init_db()
-        logger.info("FaultZero database initialised.")
+        logger.info("FaultRay database initialised.")
     except Exception:
         logger.warning("Database initialisation skipped (aiosqlite may not be installed).")
 
     # Start Prometheus background monitor if configured
     _prom_monitor = None
-    prom_url = os.environ.get("FAULTZERO_PROMETHEUS_URL", os.environ.get("CHAOSPROOF_PROMETHEUS_URL", os.environ.get("INFRASIM_PROMETHEUS_URL")))
+    prom_url = os.environ.get("FAULTRAY_PROMETHEUS_URL", os.environ.get("CHAOSPROOF_PROMETHEUS_URL", os.environ.get("INFRASIM_PROMETHEUS_URL")))
     if prom_url:
         try:
             from infrasim.discovery.prometheus_monitor import PrometheusMonitor
 
-            interval = int(os.environ.get("FAULTZERO_PROMETHEUS_INTERVAL", os.environ.get("CHAOSPROOF_PROMETHEUS_INTERVAL", os.environ.get("INFRASIM_PROMETHEUS_INTERVAL", "60"))))
+            interval = int(os.environ.get("FAULTRAY_PROMETHEUS_INTERVAL", os.environ.get("CHAOSPROOF_PROMETHEUS_INTERVAL", os.environ.get("INFRASIM_PROMETHEUS_INTERVAL", "60"))))
             _prom_monitor = PrometheusMonitor(prom_url, get_graph(), interval)
             await _prom_monitor.start()
             logger.info("Prometheus monitor started: %s (interval=%ds)", prom_url, interval)
@@ -93,7 +93,7 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="FaultZero API",
+    title="FaultRay API",
     description="Zero-risk infrastructure chaos engineering platform — simulate failures without touching production",
     version="1.0.0",
     docs_url="/docs",
@@ -102,9 +102,9 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS middleware — origins configurable via FAULTZERO_CORS_ORIGINS env var (CHAOSPROOF_CORS_ORIGINS / INFRASIM_CORS_ORIGINS also accepted)
+# CORS middleware — origins configurable via FAULTRAY_CORS_ORIGINS env var (CHAOSPROOF_CORS_ORIGINS / INFRASIM_CORS_ORIGINS also accepted)
 # ---------------------------------------------------------------------------
-_cors_origins_raw = os.environ.get("FAULTZERO_CORS_ORIGINS", os.environ.get("CHAOSPROOF_CORS_ORIGINS", os.environ.get("INFRASIM_CORS_ORIGINS", "*")))
+_cors_origins_raw = os.environ.get("FAULTRAY_CORS_ORIGINS", os.environ.get("CHAOSPROOF_CORS_ORIGINS", os.environ.get("INFRASIM_CORS_ORIGINS", "*")))
 _cors_origins: list[str] = [
     origin.strip()
     for origin in _cors_origins_raw.split(",")
@@ -182,6 +182,13 @@ app.include_router(graphql_router)
 from infrasim.api.teams import teams_router
 
 app.include_router(teams_router)
+
+# ---------------------------------------------------------------------------
+# Resilience Leaderboard API router
+# ---------------------------------------------------------------------------
+from infrasim.api.leaderboard import leaderboard_router
+
+app.include_router(leaderboard_router)
 
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -847,8 +854,8 @@ async def list_audit_logs(
 async def oauth_login(provider: str):
     """Redirect to the OAuth provider's authorization page.
 
-    Only active when ``FAULTZERO_OAUTH_{PROVIDER}_CLIENT_ID`` and
-    ``FAULTZERO_OAUTH_{PROVIDER}_CLIENT_SECRET`` env vars are set
+    Only active when ``FAULTRAY_OAUTH_{PROVIDER}_CLIENT_ID`` and
+    ``FAULTRAY_OAUTH_{PROVIDER}_CLIENT_SECRET`` env vars are set
     (``CHAOSPROOF_OAUTH_*`` and ``INFRASIM_OAUTH_*`` also accepted as fallbacks).
     """
     from infrasim.api.oauth import OAuthConfig, generate_oauth_url
@@ -974,6 +981,261 @@ async def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "has_data": True,
+    })
+
+
+@app.get("/blast-radius", response_class=HTMLResponse)
+async def blast_radius_page(request: Request):
+    """Interactive blast radius visualizer."""
+    return templates.TemplateResponse("blast_radius.html", {
+        "request": request,
+        "has_data": len(get_graph().components) > 0,
+    })
+
+
+@app.get("/api/topology", response_class=JSONResponse)
+async def get_topology(user=Depends(_require_permission("view_results"))):
+    """Return infrastructure topology as nodes/edges for D3.js blast radius visualizer."""
+    graph = get_graph()
+    if not graph.components:
+        return JSONResponse({
+            "nodes": [],
+            "edges": [],
+            "metadata": {"total_components": 0, "total_edges": 0, "resilience_score": 0},
+        })
+
+    nodes = []
+    for comp in graph.components.values():
+        dependents = graph.get_dependents(comp.id)
+        dependencies = graph.get_dependencies(comp.id)
+        is_spof = comp.replicas <= 1 and len(dependents) > 0
+        # Determine risk level
+        util = comp.utilization()
+        if is_spof and util > 70:
+            risk_level = "critical"
+        elif is_spof or util > 80:
+            risk_level = "high"
+        elif util > 60:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+
+        nodes.append({
+            "id": comp.id,
+            "name": comp.name,
+            "type": comp.type.value,
+            "replicas": comp.replicas,
+            "utilization": round(util, 1),
+            "health": comp.health.value,
+            "dependents_count": len(dependents),
+            "dependencies_count": len(dependencies),
+            "is_spof": is_spof,
+            "risk_level": risk_level,
+        })
+
+    edges = []
+    for dep in graph.all_dependency_edges():
+        edges.append({
+            "source": dep.source_id,
+            "target": dep.target_id,
+            "type": dep.dependency_type,
+            "dependency_type": dep.dependency_type,
+            "weight": dep.weight,
+            "critical": dep.weight >= 0.8,
+        })
+
+    summary = graph.summary()
+    return JSONResponse({
+        "nodes": nodes,
+        "edges": edges,
+        "metadata": {
+            "total_components": summary["total_components"],
+            "total_edges": summary["total_dependencies"],
+            "resilience_score": summary["resilience_score"],
+        },
+    })
+
+
+@app.post("/api/simulate-failure/{component_id}", response_class=JSONResponse)
+async def simulate_failure(
+    component_id: str,
+    user=Depends(_require_permission("run_simulation")),
+):
+    """Simulate a component failure and return cascade effects with wave-by-wave breakdown."""
+    from infrasim.simulator.cascade import CascadeEngine
+    from infrasim.simulator.scenarios import Fault, FaultType
+
+    graph = get_graph()
+    if not graph.components:
+        raise HTTPException(status_code=400, detail="No infrastructure loaded. Visit /demo first.")
+
+    comp = graph.get_component(component_id)
+    if comp is None:
+        raise HTTPException(status_code=404, detail=f"Component '{component_id}' not found.")
+
+    # Run cascade simulation
+    cascade_engine = CascadeEngine(graph)
+    fault = Fault(
+        target_component_id=component_id,
+        fault_type=FaultType.COMPONENT_DOWN,
+    )
+    chain = cascade_engine.simulate_fault(fault)
+
+    # Organise effects into waves based on estimated_time_seconds
+    # Wave 0 = direct failure, then group by time buckets
+    waves: list[dict] = []
+    if chain.effects:
+        # Wave 0: the directly failed component
+        wave0_comps = []
+        remaining = []
+        for effect in chain.effects:
+            if effect.component_id == component_id:
+                wave0_comps.append({
+                    "id": effect.component_id,
+                    "health": effect.health.value,
+                    "reason": effect.reason,
+                })
+            else:
+                remaining.append(effect)
+
+        if wave0_comps:
+            waves.append({"wave": 0, "components": wave0_comps})
+
+        # Sort remaining by estimated_time_seconds for wave ordering
+        remaining.sort(key=lambda e: e.estimated_time_seconds)
+
+        # Group into waves by time buckets
+        current_wave = 1
+        current_bucket: list[dict] = []
+        prev_time = 0
+        for effect in remaining:
+            if effect.estimated_time_seconds > prev_time and current_bucket:
+                waves.append({"wave": current_wave, "components": current_bucket})
+                current_wave += 1
+                current_bucket = []
+            current_bucket.append({
+                "id": effect.component_id,
+                "health": effect.health.value,
+                "reason": effect.reason,
+            })
+            prev_time = effect.estimated_time_seconds
+
+        if current_bucket:
+            waves.append({"wave": current_wave, "components": current_bucket})
+
+    total_affected = len(chain.effects)
+    total_components = len(graph.components)
+    blast_radius_score = total_affected / total_components if total_components > 0 else 0
+
+    # Estimate recovery time based on severity
+    severity = chain.severity
+    if severity > 7:
+        recovery_est = "30-60 minutes"
+    elif severity > 4:
+        recovery_est = "15-30 minutes"
+    elif severity > 2:
+        recovery_est = "5-15 minutes"
+    else:
+        recovery_est = "< 5 minutes"
+
+    return JSONResponse({
+        "root_cause": component_id,
+        "total_affected": total_affected,
+        "risk_score": round(severity, 1),
+        "waves": waves,
+        "blast_radius_score": round(blast_radius_score, 2),
+        "recovery_time_estimate": recovery_est,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Incident Replay API endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/incidents", response_class=JSONResponse)
+async def list_incidents(
+    provider: str | None = None,
+    user=Depends(_require_permission("view_results")),
+):
+    """List available historical incidents for replay."""
+    from infrasim.simulator.incident_replay import IncidentReplayEngine
+
+    engine = IncidentReplayEngine()
+    incidents = engine.list_incidents(provider=provider)
+    return JSONResponse({
+        "incidents": [
+            {
+                "id": inc.id,
+                "name": inc.name,
+                "provider": inc.provider,
+                "date": inc.date.isoformat(),
+                "duration_hours": round(inc.duration.total_seconds() / 3600, 1),
+                "severity": inc.severity,
+                "affected_services": inc.affected_services,
+                "affected_regions": inc.affected_regions,
+                "root_cause": inc.root_cause,
+                "lessons_learned": inc.lessons_learned,
+                "post_mortem_url": inc.post_mortem_url,
+                "tags": inc.tags,
+            }
+            for inc in incidents
+        ],
+        "count": len(incidents),
+    })
+
+
+@app.post("/api/replay/{incident_id}", response_class=JSONResponse)
+async def replay_incident(
+    incident_id: str,
+    user=Depends(_require_permission("run_simulation")),
+):
+    """Replay a historical incident against current infrastructure."""
+    from infrasim.simulator.incident_replay import IncidentReplayEngine
+
+    graph = get_graph()
+    if not graph.components:
+        raise HTTPException(
+            status_code=400,
+            detail="No infrastructure loaded. Visit /demo first or load a model.",
+        )
+
+    engine = IncidentReplayEngine()
+    try:
+        incident = engine.get_incident(incident_id)
+    except KeyError:
+        available = sorted(engine._incidents.keys())
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown incident ID '{incident_id}'. Available: {available}",
+        )
+
+    result = engine.replay(graph, incident)
+
+    return JSONResponse({
+        "incident_id": result.incident.id,
+        "incident_name": result.incident.name,
+        "survived": result.survived,
+        "impact_score": result.impact_score,
+        "resilience_grade": result.resilience_grade_during_incident,
+        "downtime_estimate_minutes": round(result.downtime_estimate.total_seconds() / 60, 1),
+        "revenue_impact_estimate": result.revenue_impact_estimate,
+        "affected_components": [
+            {
+                "id": ac.component_id,
+                "name": ac.component_name,
+                "impact_type": ac.impact_type,
+                "health": ac.health_during_incident.value,
+                "recovery_time_minutes": (
+                    round(ac.recovery_time.total_seconds() / 60, 1)
+                    if ac.recovery_time else None
+                ),
+                "reason": ac.reason,
+            }
+            for ac in result.affected_components
+        ],
+        "survival_factors": result.survival_factors,
+        "vulnerability_factors": result.vulnerability_factors,
+        "recommendations": result.recommendations,
     })
 
 
@@ -1140,7 +1402,7 @@ async def api_compliance_check(
 
 @app.post("/api/slack/commands", response_class=JSONResponse)
 async def slack_command_handler(request: Request):
-    """Handle Slack slash commands for FaultZero.
+    """Handle Slack slash commands for FaultRay.
 
     Expected form data from Slack:
         text: "simulate", "score", "trend", "help"
@@ -1164,12 +1426,12 @@ async def slack_command_handler(request: Request):
             user_id = body.get("user_id", "")
             channel_id = body.get("channel_id", "")
 
-        from infrasim.integrations.slack_bot import FaultZeroSlackBot, parse_slack_command
+        from infrasim.integrations.slack_bot import FaultRaySlackBot, parse_slack_command
 
         # Use the currently loaded graph's model path if available
         model_path = _model_path
 
-        bot = FaultZeroSlackBot(model_path=model_path)
+        bot = FaultRaySlackBot(model_path=model_path)
         command = parse_slack_command(str(text), user_id=str(user_id), channel_id=str(channel_id))
         response = bot.handle_command(command)
 

@@ -1,6 +1,6 @@
 # GraphQL API
 
-FaultZero exposes a GraphQL endpoint for flexible querying of infrastructure models and simulation results.
+FaultRay exposes a GraphQL endpoint for flexible querying of infrastructure models and simulation results.
 
 ## Endpoint
 

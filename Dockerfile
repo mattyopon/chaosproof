@@ -16,8 +16,8 @@ COPY README.md ./
 RUN pip install --no-cache-dir -e .
 
 # Create data directory for feed storage
-RUN mkdir -p /root/.faultzero
+RUN mkdir -p /root/.faultray
 
 # Default: run web dashboard
 EXPOSE 8000
-CMD ["faultzero", "serve", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["faultray", "serve", "--host", "0.0.0.0", "--port", "8000"]

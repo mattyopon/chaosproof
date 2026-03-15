@@ -1,6 +1,6 @@
 # Your First Simulation
 
-This guide walks you through running your first FaultZero simulation and interpreting the results.
+This guide walks you through running your first FaultRay simulation and interpreting the results.
 
 ## Creating an infrastructure model
 
@@ -45,13 +45,13 @@ edges:
 ### From cloud provider
 
 ```bash
-faultzero scan --provider aws --output my-infra.json
+faultray scan --provider aws --output my-infra.json
 ```
 
 ## Running the simulation
 
 ```bash
-faultzero simulate -m my-infra.json --json
+faultray simulate -m my-infra.json --json
 ```
 
 ### Sample output
@@ -92,7 +92,7 @@ Cascade risks identify failure chains where one component's failure triggers add
 
 ## Fixing issues
 
-FaultZero provides actionable recommendations. For example, to address the database SPOF:
+FaultRay provides actionable recommendations. For example, to address the database SPOF:
 
 ```yaml
   - id: replica-db
@@ -105,7 +105,7 @@ FaultZero provides actionable recommendations. For example, to address the datab
 Re-run the simulation to verify improvements:
 
 ```bash
-faultzero simulate -m my-infra-v2.json
+faultray simulate -m my-infra-v2.json
 ```
 
 ## Next Steps

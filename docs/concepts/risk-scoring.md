@@ -1,6 +1,6 @@
 # Risk Scoring
 
-FaultZero calculates a resilience score from 0 to 100 based on multiple weighted factors. This page explains the scoring algorithm and how to interpret results.
+FaultRay calculates a resilience score from 0 to 100 based on multiple weighted factors. This page explains the scoring algorithm and how to interpret results.
 
 ## Score Breakdown
 
@@ -85,5 +85,5 @@ scoring:
 ```
 
 ```bash
-faultzero simulate -m model.json --scoring-config scoring.yaml
+faultray simulate -m model.json --scoring-config scoring.yaml
 ```

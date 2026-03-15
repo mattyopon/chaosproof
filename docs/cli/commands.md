@@ -1,11 +1,11 @@
 # CLI Commands
 
-Complete reference for the FaultZero command-line interface.
+Complete reference for the FaultRay command-line interface.
 
 ## Global Options
 
 ```bash
-faultzero [OPTIONS] COMMAND [ARGS]
+faultray [OPTIONS] COMMAND [ARGS]
 ```
 
 | Option | Description |
@@ -22,7 +22,7 @@ faultzero [OPTIONS] COMMAND [ARGS]
 Generate a sample infrastructure model and run a demo simulation.
 
 ```bash
-faultzero quickstart [--output MODEL_PATH]
+faultray quickstart [--output MODEL_PATH]
 ```
 
 | Option | Default | Description |
@@ -34,7 +34,7 @@ faultzero quickstart [--output MODEL_PATH]
 Scan a live cloud environment and generate an infrastructure model.
 
 ```bash
-faultzero scan --provider PROVIDER [OPTIONS]
+faultray scan --provider PROVIDER [OPTIONS]
 ```
 
 | Option | Description |
@@ -49,7 +49,7 @@ faultzero scan --provider PROVIDER [OPTIONS]
 Run failure simulations against an infrastructure model.
 
 ```bash
-faultzero simulate -m MODEL_PATH [OPTIONS]
+faultray simulate -m MODEL_PATH [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -65,7 +65,7 @@ faultzero simulate -m MODEL_PATH [OPTIONS]
 Evaluate resilience and produce a score summary.
 
 ```bash
-faultzero evaluate -m MODEL_PATH [OPTIONS]
+faultray evaluate -m MODEL_PATH [OPTIONS]
 ```
 
 | Option | Description |
@@ -79,7 +79,7 @@ faultzero evaluate -m MODEL_PATH [OPTIONS]
 Generate an HTML resilience report.
 
 ```bash
-faultzero report -m MODEL_PATH -o OUTPUT_PATH [OPTIONS]
+faultray report -m MODEL_PATH -o OUTPUT_PATH [OPTIONS]
 ```
 
 | Option | Description |
@@ -93,7 +93,7 @@ faultzero report -m MODEL_PATH -o OUTPUT_PATH [OPTIONS]
 Import infrastructure model from Terraform files.
 
 ```bash
-faultzero tf-import --dir TERRAFORM_DIR [OPTIONS]
+faultray tf-import --dir TERRAFORM_DIR [OPTIONS]
 ```
 
 | Option | Description |
@@ -107,7 +107,7 @@ faultzero tf-import --dir TERRAFORM_DIR [OPTIONS]
 Compare two infrastructure models and show changes.
 
 ```bash
-faultzero diff MODEL_A MODEL_B [OPTIONS]
+faultray diff MODEL_A MODEL_B [OPTIONS]
 ```
 
 | Option | Description |
@@ -120,7 +120,7 @@ faultzero diff MODEL_A MODEL_B [OPTIONS]
 Update threat intelligence feeds for simulation scenarios.
 
 ```bash
-faultzero feed-update [OPTIONS]
+faultray feed-update [OPTIONS]
 ```
 
 | Option | Description |

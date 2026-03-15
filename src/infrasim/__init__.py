@@ -1,4 +1,4 @@
-"""FaultZero — Zero-risk infrastructure chaos simulation."""
+"""FaultRay — Zero-risk infrastructure chaos simulation."""
 
 __version__ = "2.1.0"
 
@@ -37,6 +37,23 @@ def __getattr__(name: str):
         "SecurityResilienceEngine": (
             "infrasim.simulator.security_engine", "SecurityResilienceEngine",
         ),
+        # SLA Validator
+        "SLAValidatorEngine": (
+            "infrasim.simulator.sla_validator", "SLAValidatorEngine",
+        ),
+        "SLATarget": (
+            "infrasim.simulator.sla_validator", "SLATarget",
+        ),
+        # CI/CD Gate
+        "CIGateGenerator": (
+            "infrasim.ci.github_action", "CIGateGenerator",
+        ),
+        "CIGateConfig": (
+            "infrasim.ci.github_action", "CIGateConfig",
+        ),
+        "SARIFExporter": (
+            "infrasim.ci.sarif_exporter", "SARIFExporter",
+        ),
     }
 
     if name in _import_map:
@@ -57,4 +74,6 @@ __all__ = [
     "compute_three_layer_model", "compute_five_layer_model",
     "run_monte_carlo",
     "CostImpactEngine", "SecurityResilienceEngine",
+    "SLAValidatorEngine", "SLATarget",
+    "CIGateGenerator", "CIGateConfig", "SARIFExporter",
 ]

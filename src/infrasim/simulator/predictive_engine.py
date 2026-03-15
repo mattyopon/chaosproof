@@ -1,4 +1,4 @@
-"""Predictive failure engine for FaultZero.
+"""Predictive failure engine for FaultRay.
 
 Predicts future failures from degradation trends using linear extrapolation
 and exponential failure probability (CDF).  Uses ONLY the Python standard

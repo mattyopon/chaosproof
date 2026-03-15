@@ -54,19 +54,19 @@ def daemon_command(
 
     Examples:
         # Start daemon with default 1-hour interval
-        faultzero daemon
+        faultray daemon
 
         # Custom interval
-        faultzero daemon --interval 30m
+        faultray daemon --interval 30m
 
         # Monitor with Slack notifications
-        faultzero daemon --slack-webhook https://hooks.slack.com/...
+        faultray daemon --slack-webhook https://hooks.slack.com/...
 
         # Monitor with PagerDuty alerts
-        faultzero daemon --pagerduty-key ROUTING_KEY
+        faultray daemon --pagerduty-key ROUTING_KEY
 
         # Custom model and 15-minute interval
-        faultzero daemon --model my-model.json --interval 15m
+        faultray daemon --model my-model.json --interval 15m
     """
     if not model.exists():
         console.print(f"[red]Model file not found: {model}[/]")
@@ -92,15 +92,15 @@ def daemon_command(
     if teams_webhook:
         notification_config["teams_webhook"] = teams_webhook
 
-    console.print(f"[cyan]Starting FaultZero daemon...[/]")
+    console.print(f"[cyan]Starting FaultRay daemon...[/]")
     console.print(f"  Model: {model}")
     console.print(f"  Interval: {interval} ({interval_seconds}s)")
     console.print(f"  Notifications: {list(notification_config.keys()) or ['none']}")
     console.print(f"  Press Ctrl+C to stop.\n")
 
-    from infrasim.daemon import FaultZeroDaemon
+    from infrasim.daemon import FaultRayDaemon
 
-    daemon = FaultZeroDaemon(
+    daemon = FaultRayDaemon(
         model_path=model,
         interval_seconds=interval_seconds,
         notification_config=notification_config,

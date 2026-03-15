@@ -1,13 +1,13 @@
 # GCP Integration
 
-FaultZero integrates with Google Cloud Platform to scan and model your GCP infrastructure.
+FaultRay integrates with Google Cloud Platform to scan and model your GCP infrastructure.
 
 ## Setup
 
 Install the GCP extras:
 
 ```bash
-pip install "faultzero[gcp]"
+pip install "faultray[gcp]"
 ```
 
 Authenticate with Google Cloud:
@@ -23,13 +23,13 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ### Full project scan
 
 ```bash
-faultzero scan --provider gcp --output gcp-infra.json
+faultray scan --provider gcp --output gcp-infra.json
 ```
 
 ### Specific project
 
 ```bash
-faultzero scan --provider gcp --project my-project-id --output gcp.json
+faultray scan --provider gcp --project my-project-id --output gcp.json
 ```
 
 ## Supported Services

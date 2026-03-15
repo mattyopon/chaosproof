@@ -1,4 +1,4 @@
-"""Auto-remediation pipeline for FaultZero.
+"""Auto-remediation pipeline for FaultRay.
 
 Orchestrates the full scan -> evaluate -> fix -> validate -> apply cycle.
 Dry-run by default for safety.

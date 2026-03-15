@@ -1,4 +1,4 @@
-site_name: FaultZero Documentation
+site_name: FaultRay Documentation
 site_description: Zero-risk infrastructure chaos simulation
 theme:
   name: material

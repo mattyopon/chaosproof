@@ -17,7 +17,7 @@ from infrasim.config import (
 
 config_app = typer.Typer(
     name="config",
-    help="Manage FaultZero configuration.",
+    help="Manage FaultRay configuration.",
     no_args_is_help=True,
 )
 app.add_typer(config_app, name="config")
@@ -26,17 +26,17 @@ app.add_typer(config_app, name="config")
 @config_app.command("show")
 def config_show(
     path: Path = typer.Option(
-        None, "--path", "-p", help="Config file path (default: ~/.faultzero/config.yaml)"
+        None, "--path", "-p", help="Config file path (default: ~/.faultray/config.yaml)"
     ),
 ) -> None:
-    """Show current FaultZero configuration.
+    """Show current FaultRay configuration.
 
     Examples:
         # Show all configuration
-        faultzero config show
+        faultray config show
 
         # Show config from a custom path
-        faultzero config show --path /etc/faultzero/config.yaml
+        faultray config show --path /etc/faultray/config.yaml
     """
     import yaml as yaml_lib
 
@@ -56,7 +56,7 @@ def config_show(
         "ui": config.ui,
     }
 
-    console.print(f"[bold]FaultZero Configuration[/] ({config_path})\n")
+    console.print(f"[bold]FaultRay Configuration[/] ({config_path})\n")
     console.print(yaml_lib.dump(data, default_flow_style=False, sort_keys=False))
 
 
@@ -65,20 +65,20 @@ def config_set(
     key: str = typer.Argument(..., help="Config key in dot notation (e.g. simulation.max_scenarios)"),
     value: str = typer.Argument(..., help="Value to set"),
     path: Path = typer.Option(
-        None, "--path", "-p", help="Config file path (default: ~/.faultzero/config.yaml)"
+        None, "--path", "-p", help="Config file path (default: ~/.faultray/config.yaml)"
     ),
 ) -> None:
-    """Set a FaultZero configuration value.
+    """Set a FaultRay configuration value.
 
     Examples:
         # Set max scenarios
-        faultzero config set simulation.max_scenarios 200
+        faultray config set simulation.max_scenarios 200
 
         # Set daemon interval
-        faultzero config set daemon.interval_seconds 1800
+        faultray config set daemon.interval_seconds 1800
 
         # Set with custom config path
-        faultzero config set ui.theme dark --path /etc/faultzero/config.yaml
+        faultray config set ui.theme dark --path /etc/faultray/config.yaml
     """
     config_path = path or DEFAULT_CONFIG_PATH
     config = load_config(config_path)

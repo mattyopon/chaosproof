@@ -1,0 +1,1141 @@
+{% extends "base.html" %}
+{% set active_page = "blast_radius" %}
+
+{% block title %}FaultRay - Blast Radius Visualizer{% endblock %}
+{% block page_title %}Blast Radius Visualizer{% endblock %}
+{% block page_subtitle %}<span class="page-subtitle">Interactive cascade failure propagation</span>{% endblock %}
+
+{% block head %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* ------------------------------------------------------------------ */
+/* Dark theme overrides for the blast-radius page                     */
+/* ------------------------------------------------------------------ */
+.blast-layout {
+    display: flex;
+    height: calc(100vh - 72px);
+    overflow: hidden;
+    background: #0f0f23;
+    border-radius: 8px;
+    position: relative;
+}
+
+/* ---------- Control Bar (top) ---------- */
+.blast-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #1a1a2e;
+    border-bottom: 1px solid #2a2a4a;
+    flex-wrap: wrap;
+    min-height: 48px;
+}
+.blast-controls label {
+    color: #8888aa;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.blast-controls select,
+.blast-controls input[type="range"] {
+    background: #0f0f23;
+    color: #e0e0ff;
+    border: 1px solid #3a3a5a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.blast-controls select { min-width: 180px; }
+.blast-controls input[type="range"] { width: 100px; }
+.blast-controls .btn-blast {
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.1s;
+}
+.blast-controls .btn-blast:active { transform: scale(0.97); }
+.btn-simulate { background: #e94560; color: #fff; }
+.btn-simulate:hover { background: #ff5a7a; }
+.btn-reset { background: #2a2a4a; color: #ccc; }
+.btn-reset:hover { background: #3a3a5a; }
+.btn-export { background: #0984e3; color: #fff; }
+.btn-export:hover { background: #2da3f7; }
+.toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.toggle-group input[type="checkbox"] {
+    accent-color: #e94560;
+    width: 14px;
+    height: 14px;
+}
+.speed-display {
+    color: #e0e0ff;
+    font-size: 11px;
+    min-width: 30px;
+    text-align: center;
+}
+.controls-sep {
+    width: 1px;
+    height: 24px;
+    background: #3a3a5a;
+    flex-shrink: 0;
+}
+
+/* ---------- Main canvas area ---------- */
+.blast-canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+.blast-canvas-wrap svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ---------- Sidebar ---------- */
+.blast-sidebar {
+    width: 320px;
+    background: #12122a;
+    border-left: 1px solid #2a2a4a;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s;
+}
+.blast-sidebar.collapsed {
+    width: 0;
+    border-left: none;
+}
+.blast-sidebar-toggle {
+    position: absolute;
+    right: 320px;
+    top: 56px;
+    z-index: 10;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-right: none;
+    color: #8888aa;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 4px 0 0 4px;
+    transition: right 0.3s;
+}
+.blast-sidebar.collapsed ~ .blast-sidebar-toggle {
+    right: 0;
+}
+.sidebar-section {
+    padding: 12px 14px;
+    border-bottom: 1px solid #2a2a4a;
+}
+.sidebar-section h3 {
+    color: #8888aa;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 8px;
+}
+.sidebar-search {
+    width: 100%;
+    padding: 6px 10px;
+    background: #0f0f23;
+    border: 1px solid #3a3a5a;
+    border-radius: 4px;
+    color: #e0e0ff;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+.sidebar-search::placeholder { color: #555; }
+
+/* Component list */
+.component-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px 14px;
+}
+.component-list::-webkit-scrollbar { width: 4px; }
+.component-list::-webkit-scrollbar-track { background: transparent; }
+.component-list::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 2px; }
+
+.comp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 12px;
+    color: #ccc;
+}
+.comp-item:hover { background: #1a1a3e; }
+.comp-item.active { background: #2a1a3e; }
+.comp-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Simulation state panel */
+.sim-state {
+    padding: 12px 14px;
+    border-bottom: 1px solid #2a2a4a;
+}
+.sim-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+}
+.sim-metric-label { color: #8888aa; }
+.sim-metric-value { color: #e0e0ff; font-weight: 600; }
+.sim-metric-value.critical { color: #ff4444; }
+.sim-metric-value.warning { color: #ffcc00; }
+.sim-metric-value.healthy { color: #00ff88; }
+
+/* Timeline */
+.timeline-list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0 14px 14px;
+}
+.timeline-list::-webkit-scrollbar { width: 4px; }
+.timeline-list::-webkit-scrollbar-track { background: transparent; }
+.timeline-list::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 2px; }
+
+.timeline-event {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 11px;
+    color: #999;
+    border-left: 2px solid #3a3a5a;
+    padding-left: 8px;
+    margin-left: 4px;
+}
+.timeline-event.wave-0 { border-left-color: #ff4444; }
+.timeline-event.wave-1 { border-left-color: #ffcc00; }
+.timeline-event.wave-2 { border-left-color: #ff8800; }
+.timeline-event.wave-3 { border-left-color: #ff4444; }
+.timeline-time {
+    color: #666;
+    min-width: 40px;
+    font-family: monospace;
+}
+
+/* ---------- Tooltip ---------- */
+.blast-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: #1a1a2e;
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #e0e0ff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 100;
+    max-width: 280px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.blast-tooltip.visible { opacity: 1; }
+.blast-tooltip .tt-name {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+.blast-tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 0;
+}
+.blast-tooltip .tt-label { color: #8888aa; }
+.blast-tooltip .tt-val { font-weight: 600; }
+
+/* ---------- Node pulse animation ---------- */
+@keyframes nodePulse {
+    0%   { r: var(--base-r); opacity: 0.8; }
+    50%  { r: calc(var(--base-r) + 6px); opacity: 0.3; }
+    100% { r: var(--base-r); opacity: 0.8; }
+}
+.node-pulse {
+    animation: nodePulse 1.2s ease-in-out infinite;
+}
+
+/* ---------- Blast radius circle ---------- */
+@keyframes blastExpand {
+    0%   { r: 0; opacity: 0.3; }
+    100% { r: var(--blast-r); opacity: 0.05; }
+}
+.blast-circle {
+    fill: #ff4444;
+    animation: blastExpand 1s ease-out forwards;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+    .blast-sidebar { width: 0; border-left: none; }
+    .blast-sidebar-toggle { right: 0; }
+    .blast-controls { gap: 6px; padding: 6px 10px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Control bar -->
+<div class="blast-controls" id="blastControls">
+    <label for="scenarioSelect">Scenario:</label>
+    <select id="scenarioSelect">
+        <option value="">-- Click a node or select --</option>
+    </select>
+
+    <button class="btn-blast btn-simulate" id="btnSimulate" onclick="runSelectedScenario()">Simulate</button>
+    <button class="btn-blast btn-reset" id="btnReset" onclick="resetSimulation()">Reset</button>
+
+    <div class="controls-sep"></div>
+
+    <label for="speedSlider">Speed:</label>
+    <input type="range" id="speedSlider" min="0.5" max="5" step="0.5" value="1" oninput="updateSpeed(this.value)">
+    <span class="speed-display" id="speedDisplay">1x</span>
+
+    <div class="controls-sep"></div>
+
+    <div class="toggle-group">
+        <input type="checkbox" id="toggleLabels" checked onchange="toggleLabels(this.checked)">
+        <label for="toggleLabels">Labels</label>
+    </div>
+    <div class="toggle-group">
+        <input type="checkbox" id="toggleWeights" onchange="toggleWeights(this.checked)">
+        <label for="toggleWeights">Weights</label>
+    </div>
+
+    <div class="controls-sep"></div>
+
+    <button class="btn-blast btn-export" onclick="exportSVG()">Export SVG</button>
+</div>
+
+<!-- Main layout -->
+<div class="blast-layout" id="blastLayout">
+    <div class="blast-canvas-wrap" id="canvasWrap">
+        <svg id="blastSvg"></svg>
+        <div class="blast-tooltip" id="blastTooltip"></div>
+    </div>
+
+    <div class="blast-sidebar" id="blastSidebar">
+        <div class="sidebar-section">
+            <h3>Components</h3>
+            <input class="sidebar-search" id="compSearch" type="text" placeholder="Search components..." oninput="filterComponents(this.value)">
+        </div>
+        <div class="component-list" id="compList"></div>
+
+        <div class="sim-state" id="simState">
+            <h3 style="color:#8888aa;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;">Simulation</h3>
+            <div class="sim-metric">
+                <span class="sim-metric-label">State</span>
+                <span class="sim-metric-value" id="simStateVal">Idle</span>
+            </div>
+            <div class="sim-metric">
+                <span class="sim-metric-label">Affected</span>
+                <span class="sim-metric-value" id="simAffected">0</span>
+            </div>
+            <div class="sim-metric">
+                <span class="sim-metric-label">Blast Radius</span>
+                <span class="sim-metric-value" id="simBlastScore">--</span>
+            </div>
+            <div class="sim-metric">
+                <span class="sim-metric-label">Risk Score</span>
+                <span class="sim-metric-value" id="simRiskScore">--</span>
+            </div>
+            <div class="sim-metric">
+                <span class="sim-metric-label">Recovery Est.</span>
+                <span class="sim-metric-value" id="simRecovery">--</span>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>Cascade Timeline</h3>
+        </div>
+        <div class="timeline-list" id="timelineList"></div>
+    </div>
+
+    <button class="blast-sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"/>
+        </svg>
+    </button>
+</div>
+
+<script>
+/* ================================================================== */
+/* Blast Radius Visualizer — D3.js v7 Force-Directed Graph            */
+/* ================================================================== */
+(function() {
+    "use strict";
+
+    // ---- State ----
+    let topology = { nodes: [], edges: [], metadata: {} };
+    let simulation = null;
+    let svgRoot, gRoot, gEdges, gNodes, gLabels, gWeights, gBlast;
+    let zoom;
+    let showLabels = true;
+    let showWeights = false;
+    let animSpeed = 1;
+    let isSimulating = false;
+    let currentWaves = null;
+
+    // ---- Color / shape maps ----
+    const healthColor = {
+        healthy:    "#00ff88",
+        degraded:   "#ffcc00",
+        overloaded: "#ff8800",
+        down:       "#ff4444"
+    };
+
+    const typeShape = {
+        web_server:     "circle",
+        app_server:     "circle",
+        database:       "diamond",
+        cache:          "square",
+        load_balancer:  "hexagon",
+        queue:          "triangle",
+        storage:        "circle",
+        dns:            "hexagon",
+        external_api:   "circle",
+        custom:         "circle"
+    };
+
+    const typeLabel = {
+        web_server: "Server",
+        app_server: "Server",
+        database: "Database",
+        cache: "Cache",
+        load_balancer: "LB",
+        queue: "Queue",
+        storage: "Storage",
+        dns: "DNS",
+        external_api: "External",
+        custom: "Custom"
+    };
+
+    // ---- Init ----
+    document.addEventListener("DOMContentLoaded", loadTopology);
+
+    async function loadTopology() {
+        try {
+            const resp = await fetch("/api/topology");
+            if (!resp.ok) throw new Error("Failed to load topology");
+            topology = await resp.json();
+        } catch (e) {
+            console.error("Topology load error:", e);
+            topology = { nodes: [], edges: [], metadata: {} };
+        }
+        initGraph();
+        populateSidebar();
+        populateScenarios();
+    }
+
+    // ---- D3 Graph Setup ----
+    function initGraph() {
+        const container = document.getElementById("canvasWrap");
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        d3.select("#blastSvg").selectAll("*").remove();
+
+        svgRoot = d3.select("#blastSvg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", [0, 0, width, height]);
+
+        // Defs for markers and filters
+        const defs = svgRoot.append("defs");
+
+        // Arrow marker
+        defs.append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 20)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#555");
+
+        // Glow filter for failing nodes
+        const glowFilter = defs.append("filter")
+            .attr("id", "glow")
+            .attr("x", "-50%").attr("y", "-50%")
+            .attr("width", "200%").attr("height", "200%");
+        glowFilter.append("feGaussianBlur")
+            .attr("stdDeviation", "4")
+            .attr("result", "blur");
+        glowFilter.append("feMerge")
+            .selectAll("feMergeNode")
+            .data(["blur", "SourceGraphic"])
+            .enter().append("feMergeNode")
+            .attr("in", d => d);
+
+        // Zoom
+        zoom = d3.zoom()
+            .scaleExtent([0.2, 5])
+            .on("zoom", (event) => {
+                gRoot.attr("transform", event.transform);
+            });
+        svgRoot.call(zoom);
+
+        // Double-click to reset
+        svgRoot.on("dblclick.zoom", null);
+        svgRoot.on("dblclick", () => resetSimulation());
+
+        gRoot = svgRoot.append("g").attr("class", "root");
+
+        // Subtle grid
+        const gridG = gRoot.append("g").attr("class", "grid");
+        for (let x = 0; x < width; x += 50) {
+            gridG.append("line")
+                .attr("x1", x).attr("y1", 0).attr("x2", x).attr("y2", height)
+                .attr("stroke", "#1a1a2e").attr("stroke-width", 0.5);
+        }
+        for (let y = 0; y < height; y += 50) {
+            gridG.append("line")
+                .attr("x1", 0).attr("y1", y).attr("x2", width).attr("y2", y)
+                .attr("stroke", "#1a1a2e").attr("stroke-width", 0.5);
+        }
+
+        gBlast = gRoot.append("g").attr("class", "blast-circles");
+        gEdges = gRoot.append("g").attr("class", "edges");
+        gWeights = gRoot.append("g").attr("class", "weight-labels");
+        gNodes = gRoot.append("g").attr("class", "nodes");
+        gLabels = gRoot.append("g").attr("class", "labels");
+
+        // Process data
+        const nodes = topology.nodes.map(n => ({
+            ...n,
+            _health: n.health || "healthy",
+            _origHealth: n.health || "healthy"
+        }));
+
+        const edges = topology.edges.map(e => ({
+            ...e,
+            _health: "healthy"
+        }));
+
+        // Edges
+        const linkSel = gEdges.selectAll("line")
+            .data(edges)
+            .enter().append("line")
+            .attr("stroke", "#555")
+            .attr("stroke-width", d => Math.max(1, (d.weight || 0.5) * 3))
+            .attr("stroke-dasharray", d => {
+                if (d.type === "optional" || d.dependency_type === "optional") return "6,3";
+                if (d.type === "async" || d.dependency_type === "async") return "2,4";
+                return null;
+            })
+            .attr("marker-end", "url(#arrowhead)")
+            .attr("stroke-opacity", 0.6);
+
+        // Weight labels
+        const weightSel = gWeights.selectAll("text")
+            .data(edges)
+            .enter().append("text")
+            .attr("text-anchor", "middle")
+            .attr("fill", "#555")
+            .attr("font-size", "9px")
+            .attr("dy", -4)
+            .text(d => d.weight ? d.weight.toFixed(1) : "")
+            .attr("display", showWeights ? null : "none");
+
+        // Node groups
+        const nodeSel = gNodes.selectAll("g")
+            .data(nodes)
+            .enter().append("g")
+            .attr("class", "node-group")
+            .attr("cursor", "pointer")
+            .call(d3.drag()
+                .on("start", dragStart)
+                .on("drag", dragged)
+                .on("end", dragEnd));
+
+        // Draw shapes
+        nodeSel.each(function(d) {
+            const g = d3.select(this);
+            const r = nodeRadius(d);
+            const shape = typeShape[d.type] || "circle";
+            const color = healthColor[d._health] || "#00ff88";
+
+            if (shape === "circle") {
+                g.append("circle")
+                    .attr("class", "node-shape")
+                    .attr("r", r)
+                    .attr("fill", color)
+                    .attr("fill-opacity", 0.25)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 2);
+            } else if (shape === "diamond") {
+                g.append("polygon")
+                    .attr("class", "node-shape")
+                    .attr("points", diamondPoints(r))
+                    .attr("fill", color)
+                    .attr("fill-opacity", 0.25)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 2);
+            } else if (shape === "square") {
+                g.append("rect")
+                    .attr("class", "node-shape")
+                    .attr("x", -r).attr("y", -r)
+                    .attr("width", r*2).attr("height", r*2)
+                    .attr("rx", 3)
+                    .attr("fill", color)
+                    .attr("fill-opacity", 0.25)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 2);
+            } else if (shape === "hexagon") {
+                g.append("polygon")
+                    .attr("class", "node-shape")
+                    .attr("points", hexPoints(r))
+                    .attr("fill", color)
+                    .attr("fill-opacity", 0.25)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 2);
+            } else if (shape === "triangle") {
+                g.append("polygon")
+                    .attr("class", "node-shape")
+                    .attr("points", trianglePoints(r))
+                    .attr("fill", color)
+                    .attr("fill-opacity", 0.25)
+                    .attr("stroke", color)
+                    .attr("stroke-width", 2);
+            }
+
+            // Type icon (small letter)
+            g.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("fill", color)
+                .attr("font-size", Math.max(9, r * 0.7) + "px")
+                .attr("font-weight", "700")
+                .attr("pointer-events", "none")
+                .text(typeIcon(d.type));
+        });
+
+        // Click handler
+        nodeSel.on("click", (event, d) => {
+            event.stopPropagation();
+            simulateNodeFailure(d.id);
+        });
+
+        // Hover
+        nodeSel.on("mouseenter", (event, d) => showTooltip(event, d))
+               .on("mousemove", (event, d) => moveTooltip(event))
+               .on("mouseleave", () => hideTooltip());
+
+        // Labels
+        const labelSel = gLabels.selectAll("text")
+            .data(nodes)
+            .enter().append("text")
+            .attr("text-anchor", "middle")
+            .attr("fill", "#ccc")
+            .attr("font-size", "10px")
+            .attr("dy", d => nodeRadius(d) + 14)
+            .attr("pointer-events", "none")
+            .text(d => d.name)
+            .attr("display", showLabels ? null : "none");
+
+        // Force simulation
+        simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(edges)
+                .id(d => d.id)
+                .distance(120)
+                .strength(d => (d.weight || 0.5) * 0.3))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 20))
+            .on("tick", () => {
+                linkSel
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                weightSel
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+
+                nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+                labelSel.attr("x", d => d.x).attr("y", d => d.y);
+            });
+
+        // Store selections for later
+        window._blastState = { nodes, edges, nodeSel, linkSel, labelSel, weightSel };
+    }
+
+    // ---- Shape helpers ----
+    function nodeRadius(d) {
+        const base = 14;
+        const deps = d.dependents_count || 0;
+        return base + Math.min(deps * 3, 18);
+    }
+
+    function diamondPoints(r) {
+        return `0,${-r} ${r},0 0,${r} ${-r},0`;
+    }
+
+    function hexPoints(r) {
+        const pts = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 6;
+            pts.push(`${r * Math.cos(angle)},${r * Math.sin(angle)}`);
+        }
+        return pts.join(" ");
+    }
+
+    function trianglePoints(r) {
+        return `0,${-r} ${r * 0.866},${r * 0.5} ${-r * 0.866},${r * 0.5}`;
+    }
+
+    function typeIcon(type) {
+        const icons = {
+            web_server: "W", app_server: "A", database: "D",
+            cache: "C", load_balancer: "L", queue: "Q",
+            storage: "S", dns: "N", external_api: "E", custom: "?"
+        };
+        return icons[type] || "?";
+    }
+
+    // ---- Drag ----
+    function dragStart(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+    function dragEnd(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    // ---- Tooltip ----
+    function showTooltip(event, d) {
+        const tip = document.getElementById("blastTooltip");
+        tip.innerHTML = `
+            <div class="tt-name">${d.name}</div>
+            <div class="tt-row"><span class="tt-label">Type</span><span class="tt-val">${typeLabel[d.type] || d.type}</span></div>
+            <div class="tt-row"><span class="tt-label">Health</span><span class="tt-val" style="color:${healthColor[d._health]}">${d._health}</span></div>
+            <div class="tt-row"><span class="tt-label">Replicas</span><span class="tt-val">${d.replicas}</span></div>
+            <div class="tt-row"><span class="tt-label">Utilization</span><span class="tt-val">${d.utilization != null ? d.utilization + '%' : '--'}</span></div>
+            <div class="tt-row"><span class="tt-label">Dependents</span><span class="tt-val">${d.dependents_count}</span></div>
+            <div class="tt-row"><span class="tt-label">Risk</span><span class="tt-val">${d.risk_level || '--'}</span></div>
+            ${d.is_spof ? '<div class="tt-row"><span class="tt-label">SPOF</span><span class="tt-val" style="color:#ff4444">YES</span></div>' : ''}
+        `;
+        tip.classList.add("visible");
+        moveTooltip(event);
+    }
+    function moveTooltip(event) {
+        const tip = document.getElementById("blastTooltip");
+        const wrap = document.getElementById("canvasWrap");
+        const rect = wrap.getBoundingClientRect();
+        let x = event.clientX - rect.left + 15;
+        let y = event.clientY - rect.top + 15;
+        if (x + 280 > rect.width) x = x - 300;
+        if (y + 200 > rect.height) y = y - 200;
+        tip.style.left = x + "px";
+        tip.style.top = y + "px";
+    }
+    function hideTooltip() {
+        document.getElementById("blastTooltip").classList.remove("visible");
+    }
+
+    // ---- Simulate failure ----
+    async function simulateNodeFailure(componentId) {
+        if (isSimulating) return;
+        isSimulating = true;
+        updateSimState("Simulating...", "warning");
+
+        try {
+            const resp = await fetch(`/api/simulate-failure/${componentId}`, { method: "POST" });
+            if (!resp.ok) throw new Error("Simulation failed");
+            const result = await resp.json();
+            animateCascade(result);
+        } catch (e) {
+            console.error("Simulation error:", e);
+            updateSimState("Error", "critical");
+            isSimulating = false;
+        }
+    }
+
+    function animateCascade(result) {
+        const { nodes, edges, nodeSel, linkSel } = window._blastState;
+        const waves = result.waves || [];
+        currentWaves = result;
+
+        // Update sidebar metrics
+        document.getElementById("simAffected").textContent = result.total_affected || 0;
+        document.getElementById("simAffected").className = "sim-metric-value " +
+            (result.total_affected > 3 ? "critical" : result.total_affected > 0 ? "warning" : "healthy");
+        document.getElementById("simBlastScore").textContent =
+            result.blast_radius_score != null ? (result.blast_radius_score * 100).toFixed(0) + "%" : "--";
+        document.getElementById("simRiskScore").textContent =
+            result.risk_score != null ? result.risk_score.toFixed(1) : "--";
+        document.getElementById("simRiskScore").className = "sim-metric-value " +
+            (result.risk_score > 7 ? "critical" : result.risk_score > 4 ? "warning" : "healthy");
+        document.getElementById("simRecovery").textContent = result.recovery_time_estimate || "--";
+
+        // Clear timeline
+        const timeline = document.getElementById("timelineList");
+        timeline.innerHTML = "";
+
+        // Animate wave by wave
+        let totalDelay = 0;
+        const baseDelay = 500;
+
+        waves.forEach((wave, wi) => {
+            const delay = totalDelay;
+            totalDelay += baseDelay / animSpeed;
+
+            setTimeout(() => {
+                wave.components.forEach(comp => {
+                    // Update node visual
+                    const nodeData = nodes.find(n => n.id === comp.id);
+                    if (nodeData) {
+                        nodeData._health = comp.health;
+                    }
+
+                    // Update node shape color
+                    nodeSel.filter(d => d.id === comp.id).each(function(d) {
+                        const g = d3.select(this);
+                        const color = healthColor[comp.health] || "#666";
+                        g.select(".node-shape")
+                            .transition().duration(300)
+                            .attr("fill", color)
+                            .attr("fill-opacity", comp.health === "down" ? 0.6 : 0.35)
+                            .attr("stroke", color);
+
+                        // Pulse effect for the root cause
+                        if (wi === 0) {
+                            g.select(".node-shape")
+                                .attr("filter", "url(#glow)");
+                            // Add pulsing ring
+                            const r = nodeRadius(d);
+                            g.append("circle")
+                                .attr("class", "pulse-ring")
+                                .attr("r", r)
+                                .attr("fill", "none")
+                                .attr("stroke", "#ff4444")
+                                .attr("stroke-width", 3)
+                                .attr("opacity", 0.8)
+                                .transition().duration(1000)
+                                .attr("r", r + 25)
+                                .attr("opacity", 0)
+                                .remove();
+                        }
+
+                        // Ripple effect for non-root
+                        if (wi > 0) {
+                            const r = nodeRadius(d);
+                            g.append("circle")
+                                .attr("class", "ripple")
+                                .attr("r", r)
+                                .attr("fill", "none")
+                                .attr("stroke", color)
+                                .attr("stroke-width", 2)
+                                .attr("opacity", 0.7)
+                                .transition().duration(600)
+                                .attr("r", r + 18)
+                                .attr("opacity", 0)
+                                .remove();
+                        }
+
+                        // Update text color
+                        g.select("text")
+                            .transition().duration(300)
+                            .attr("fill", color);
+                    });
+
+                    // Update edge colors
+                    linkSel.each(function(e) {
+                        if (e.target.id === comp.id || e.source.id === comp.id) {
+                            const edgeHealth = comp.health;
+                            d3.select(this)
+                                .transition().duration(400)
+                                .attr("stroke", healthColor[edgeHealth] || "#555")
+                                .attr("stroke-opacity", 0.9);
+                        }
+                    });
+
+                    // Timeline entry
+                    const timeEntry = document.createElement("div");
+                    timeEntry.className = `timeline-event wave-${Math.min(wi, 3)}`;
+                    timeEntry.innerHTML = `
+                        <span class="timeline-time">${(delay / 1000).toFixed(1)}s</span>
+                        <span><strong style="color:${healthColor[comp.health]}">${comp.id}</strong> &rarr; ${comp.health} ${comp.reason ? '(' + comp.reason + ')' : ''}</span>
+                    `;
+                    timeline.appendChild(timeEntry);
+                    timeline.scrollTop = timeline.scrollHeight;
+                });
+
+                // Update component list health indicators
+                updateCompListHealth(nodes);
+
+                // Update state
+                if (wi === waves.length - 1) {
+                    updateSimState("Complete", "critical");
+                    isSimulating = false;
+
+                    // Draw blast radius circle
+                    drawBlastCircle(result);
+                }
+            }, delay);
+        });
+
+        if (waves.length === 0) {
+            updateSimState("No cascade", "healthy");
+            isSimulating = false;
+        }
+    }
+
+    function drawBlastCircle(result) {
+        gBlast.selectAll("*").remove();
+        if (!result.root_cause) return;
+
+        const { nodes } = window._blastState;
+        const rootNode = nodes.find(n => n.id === result.root_cause);
+        if (!rootNode) return;
+
+        // Calculate radius based on affected nodes
+        const affectedIds = new Set();
+        (result.waves || []).forEach(w => {
+            w.components.forEach(c => affectedIds.add(c.id));
+        });
+
+        let maxDist = 0;
+        nodes.forEach(n => {
+            if (affectedIds.has(n.id)) {
+                const dx = n.x - rootNode.x;
+                const dy = n.y - rootNode.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > maxDist) maxDist = dist;
+            }
+        });
+
+        const blastR = Math.max(60, maxDist + 40);
+
+        gBlast.append("circle")
+            .attr("cx", rootNode.x)
+            .attr("cy", rootNode.y)
+            .attr("r", 0)
+            .attr("fill", "#ff4444")
+            .attr("fill-opacity", 0)
+            .attr("stroke", "#ff4444")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", "8,4")
+            .attr("stroke-opacity", 0.4)
+            .transition().duration(800)
+            .attr("r", blastR)
+            .attr("fill-opacity", 0.03);
+    }
+
+    // ---- Reset ----
+    window.resetSimulation = function() {
+        if (!window._blastState) return;
+        const { nodes, nodeSel, linkSel } = window._blastState;
+        isSimulating = false;
+        currentWaves = null;
+
+        // Reset health
+        nodes.forEach(n => { n._health = n._origHealth; });
+
+        // Reset node visuals
+        nodeSel.each(function(d) {
+            const g = d3.select(this);
+            const color = healthColor[d._origHealth] || "#00ff88";
+            g.select(".node-shape")
+                .transition().duration(400)
+                .attr("fill", color)
+                .attr("fill-opacity", 0.25)
+                .attr("stroke", color)
+                .attr("filter", null);
+            g.select("text")
+                .transition().duration(400)
+                .attr("fill", color);
+            g.selectAll(".pulse-ring, .ripple").remove();
+        });
+
+        // Reset edges
+        linkSel.transition().duration(400)
+            .attr("stroke", "#555")
+            .attr("stroke-opacity", 0.6);
+
+        // Clear blast circles
+        gBlast.selectAll("*").remove();
+
+        // Reset sidebar
+        updateSimState("Idle", "");
+        document.getElementById("simAffected").textContent = "0";
+        document.getElementById("simAffected").className = "sim-metric-value";
+        document.getElementById("simBlastScore").textContent = "--";
+        document.getElementById("simRiskScore").textContent = "--";
+        document.getElementById("simRiskScore").className = "sim-metric-value";
+        document.getElementById("simRecovery").textContent = "--";
+        document.getElementById("timelineList").innerHTML = "";
+
+        updateCompListHealth(nodes);
+    };
+
+    // ---- Sidebar ----
+    function populateSidebar() {
+        const list = document.getElementById("compList");
+        list.innerHTML = "";
+        topology.nodes.forEach(n => {
+            const item = document.createElement("div");
+            item.className = "comp-item";
+            item.setAttribute("data-id", n.id);
+            item.innerHTML = `
+                <span class="comp-dot" style="background:${healthColor[n.health] || '#00ff88'}"></span>
+                <span>${n.name}</span>
+                <span style="margin-left:auto;color:#555;font-size:10px;">${typeLabel[n.type] || n.type}</span>
+            `;
+            item.addEventListener("click", () => {
+                simulateNodeFailure(n.id);
+                // Highlight in list
+                list.querySelectorAll(".comp-item").forEach(el => el.classList.remove("active"));
+                item.classList.add("active");
+            });
+            list.appendChild(item);
+        });
+    }
+
+    function updateCompListHealth(nodes) {
+        const list = document.getElementById("compList");
+        nodes.forEach(n => {
+            const item = list.querySelector(`[data-id="${n.id}"]`);
+            if (item) {
+                const dot = item.querySelector(".comp-dot");
+                if (dot) dot.style.background = healthColor[n._health] || "#00ff88";
+            }
+        });
+    }
+
+    window.filterComponents = function(query) {
+        const items = document.querySelectorAll("#compList .comp-item");
+        const q = query.toLowerCase();
+        items.forEach(item => {
+            const id = item.getAttribute("data-id") || "";
+            const name = item.textContent || "";
+            item.style.display = (id.toLowerCase().includes(q) || name.toLowerCase().includes(q)) ? "" : "none";
+        });
+    };
+
+    // ---- Scenarios ----
+    function populateScenarios() {
+        const sel = document.getElementById("scenarioSelect");
+        topology.nodes.forEach(n => {
+            const opt = document.createElement("option");
+            opt.value = n.id;
+            opt.textContent = `${n.name} failure`;
+            sel.appendChild(opt);
+        });
+    }
+
+    window.runSelectedScenario = function() {
+        const sel = document.getElementById("scenarioSelect");
+        const compId = sel.value;
+        if (!compId) return;
+        resetSimulation();
+        setTimeout(() => simulateNodeFailure(compId), 100);
+    };
+
+    // ---- Controls ----
+    window.updateSpeed = function(val) {
+        animSpeed = parseFloat(val);
+        document.getElementById("speedDisplay").textContent = animSpeed + "x";
+    };
+
+    window.toggleLabels = function(show) {
+        showLabels = show;
+        if (window._blastState) {
+            window._blastState.labelSel.attr("display", show ? null : "none");
+        }
+    };
+
+    window.toggleWeights = function(show) {
+        showWeights = show;
+        if (window._blastState) {
+            window._blastState.weightSel.attr("display", show ? null : "none");
+        }
+    };
+
+    window.toggleSidebar = function() {
+        const sb = document.getElementById("blastSidebar");
+        sb.classList.toggle("collapsed");
+    };
+
+    window.exportSVG = function() {
+        const svg = document.getElementById("blastSvg");
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svg);
+
+        // Add XML declaration and styling
+        source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+        const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "blast-radius.svg";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    function updateSimState(text, level) {
+        const el = document.getElementById("simStateVal");
+        el.textContent = text;
+        el.className = "sim-metric-value " + (level || "");
+    }
+
+    // ---- Resize ----
+    let resizeTimeout;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            if (simulation) {
+                const container = document.getElementById("canvasWrap");
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                svgRoot.attr("width", w).attr("height", h).attr("viewBox", [0, 0, w, h]);
+                simulation.force("center", d3.forceCenter(w / 2, h / 2));
+                simulation.alpha(0.3).restart();
+            }
+        }, 200);
+    });
+
+    // ---- Fullscreen ----
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "F11") {
+            e.preventDefault();
+            const layout = document.getElementById("blastLayout");
+            if (!document.fullscreenElement) {
+                layout.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen();
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

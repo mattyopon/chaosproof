@@ -1,6 +1,6 @@
 # How It Works
 
-FaultZero uses a graph-based simulation engine to model infrastructure and evaluate resilience without touching production systems.
+FaultRay uses a graph-based simulation engine to model infrastructure and evaluate resilience without touching production systems.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The simulation pipeline consists of four stages:
 
 ## Model Construction
 
-FaultZero represents infrastructure as a directed acyclic graph (DAG) where:
+FaultRay represents infrastructure as a directed acyclic graph (DAG) where:
 
 - **Nodes** represent infrastructure components (servers, databases, load balancers, etc.)
 - **Edges** represent dependencies between components
@@ -39,7 +39,7 @@ FaultZero represents infrastructure as a directed acyclic graph (DAG) where:
 
 ## Scenario Generation
 
-FaultZero generates failure scenarios based on:
+FaultRay generates failure scenarios based on:
 
 - **Single component failure** — What happens when one node goes down?
 - **Multi-component failure** — Regional outages, provider-wide incidents

@@ -1,4 +1,4 @@
-"""Interactive quickstart command for FaultZero."""
+"""Interactive quickstart command for FaultRay."""
 
 from __future__ import annotations
 
@@ -68,23 +68,23 @@ def quickstart(
 
     Examples:
         # Interactive mode (prompts for choices)
-        faultzero quickstart
+        faultray quickstart
 
         # Non-interactive with template
-        faultzero quickstart --template fintech
+        faultray quickstart --template fintech
 
         # Use ecommerce template with custom output
-        faultzero quickstart --template ecommerce --output my-infra.yaml
+        faultray quickstart --template ecommerce --output my-infra.yaml
 
         # Skip simulation
-        faultzero quickstart --template saas --no-simulate
+        faultray quickstart --template saas --no-simulate
 
         # Generate and open web dashboard
-        faultzero quickstart --template web-app --web
+        faultray quickstart --template web-app --web
     """
     console.print(Panel(
-        "[bold cyan]FaultZero Quickstart[/]\n\n"
-        "This wizard helps you get started with FaultZero in seconds.\n"
+        "[bold cyan]FaultRay Quickstart[/]\n\n"
+        "This wizard helps you get started with FaultRay in seconds.\n"
         "Choose an industry template, run your first chaos simulation,\n"
         "and explore the results in the web dashboard.",
         border_style="cyan",
@@ -174,6 +174,6 @@ def quickstart(
         console.print(
             "\n[dim]Next steps:[/]\n"
             f"  1. Edit [cyan]{output}[/] to customize your infrastructure\n"
-            "  2. Run [cyan]faultzero simulate {output}[/] for detailed analysis\n"
-            "  3. Run [cyan]faultzero serve[/] to open the web dashboard\n"
+            "  2. Run [cyan]faultray simulate {output}[/] for detailed analysis\n"
+            "  3. Run [cyan]faultray serve[/] to open the web dashboard\n"
         )
