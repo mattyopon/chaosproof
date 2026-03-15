@@ -1,6 +1,6 @@
-# ChaosProof プロダクト化ハンドオフプロンプト v3
+# FaultZero プロダクト化ハンドオフプロンプト v3
 
-> **目的**: ChaosProofを「売れるプロダクト」にするための非機能要件・UX・インテグレーション改善
+> **目的**: FaultZeroを「売れるプロダクト」にするための非機能要件・UX・インテグレーション改善
 > **前提**: v2（エンジン追加）と並行または後続で実施
 > **焦点**: コードの機能ではなく「使ってもらえる状態」にすること
 > **作成日**: 2026-03-15
@@ -9,7 +9,7 @@
 
 ## プロンプト（以下をそのまま別セッションのエージェントに渡す）
 
-ChaosProof（旧InfraSim）を「売れるプロダクト」にするための改善を実装してください。
+FaultZero（旧InfraSim）を「売れるプロダクト」にするための改善を実装してください。
 エンジン追加（v2プロンプト）とは別の軸で、**プロダクトとしての完成度**を上げる作業です。
 
 **プロジェクトパス**: /home/user/projects/tools/infrasim/
@@ -247,10 +247,10 @@ class DatadogIntegration:
     async def submit_metrics(self, metrics: list[dict]) -> dict:
         """POST /api/v2/series — Resilience Score等をカスタムメトリクスとして送信"""
         # メトリクス例:
-        # chaosproof.resilience_score: 73.0
-        # chaosproof.security_score: 61.0
-        # chaosproof.annual_risk_exposure: 2400000.0
-        # chaosproof.availability_nines: 3.92
+        # faultzero.resilience_score: 73.0
+        # faultzero.security_score: 61.0
+        # faultzero.annual_risk_exposure: 2400000.0
+        # faultzero.availability_nines: 3.92
 
     async def fetch_metrics(self, query: str, from_ts: int, to_ts: int) -> dict:
         """GET /api/v1/query — Datadogからメトリクスを取得してインフラモデルに反映"""
@@ -270,11 +270,11 @@ class GrafanaIntegration:
         """POST /api/annotations — シミュレーション実行をGrafanaアノテーションとして記録"""
 
     async def import_dashboard(self) -> dict:
-        """POST /api/dashboards/db — ChaosProof専用ダッシュボードをGrafanaにインポート"""
+        """POST /api/dashboards/db — FaultZero専用ダッシュボードをGrafanaにインポート"""
 ```
 
 - シミュレーション結果をGrafanaのアノテーションとしてタイムラインに表示
-- ChaosProof専用Grafanaダッシュボード JSON定義を同梱（`examples/grafana-dashboard.json`）
+- FaultZero専用Grafanaダッシュボード JSON定義を同梱（`examples/grafana-dashboard.json`）
 
 ### 2-4. Jira / Linear 連携
 **ファイル**: `src/infrasim/integrations/issue_tracker.py`（新規）
@@ -290,7 +290,7 @@ class LinearIntegration:
 ```
 
 - セキュリティ/コンプライアンスのFAIL項目を自動チケット化
-- 「ChaosProof: [CRITICAL] SPOFが検出されました — api-server」のようなチケットが自動作成される
+- 「FaultZero: [CRITICAL] SPOFが検出されました — api-server」のようなチケットが自動作成される
 
 ### 2-5. AWS / GCP / Azure メトリクス取得
 **ファイル**: `src/infrasim/discovery/cloud_metrics.py`（新規）
@@ -428,7 +428,7 @@ class IntegrationConfig(Base):
 v1_router = APIRouter(prefix="/api/v1")
 
 # OpenAPI仕様を充実させる（顧客のAPI統合用）
-app.title = "ChaosProof API"
+app.title = "FaultZero API"
 app.version = "1.0.0"
 app.description = "Infrastructure Resilience Intelligence Platform API"
 ```
@@ -440,7 +440,7 @@ app.description = "Infrastructure Resilience Intelligence Platform API"
 ### 4-1. バックテストエンジン
 **ファイル**: `src/infrasim/simulator/backtest_engine.py`（新規）
 
-過去の実際の障害とChaosProofのシミュレーション結果を比較して精度を検証する。
+過去の実際の障害とFaultZeroのシミュレーション結果を比較して精度を検証する。
 
 ```python
 @dataclass
@@ -460,7 +460,7 @@ class BacktestResult:
     """バックテスト結果"""
     incident: RealIncident
 
-    # ChaosProofの予測
+    # FaultZeroの予測
     predicted_affected: list[str]
     predicted_severity: float
     predicted_downtime_minutes: float
@@ -489,7 +489,7 @@ class BacktestEngine:
 #### CLIコマンド
 ```bash
 # 過去の障害記録JSONを食わせてバックテスト
-chaosproof backtest <infra.yaml> --incidents incidents.json
+faultzero backtest <infra.yaml> --incidents incidents.json
 
 # 出力例:
 # Backtest Results (5 incidents):
@@ -515,7 +515,7 @@ chaosproof backtest <infra.yaml> --incidents incidents.json
 ]
 ```
 
-**これが最も重要な機能**。「ChaosProofの予測精度は F1=0.87」と言えれば、信頼性の実証になる。
+**これが最も重要な機能**。「FaultZeroの予測精度は F1=0.87」と言えれば、信頼性の実証になる。
 
 ### 4-2. 継続的バリデーション
 **ファイル**: `src/infrasim/validator/continuous.py`（新規）
@@ -528,13 +528,13 @@ class ContinuousValidator:
 
     async def validate_utilization(self, graph: InfraGraph, prometheus_url: str) -> dict:
         """
-        ChaosProofのモデル上の利用率と、Prometheusの実測値を比較。
+        FaultZeroのモデル上の利用率と、Prometheusの実測値を比較。
         乖離が大きいコンポーネントをリストアップ。
         """
 
     async def validate_availability(self, graph: InfraGraph, uptime_data: dict) -> dict:
         """
-        ChaosProofの可用性モデル出力と、実際のSLI実績値を比較。
+        FaultZeroの可用性モデル出力と、実際のSLI実績値を比較。
         """
 
     def generate_accuracy_report(self) -> dict:
@@ -582,13 +582,13 @@ examples/
 ```
 
 各サンプルにはターゲット業界の規制要件に合わせた `security` / `compliance` / `cost` 設定を含める。
-`incidents/` は実際の大規模障害をChaosProofで再現するデモ用。
+`incidents/` は実際の大規模障害をFaultZeroで再現するデモ用。
 
 ### 5-3. クイックスタートガイド（CLI出力）
 **ファイル**: `src/infrasim/cli/main.py`（既存を修正）
 
 ```bash
-$ chaosproof quickstart
+$ faultzero quickstart
 # 対話形式でインフラ定義を生成:
 # > インフラの種類は？ [web-app / microservices / data-pipeline]
 # > 主要コンポーネント数は？ [5 / 10 / 20 / 50]
@@ -645,21 +645,21 @@ FastAPIの自動ドキュメント（/docs）を充実させる:
 ```yaml
 version: "3.8"
 services:
-  chaosproof:
+  faultzero:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - CHAOSPROOF_DB_PATH=/data/chaosproof.db
-      - CHAOSPROOF_CORS_ORIGINS=*
+      - FAULTZERO_DB_PATH=/data/faultzero.db
+      - FAULTZERO_CORS_ORIGINS=*
     volumes:
-      - chaosproof-data:/data
+      - faultzero-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
 
 volumes:
-  chaosproof-data:
+  faultzero-data:
 ```
 
 ```bash
@@ -669,11 +669,11 @@ docker compose up -d
 ```
 
 ### 7-2. Helm Chart スタブ
-**ファイル**: `deploy/helm/chaosproof/` ディレクトリ（新規）
+**ファイル**: `deploy/helm/faultzero/` ディレクトリ（新規）
 
 Kubernetes環境向けのHelm Chartスタブ:
 ```
-deploy/helm/chaosproof/
+deploy/helm/faultzero/
 ├── Chart.yaml
 ├── values.yaml
 ├── templates/
