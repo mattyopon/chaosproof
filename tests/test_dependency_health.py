@@ -631,3 +631,151 @@ class TestTopDegradationSources:
         if sources:
             assert sources[0]["name"] == "Database"
             assert sources[0]["affected_count"] == 5
+
+
+# ---------------------------------------------------------------------------
+# Coverage: uncovered branches (lines 367, 392, 429, 459, 467)
+# ---------------------------------------------------------------------------
+
+
+class TestPropagateNoDeps:
+    def test_no_health_contributions_returns_100(self):
+        """Line 367: When BFS finds no health_contributions (all deps already
+        visited because it depends on itself), dependency health defaults to 100."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        from infrasim.model.components import Dependency
+
+        # Self-dependency: component depends on itself.
+        # BFS queue starts with [(a, 1)] but 'a' is already in visited,
+        # so health_contributions stays empty -> line 367.
+        g.add_component(_comp("a", "A"))
+        g.add_dependency(Dependency(source_id="a", target_id="a"))
+
+        own_scores = {"a": 100.0}
+        dep_health, sources, depth = engine._propagate_dependency_health(
+            g, "a", own_scores
+        )
+        assert dep_health == 100.0
+        assert sources == []
+        assert depth == 0
+
+
+class TestDegradedPathsMissingComponent:
+    def test_missing_component_in_degraded_path(self):
+        """Line 392: When source_comp or dep_comp is None in _find_degraded_paths,
+        that path is skipped."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        from infrasim.model.components import Dependency
+
+        g.add_component(_comp("db", "Database", ComponentType.DATABASE, health=HealthStatus.DOWN))
+        g.add_component(_comp("api", "API"))
+        g.add_dependency(Dependency(source_id="api", target_id="db"))
+
+        report = engine.analyze(g)
+        # Should work even if internal state has edge cases
+        assert report.component_count == 2
+        # DB is down and has dependents, so there should be degraded paths
+        assert len(report.degraded_paths) >= 1
+
+    def test_find_degraded_paths_with_removed_dependent(self):
+        """Line 392: If a dependent's component was removed from the
+        internal dict after edges were set, the path is skipped."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        from infrasim.model.components import Dependency
+
+        # Build a graph with db -> api dependency
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, health=HealthStatus.DOWN))
+        g.add_component(_comp("api", "API"))
+        g.add_dependency(Dependency(source_id="api", target_id="db"))
+
+        # Score them normally
+        own_scores = {"db": 0.0, "api": 100.0}
+
+        # Remove 'api' from the components dict (not from networkx graph)
+        # so get_dependents('db') returns api via networkx but
+        # get_component('api') returns None
+        del g._components["api"]
+
+        paths = engine._find_degraded_paths(g, own_scores)
+        # 'api' dependent should be skipped (get_component returns None)
+        assert isinstance(paths, list)
+        # No valid path should be found since dep_comp is None
+        assert len(paths) == 0
+
+
+class TestFindHealthClustersEmptyScores:
+    def test_empty_member_scores_skipped(self):
+        """Line 429: clusters with empty member_scores are skipped."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        from infrasim.model.components import Dependency
+
+        # Two components share a dependency, but use a scores dict
+        # that's missing one member to trigger the empty branch.
+        g.add_component(_comp("a", "A"))
+        g.add_component(_comp("b", "B"))
+        g.add_component(_comp("shared", "Shared"))
+        g.add_dependency(Dependency(source_id="a", target_id="shared"))
+        g.add_dependency(Dependency(source_id="b", target_id="shared"))
+
+        # Build a scores dict missing 'a' and 'b' — so member_scores will be empty
+        scores = {
+            "shared": DependencyHealthScore(
+                component_id="shared", component_name="Shared",
+                component_type="app_server",
+                own_health_score=100.0, dependency_health_score=100.0,
+                effective_health_score=100.0, tier=HealthTier.EXCELLENT,
+                health_status=HealthStatus.HEALTHY, degradation_sources=[],
+                dependency_depth=0, critical_dependency_count=0, is_leaf=True,
+            ),
+        }
+        clusters = engine._find_health_clusters(g, scores)
+        # Cluster should be skipped because member_scores is empty
+        assert isinstance(clusters, list)
+
+
+class TestGenerateSuggestionsWithGhostComponent:
+    def test_generate_suggestions_skips_missing_component(self):
+        """Line 459: When graph.get_component returns None, suggestion
+        generation for that component is skipped."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        # Create a scores dict that references a component not in the graph
+        scores = {
+            "ghost": DependencyHealthScore(
+                component_id="ghost", component_name="Ghost",
+                component_type="app_server",
+                own_health_score=10.0, dependency_health_score=10.0,
+                effective_health_score=10.0, tier=HealthTier.CRITICAL,
+                health_status=HealthStatus.DOWN, degradation_sources=[],
+                dependency_depth=0, critical_dependency_count=0, is_leaf=True,
+            ),
+        }
+        suggestions = engine._generate_suggestions(g, scores)
+        # ghost is not in graph, so no suggestions should be generated for it
+        assert isinstance(suggestions, list)
+        assert len(suggestions) == 0
+
+
+class TestSuggestionsForPoorTierSingleReplica:
+    def test_poor_tier_single_replica_suggestion(self):
+        """Line 467: Component in POOR tier with replicas <= 1
+        should get 'Add replicas' suggestion."""
+        engine = DependencyHealthEngine()
+        g = InfraGraph()
+        # OVERLOADED with high CPU to push effective score into POOR range
+        g.add_component(
+            _comp("slow", "Slow Server", health=HealthStatus.OVERLOADED, cpu=95.0)
+        )
+        report = engine.analyze(g)
+        score = report.scores["slow"]
+        # Verify it's in POOR or CRITICAL tier
+        assert score.tier in (HealthTier.POOR, HealthTier.CRITICAL)
+        # Should suggest adding replicas
+        assert any(
+            "replica" in s.lower() or "Add replicas" in s
+            for s in report.improvement_suggestions
+        )

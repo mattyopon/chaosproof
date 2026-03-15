@@ -1427,3 +1427,37 @@ class TestRiskRecommendations:
 
         recs = topo.risk_assessment.recommendations
         assert any("latency is moderate" in r.lower() for r in recs)
+
+
+# ---------------------------------------------------------------------------
+# Coverage: private helper edge cases (lines 818, 834, 867, 892, 908)
+# ---------------------------------------------------------------------------
+
+
+class TestPrivateHelperEdgeCases:
+    def test_provider_concentration_zero_total(self):
+        mapper = MultiCloudMapper()
+        # total == 0 should return "Low"
+        result = mapper._assess_provider_concentration({"aws": 0}, 0)
+        assert result == "Low"
+
+    def test_region_concentration_zero_total(self):
+        mapper = MultiCloudMapper()
+        result = mapper._assess_region_concentration({}, 0)
+        assert result == "Low"
+
+    def test_vendor_lock_in_empty_mappings(self):
+        mapper = MultiCloudMapper()
+        result = mapper._calc_vendor_lock_in({})
+        assert result == 0.0
+
+    def test_geographic_distribution_no_regions(self):
+        mapper = MultiCloudMapper()
+        result = mapper._calc_geographic_distribution([])
+        assert result == 0.0
+
+    def test_geographic_distribution_single_region(self):
+        mapper = MultiCloudMapper()
+        region = CloudRegion(CloudProvider.AWS, "us-east-1", "US East", 39.0, -77.0)
+        result = mapper._calc_geographic_distribution([region])
+        assert result == 20.0

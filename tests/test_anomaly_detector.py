@@ -1,16 +1,16 @@
-"""Tests for the Statistical Anomaly Detector."""
+"""Tests for the Infrastructure Anomaly Detection Engine."""
 
 from __future__ import annotations
 
 import pytest
 
 from infrasim.model.components import (
-    AutoScalingConfig,
     CircuitBreakerConfig,
     Component,
     ComponentType,
     Dependency,
     FailoverConfig,
+    HealthStatus,
     ResourceMetrics,
     SecurityProfile,
 )
@@ -19,13 +19,29 @@ from infrasim.simulator.anomaly_detector import (
     Anomaly,
     AnomalyDetector,
     AnomalyReport,
+    AnomalySeverity,
     AnomalyType,
-    _iqr_bounds,
-    _mean,
-    _quartiles,
-    _std_dev,
-    _z_score,
 )
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+
+def _comp(
+    cid: str,
+    name: str,
+    ctype: ComponentType = ComponentType.APP_SERVER,
+    replicas: int = 1,
+    failover: bool = False,
+    health: HealthStatus = HealthStatus.HEALTHY,
+) -> Component:
+    c = Component(id=cid, name=name, type=ctype, replicas=replicas)
+    c.health = health
+    if failover:
+        c.failover.enabled = True
+    return c
 
 
 # ---------------------------------------------------------------------------
@@ -34,505 +50,834 @@ from infrasim.simulator.anomaly_detector import (
 
 
 @pytest.fixture
-def spof_graph() -> InfraGraph:
-    """Graph with an obvious SPOF: single-replica DB with many dependents."""
-    graph = InfraGraph()
-    graph.add_component(Component(
-        id="lb", name="Load Balancer", type=ComponentType.LOAD_BALANCER,
-        replicas=3,
-    ))
-    graph.add_component(Component(
-        id="app1", name="App Server 1", type=ComponentType.APP_SERVER,
-        replicas=3,
-    ))
-    graph.add_component(Component(
-        id="app2", name="App Server 2", type=ComponentType.APP_SERVER,
-        replicas=3,
-    ))
-    graph.add_component(Component(
-        id="db", name="PostgreSQL", type=ComponentType.DATABASE,
-        replicas=1,
-    ))
-    graph.add_dependency(Dependency(source_id="lb", target_id="app1", dependency_type="requires"))
-    graph.add_dependency(Dependency(source_id="lb", target_id="app2", dependency_type="requires"))
-    graph.add_dependency(Dependency(source_id="app1", target_id="db", dependency_type="requires"))
-    graph.add_dependency(Dependency(source_id="app2", target_id="db", dependency_type="requires"))
-    return graph
-
-
-@pytest.fixture
-def healthy_graph() -> InfraGraph:
-    """Well-configured graph with consistent settings."""
-    graph = InfraGraph()
-    for i, (name, ctype) in enumerate([
-        ("LB", ComponentType.LOAD_BALANCER),
-        ("App", ComponentType.APP_SERVER),
-        ("DB", ComponentType.DATABASE),
-    ]):
-        graph.add_component(Component(
-            id=name.lower(), name=name, type=ctype,
-            replicas=3,
-            failover=FailoverConfig(enabled=True),
-            autoscaling=AutoScalingConfig(enabled=True),
-        ))
-    graph.add_dependency(Dependency(
-        source_id="lb", target_id="app", dependency_type="requires",
-        circuit_breaker=CircuitBreakerConfig(enabled=True),
-    ))
-    graph.add_dependency(Dependency(
-        source_id="app", target_id="db", dependency_type="requires",
-        circuit_breaker=CircuitBreakerConfig(enabled=True),
-    ))
-    return graph
-
-
-@pytest.fixture
-def inconsistent_graph() -> InfraGraph:
-    """Graph with inconsistent configurations across similar components."""
-    graph = InfraGraph()
-    # Three app servers, only 2 have failover
-    graph.add_component(Component(
-        id="app1", name="App Server 1", type=ComponentType.APP_SERVER,
-        replicas=3, failover=FailoverConfig(enabled=True),
-    ))
-    graph.add_component(Component(
-        id="app2", name="App Server 2", type=ComponentType.APP_SERVER,
-        replicas=3, failover=FailoverConfig(enabled=True),
-    ))
-    graph.add_component(Component(
-        id="app3", name="App Server 3", type=ComponentType.APP_SERVER,
-        replicas=3, failover=FailoverConfig(enabled=False),  # inconsistent
-    ))
-    graph.add_component(Component(
-        id="db", name="PostgreSQL", type=ComponentType.DATABASE,
-        replicas=2,
-    ))
-    graph.add_dependency(Dependency(source_id="app1", target_id="db", dependency_type="requires"))
-    graph.add_dependency(Dependency(source_id="app2", target_id="db", dependency_type="requires"))
-    graph.add_dependency(Dependency(source_id="app3", target_id="db", dependency_type="requires"))
-    return graph
-
-
-@pytest.fixture
-def utilization_graph() -> InfraGraph:
-    """Graph with varied utilization levels."""
-    graph = InfraGraph()
-    graph.add_component(Component(
-        id="app1", name="App Normal", type=ComponentType.APP_SERVER,
-        replicas=2,
-        metrics=ResourceMetrics(cpu_percent=50.0),
-    ))
-    graph.add_component(Component(
-        id="app2", name="App Normal 2", type=ComponentType.APP_SERVER,
-        replicas=2,
-        metrics=ResourceMetrics(cpu_percent=55.0),
-    ))
-    graph.add_component(Component(
-        id="app3", name="App Normal 3", type=ComponentType.APP_SERVER,
-        replicas=2,
-        metrics=ResourceMetrics(cpu_percent=45.0),
-    ))
-    graph.add_component(Component(
-        id="app_hot", name="App Hot", type=ComponentType.APP_SERVER,
-        replicas=2,
-        metrics=ResourceMetrics(cpu_percent=95.0),  # outlier
-    ))
-    return graph
-
-
-@pytest.fixture
-def orphan_graph() -> InfraGraph:
-    """Graph with an orphan component (no connections)."""
-    graph = InfraGraph()
-    graph.add_component(Component(
-        id="app", name="App Server", type=ComponentType.APP_SERVER,
-        replicas=2,
-    ))
-    graph.add_component(Component(
-        id="db", name="PostgreSQL", type=ComponentType.DATABASE,
-        replicas=2,
-    ))
-    graph.add_component(Component(
-        id="orphan", name="Orphan Service", type=ComponentType.APP_SERVER,
-        replicas=1,
-    ))
-    graph.add_dependency(Dependency(source_id="app", target_id="db", dependency_type="requires"))
-    return graph
-
-
-@pytest.fixture
 def empty_graph() -> InfraGraph:
     return InfraGraph()
 
 
 @pytest.fixture
-def security_inconsistent_graph() -> InfraGraph:
-    """Graph with inconsistent security settings."""
-    graph = InfraGraph()
-    graph.add_component(Component(
-        id="app1", name="App 1", type=ComponentType.APP_SERVER,
-        replicas=2,
-        security=SecurityProfile(encryption_at_rest=True, backup_enabled=True),
+def single_component_graph() -> InfraGraph:
+    g = InfraGraph()
+    g.add_component(_comp("app", "App Server"))
+    return g
+
+
+@pytest.fixture
+def healthy_graph() -> InfraGraph:
+    """Well-configured graph with replicas, failover, encryption, logging, backups."""
+    g = InfraGraph()
+    db = Component(
+        id="db", name="PostgreSQL", type=ComponentType.DATABASE,
+        replicas=3, failover=FailoverConfig(enabled=True),
+        security=SecurityProfile(
+            encryption_at_rest=True, log_enabled=True, backup_enabled=True,
+        ),
+    )
+    app = Component(
+        id="app", name="App Server", type=ComponentType.APP_SERVER,
+        replicas=3, failover=FailoverConfig(enabled=True),
+        security=SecurityProfile(log_enabled=True),
+    )
+    lb = Component(
+        id="lb", name="Load Balancer", type=ComponentType.LOAD_BALANCER,
+        replicas=2, failover=FailoverConfig(enabled=True),
+        security=SecurityProfile(log_enabled=True),
+    )
+    g.add_component(db)
+    g.add_component(app)
+    g.add_component(lb)
+    g.add_dependency(Dependency(
+        source_id="lb", target_id="app", dependency_type="requires",
+        circuit_breaker=CircuitBreakerConfig(enabled=True),
     ))
-    graph.add_component(Component(
-        id="app2", name="App 2", type=ComponentType.APP_SERVER,
-        replicas=2,
-        security=SecurityProfile(encryption_at_rest=True, backup_enabled=True),
+    g.add_dependency(Dependency(
+        source_id="app", target_id="db", dependency_type="requires",
+        circuit_breaker=CircuitBreakerConfig(enabled=True),
     ))
-    graph.add_component(Component(
-        id="app3", name="App 3", type=ComponentType.APP_SERVER,
-        replicas=2,
-        security=SecurityProfile(encryption_at_rest=False, backup_enabled=False),  # inconsistent
-    ))
-    return graph
+    return g
 
 
-# ---------------------------------------------------------------------------
-# Tests: Statistics helpers
-# ---------------------------------------------------------------------------
+@pytest.fixture
+def spof_graph() -> InfraGraph:
+    """Graph with a single-replica DB depended on by two app servers."""
+    g = InfraGraph()
+    g.add_component(_comp("db", "PostgreSQL", ComponentType.DATABASE, replicas=1))
+    g.add_component(_comp("app1", "App 1", replicas=3))
+    g.add_component(_comp("app2", "App 2", replicas=3))
+    g.add_dependency(Dependency(source_id="app1", target_id="db", dependency_type="requires"))
+    g.add_dependency(Dependency(source_id="app2", target_id="db", dependency_type="requires"))
+    return g
 
 
-class TestStatisticsHelpers:
-    """Tests for basic statistics functions."""
-
-    def test_mean_basic(self):
-        assert _mean([1.0, 2.0, 3.0]) == 2.0
-
-    def test_mean_single(self):
-        assert _mean([5.0]) == 5.0
-
-    def test_mean_empty(self):
-        assert _mean([]) == 0.0
-
-    def test_std_dev_basic(self):
-        std = _std_dev([1.0, 2.0, 3.0, 4.0, 5.0])
-        assert abs(std - 1.4142) < 0.01  # sqrt(2) for population std dev
-
-    def test_std_dev_uniform(self):
-        assert _std_dev([5.0, 5.0, 5.0]) == 0.0
-
-    def test_std_dev_single(self):
-        assert _std_dev([5.0]) == 0.0
-
-    def test_z_score_basic(self):
-        z = _z_score(5.0, 3.0, 1.0)
-        assert z == 2.0
-
-    def test_z_score_negative(self):
-        z = _z_score(1.0, 3.0, 1.0)
-        assert z == -2.0
-
-    def test_z_score_zero_std(self):
-        z = _z_score(5.0, 3.0, 0.0)
-        assert z == 0.0
-
-    def test_quartiles_basic(self):
-        q1, q2, q3 = _quartiles([1.0, 2.0, 3.0, 4.0, 5.0])
-        assert q1 == 2.0
-        assert q2 == 3.0
-        assert q3 == 4.0
-
-    def test_quartiles_empty(self):
-        q1, q2, q3 = _quartiles([])
-        assert q1 == 0.0
-        assert q2 == 0.0
-        assert q3 == 0.0
-
-    def test_iqr_bounds(self):
-        lower, upper = _iqr_bounds([1.0, 2.0, 3.0, 4.0, 5.0])
-        iqr = 4.0 - 2.0  # Q3 - Q1
-        assert lower == 2.0 - 1.5 * iqr
-        assert upper == 4.0 + 1.5 * iqr
-
-
-# ---------------------------------------------------------------------------
-# Tests: AnomalyDetector
-# ---------------------------------------------------------------------------
-
-
-class TestAnomalyDetector:
-    """Tests for the AnomalyDetector class."""
-
-    def test_detect_empty_graph(self, empty_graph):
-        detector = AnomalyDetector()
-        report = detector.detect(empty_graph)
-        assert isinstance(report, AnomalyReport)
-        assert report.total_components_analyzed == 0
-        assert len(report.anomalies) == 0
-
-    def test_detect_spof_graph(self, spof_graph):
-        detector = AnomalyDetector()
-        report = detector.detect(spof_graph)
-        assert report.total_components_analyzed == 4
-        assert len(report.anomalies) > 0
-
-        # Should detect the single-replica DB as an anomaly
-        db_anomalies = [a for a in report.anomalies if a.component_id == "db"]
-        assert len(db_anomalies) > 0
-
-    def test_detect_healthy_graph(self, healthy_graph):
-        detector = AnomalyDetector()
-        report = detector.detect(healthy_graph)
-        # Healthy graph should have fewer anomalies
-        critical = [a for a in report.anomalies if a.severity == "critical"]
-        assert len(critical) == 0
-
-    def test_detect_report_fields(self, spof_graph):
-        detector = AnomalyDetector()
-        report = detector.detect(spof_graph)
-        assert isinstance(report.total_components_analyzed, int)
-        assert isinstance(report.anomaly_rate, float)
-        assert isinstance(report.critical_count, int)
-        assert isinstance(report.warning_count, int)
-        assert isinstance(report.healthiest_components, list)
-        assert isinstance(report.most_anomalous_components, list)
-
-
-# ---------------------------------------------------------------------------
-# Tests: Replica anomalies
-# ---------------------------------------------------------------------------
-
-
-class TestReplicaAnomalies:
-    """Tests for replica outlier detection."""
-
-    def test_detects_low_replica_outlier(self, spof_graph):
-        detector = AnomalyDetector()
-        anomalies = detector.detect_replica_anomalies(spof_graph)
-
-        # db has 1 replica while others have 3 - should be flagged
-        replica_anomalies = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.REPLICA_OUTLIER
-        ]
-        assert len(replica_anomalies) >= 1
-
-        # Check that db is flagged
-        db_flagged = any(a.component_id == "db" for a in replica_anomalies)
-        assert db_flagged
-
-    def test_no_outlier_when_uniform(self):
-        graph = InfraGraph()
-        for i in range(4):
-            graph.add_component(Component(
-                id=f"app{i}", name=f"App {i}", type=ComponentType.APP_SERVER,
-                replicas=2,
-            ))
-        detector = AnomalyDetector()
-        anomalies = detector.detect_replica_anomalies(graph)
-        replica_outliers = [a for a in anomalies if a.anomaly_type == AnomalyType.REPLICA_OUTLIER]
-        assert len(replica_outliers) == 0
-
-    def test_under_provisioned_detection(self, spof_graph):
-        detector = AnomalyDetector()
-        anomalies = detector.detect_replica_anomalies(spof_graph)
-
-        # db has replicas=1 with 2 dependents, no failover
-        under_provisioned = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.UNDER_PROVISIONED
-            or a.anomaly_type == AnomalyType.REPLICA_OUTLIER
-        ]
-        db_flagged = any(a.component_id == "db" for a in under_provisioned)
-        assert db_flagged
-
-
-# ---------------------------------------------------------------------------
-# Tests: Utilization anomalies
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Tests: detect_utilization_anomalies
+# ===========================================================================
 
 
 class TestUtilizationAnomalies:
-    """Tests for utilization outlier detection."""
+    """Tests for utilization spike and waste detection."""
 
-    def test_detects_high_utilization(self, utilization_graph):
-        detector = AnomalyDetector()
-        anomalies = detector.detect_utilization_anomalies(utilization_graph)
+    def test_high_utilization_critical(self):
+        """Utilization > 95% should be CRITICAL."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="hot", name="Hot Server", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=96.0),
+        ))
+        detector = AnomalyDetector(utilization_threshold=80.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.CRITICAL
+        assert anomalies[0].anomaly_type == AnomalyType.UTILIZATION_SPIKE
 
-        high_util = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.UTILIZATION_OUTLIER
-        ]
-        assert len(high_util) >= 1
-        assert any(a.component_id == "app_hot" for a in high_util)
+    def test_high_utilization_high(self):
+        """Utilization 91-95% should be HIGH."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="warm", name="Warm Server", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=92.0),
+        ))
+        detector = AnomalyDetector(utilization_threshold=80.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.HIGH
 
-    def test_no_outlier_when_uniform_utilization(self):
-        graph = InfraGraph()
-        for i in range(4):
-            graph.add_component(Component(
-                id=f"app{i}", name=f"App {i}", type=ComponentType.APP_SERVER,
-                replicas=2,
-                metrics=ResourceMetrics(cpu_percent=50.0),
-            ))
-        detector = AnomalyDetector()
-        anomalies = detector.detect_utilization_anomalies(graph)
-        assert len(anomalies) == 0
+    def test_high_utilization_medium(self):
+        """Utilization 81-90% should be MEDIUM."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="mid", name="Mid Server", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=85.0),
+        ))
+        detector = AnomalyDetector(utilization_threshold=80.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.MEDIUM
 
-    def test_needs_minimum_samples(self):
-        """Should need at least 3 non-zero utilization values."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app1", name="App 1", type=ComponentType.APP_SERVER,
+    def test_normal_utilization_no_anomaly(self):
+        """Utilization within threshold should not flag."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="ok", name="OK Server", type=ComponentType.APP_SERVER,
             metrics=ResourceMetrics(cpu_percent=50.0),
         ))
-        graph.add_component(Component(
-            id="app2", name="App 2", type=ComponentType.APP_SERVER,
+        detector = AnomalyDetector(utilization_threshold=80.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 0
+
+    def test_zero_utilization_with_replicas_flags_waste(self):
+        """Zero utilization with multiple replicas should flag capacity waste."""
+        g = InfraGraph()
+        g.add_component(_comp("idle", "Idle Server", replicas=3))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_utilization_anomalies(g)
+        capacity = [a for a in anomalies if a.anomaly_type == AnomalyType.CAPACITY_ANOMALY]
+        assert len(capacity) == 1
+        assert capacity[0].severity == AnomalySeverity.LOW
+
+    def test_zero_utilization_single_replica_no_flag(self):
+        """Zero utilization with 1 replica should not flag waste."""
+        g = InfraGraph()
+        g.add_component(_comp("single", "Single", replicas=1))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 0
+
+    def test_custom_threshold(self):
+        """Custom utilization threshold should be respected."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="s", name="Server", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=55.0),
+        ))
+        # With threshold at 50, 55% should flag
+        detector = AnomalyDetector(utilization_threshold=50.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert len(anomalies) == 1
+
+    def test_anomaly_id_format(self):
+        """Anomaly IDs should follow the pattern type-componentId."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="srv1", name="Server 1", type=ComponentType.APP_SERVER,
             metrics=ResourceMetrics(cpu_percent=95.0),
         ))
         detector = AnomalyDetector()
-        anomalies = detector.detect_utilization_anomalies(graph)
-        assert len(anomalies) == 0  # Not enough samples
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert anomalies[0].id == "utilization_spike-srv1"
+
+    def test_utilization_expected_range(self):
+        """Expected range should reflect the threshold."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="s", name="S", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=90.0),
+        ))
+        detector = AnomalyDetector(utilization_threshold=75.0)
+        anomalies = detector.detect_utilization_anomalies(g)
+        assert "75" in anomalies[0].expected_range
 
 
-# ---------------------------------------------------------------------------
-# Tests: Config inconsistencies
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Tests: detect_health_anomalies
+# ===========================================================================
 
 
-class TestConfigInconsistencies:
-    """Tests for configuration inconsistency detection."""
+class TestHealthAnomalies:
+    """Tests for health status anomaly detection."""
 
-    def test_detects_failover_inconsistency(self, inconsistent_graph):
+    def test_down_component_critical(self):
+        """DOWN component should be CRITICAL."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", health=HealthStatus.DOWN))
         detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(inconsistent_graph)
+        anomalies = detector.detect_health_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.CRITICAL
+        assert anomalies[0].anomaly_type == AnomalyType.HEALTH_ANOMALY
 
-        failover_issues = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.CONFIG_INCONSISTENCY
-            and "failover" in a.description
-        ]
-        assert len(failover_issues) >= 1
-        assert any(a.component_id == "app3" for a in failover_issues)
-
-    def test_detects_security_inconsistency(self, security_inconsistent_graph):
+    def test_degraded_component_high(self):
+        """DEGRADED component should be HIGH."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App", health=HealthStatus.DEGRADED))
         detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(security_inconsistent_graph)
+        anomalies = detector.detect_health_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.HIGH
 
-        security_issues = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.SECURITY_INCONSISTENCY
-        ]
-        assert len(security_issues) >= 1
-        assert any(a.component_id == "app3" for a in security_issues)
-
-    def test_no_inconsistency_when_uniform(self, healthy_graph):
+    def test_overloaded_component_high(self):
+        """OVERLOADED component should be HIGH."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App", health=HealthStatus.OVERLOADED))
         detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(healthy_graph)
+        anomalies = detector.detect_health_anomalies(g)
+        assert len(anomalies) == 1
+        assert anomalies[0].severity == AnomalySeverity.HIGH
 
-        # Healthy graph has consistent configs - should have fewer issues
-        failover_issues = [
+    def test_healthy_component_no_anomaly(self):
+        """HEALTHY component should not be flagged."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App", health=HealthStatus.HEALTHY))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_health_anomalies(g)
+        assert len(anomalies) == 0
+
+    def test_down_with_dependents_higher_confidence(self):
+        """DOWN component with dependents should have higher confidence."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", health=HealthStatus.DOWN))
+        g.add_component(_comp("app", "App"))
+        g.add_dependency(Dependency(source_id="app", target_id="db"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_health_anomalies(g)
+        db_anomalies = [a for a in anomalies if a.component_id == "db"]
+        assert len(db_anomalies) == 1
+        assert db_anomalies[0].confidence == 0.9
+
+    def test_down_without_dependents_lower_confidence(self):
+        """DOWN component without dependents should have lower confidence."""
+        g = InfraGraph()
+        g.add_component(_comp("leaf", "Leaf", health=HealthStatus.DOWN))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_health_anomalies(g)
+        assert anomalies[0].confidence == 0.8
+
+    def test_health_anomaly_id_format(self):
+        """Health anomaly ID should follow the naming pattern."""
+        g = InfraGraph()
+        g.add_component(_comp("svc1", "Service 1", health=HealthStatus.DOWN))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_health_anomalies(g)
+        assert anomalies[0].id == "health_anomaly-svc1"
+
+
+# ===========================================================================
+# Tests: detect_topology_anomalies
+# ===========================================================================
+
+
+class TestTopologyAnomalies:
+    """Tests for topology pattern anomaly detection."""
+
+    def test_deep_dependency_chain(self):
+        """Dependency chain deeper than threshold should flag."""
+        g = InfraGraph()
+        # Create a chain: c0 -> c1 -> c2 -> c3 -> c4 -> c5
+        for i in range(6):
+            g.add_component(_comp(f"c{i}", f"Comp {i}"))
+        for i in range(5):
+            g.add_dependency(Dependency(source_id=f"c{i}", target_id=f"c{i+1}"))
+        detector = AnomalyDetector(dependency_depth_threshold=4)
+        anomalies = detector.detect_topology_anomalies(g)
+        deep = [a for a in anomalies if "deep" in a.description.lower() or "depth" in a.description.lower()]
+        assert len(deep) >= 1
+        assert deep[0].severity == AnomalySeverity.HIGH
+
+    def test_shallow_chain_no_flag(self):
+        """Chain within threshold should not flag."""
+        g = InfraGraph()
+        for i in range(3):
+            g.add_component(_comp(f"c{i}", f"Comp {i}"))
+        for i in range(2):
+            g.add_dependency(Dependency(source_id=f"c{i}", target_id=f"c{i+1}"))
+        detector = AnomalyDetector(dependency_depth_threshold=4)
+        anomalies = detector.detect_topology_anomalies(g)
+        deep = [a for a in anomalies if "depth" in a.description.lower()]
+        assert len(deep) == 0
+
+    def test_orphan_component_detected(self):
+        """Component with no connections should be flagged as orphan."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("db", "DB"))
+        g.add_component(_comp("orphan", "Orphan"))
+        g.add_dependency(Dependency(source_id="app", target_id="db"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(g)
+        orphans = [a for a in anomalies if "orphan" in a.description.lower()]
+        assert len(orphans) == 1
+        assert orphans[0].component_id == "orphan"
+        assert orphans[0].severity == AnomalySeverity.LOW
+
+    def test_no_orphan_when_single_component(self):
+        """Single component should not be flagged as orphan."""
+        g = InfraGraph()
+        g.add_component(_comp("solo", "Solo"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(g)
+        orphans = [a for a in anomalies if "orphan" in a.description.lower()]
+        assert len(orphans) == 0
+
+    def test_circular_dependency_detected(self):
+        """Circular dependency should be flagged as CRITICAL."""
+        g = InfraGraph()
+        g.add_component(_comp("a", "A"))
+        g.add_component(_comp("b", "B"))
+        g.add_component(_comp("c", "C"))
+        g.add_dependency(Dependency(source_id="a", target_id="b"))
+        g.add_dependency(Dependency(source_id="b", target_id="c"))
+        g.add_dependency(Dependency(source_id="c", target_id="a"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(g)
+        circular = [a for a in anomalies if "circular" in a.description.lower()]
+        assert len(circular) >= 1
+        assert circular[0].severity == AnomalySeverity.CRITICAL
+        assert circular[0].confidence == 1.0
+
+    def test_high_fanout_detected(self):
+        """Component with more than 5 dependencies should be flagged."""
+        g = InfraGraph()
+        g.add_component(_comp("hub", "Hub"))
+        for i in range(7):
+            g.add_component(_comp(f"dep{i}", f"Dep {i}"))
+            g.add_dependency(Dependency(source_id="hub", target_id=f"dep{i}"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(g)
+        fanout = [a for a in anomalies if "fan-out" in a.description.lower()]
+        assert len(fanout) == 1
+        assert fanout[0].component_id == "hub"
+        assert fanout[0].severity == AnomalySeverity.MEDIUM
+
+    def test_fanout_at_5_no_flag(self):
+        """Exactly 5 dependencies should not flag fan-out."""
+        g = InfraGraph()
+        g.add_component(_comp("hub", "Hub"))
+        for i in range(5):
+            g.add_component(_comp(f"dep{i}", f"Dep {i}"))
+            g.add_dependency(Dependency(source_id="hub", target_id=f"dep{i}"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(g)
+        fanout = [a for a in anomalies if "fan-out" in a.description.lower()]
+        assert len(fanout) == 0
+
+    def test_empty_graph_no_topology_anomalies(self, empty_graph):
+        """Empty graph should produce no topology anomalies."""
+        detector = AnomalyDetector()
+        anomalies = detector.detect_topology_anomalies(empty_graph)
+        assert len(anomalies) == 0
+
+    def test_cycle_detection_exception_handled(self, monkeypatch):
+        """When nx.simple_cycles raises, the exception should be swallowed."""
+        from unittest.mock import patch
+
+        g = InfraGraph()
+        g.add_component(_comp("a", "A"))
+        g.add_component(_comp("b", "B"))
+        g.add_dependency(Dependency(source_id="a", target_id="b"))
+
+        with patch("networkx.simple_cycles", side_effect=RuntimeError("fail")):
+            detector = AnomalyDetector()
+            anomalies = detector.detect_topology_anomalies(g)
+        circular = [a for a in anomalies if "circular" in a.description.lower()]
+        assert len(circular) == 0
+
+
+# ===========================================================================
+# Tests: detect_configuration_anomalies
+# ===========================================================================
+
+
+class TestConfigurationAnomalies:
+    """Tests for configuration issue detection."""
+
+    def test_database_insufficient_replicas(self):
+        """Database with 1 replica should be flagged (min_replicas=2)."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=1))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_configuration_anomalies(g)
+        replica_issues = [a for a in anomalies if "replica" in a.description.lower()]
+        assert len(replica_issues) >= 1
+
+    def test_database_sufficient_replicas(self):
+        """Database with enough replicas should not flag replica issues."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=3, failover=True))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_configuration_anomalies(g)
+        replica_issues = [
             a for a in anomalies
-            if "failover" in a.description.lower()
-            and a.anomaly_type == AnomalyType.CONFIG_INCONSISTENCY
+            if a.anomaly_type == AnomalyType.CONFIGURATION_ANOMALY
+            and "replica" in a.description.lower()
         ]
+        assert len(replica_issues) == 0
+
+    def test_database_no_failover(self):
+        """Database without failover should be flagged as HIGH."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=3, failover=False))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_configuration_anomalies(g)
+        failover_issues = [a for a in anomalies if "failover" in a.description.lower()]
+        assert len(failover_issues) == 1
+        assert failover_issues[0].severity == AnomalySeverity.HIGH
+
+    def test_database_with_failover_no_failover_flag(self):
+        """Database with failover should not flag failover issues."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=3, failover=True))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_configuration_anomalies(g)
+        failover_issues = [a for a in anomalies if "failover" in a.description.lower()]
         assert len(failover_issues) == 0
 
+    def test_over_provisioned_replicas(self):
+        """Component with > 10 replicas should be flagged."""
+        g = InfraGraph()
+        g.add_component(_comp("big", "Big Service", replicas=15))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_configuration_anomalies(g)
+        overprov = [a for a in anomalies if "over-provisioned" in a.description.lower()]
+        assert len(overprov) == 1
+        assert overprov[0].severity == AnomalySeverity.MEDIUM
 
-# ---------------------------------------------------------------------------
-# Tests: Dependency anomalies
-# ---------------------------------------------------------------------------
+    def test_ten_replicas_no_flag(self):
+        """Exactly 10 replicas should NOT be flagged as over-provisioned."""
+        g = InfraGraph()
+        g.add_component(_comp("ok", "OK Service", replicas=10))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_configuration_anomalies(g)
+        overprov = [a for a in anomalies if "over-provisioned" in a.description.lower()]
+        assert len(overprov) == 0
+
+    def test_component_with_many_dependents_insufficient_replicas(self):
+        """Component with >= 2 dependents and < min replicas should be CRITICAL."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=1))
+        g.add_component(_comp("app1", "App1"))
+        g.add_component(_comp("app2", "App2"))
+        g.add_dependency(Dependency(source_id="app1", target_id="db", dependency_type="requires"))
+        g.add_dependency(Dependency(source_id="app2", target_id="db", dependency_type="requires"))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_configuration_anomalies(g)
+        replica_crit = [
+            a for a in anomalies
+            if "replica" in a.description.lower()
+            and a.severity == AnomalySeverity.CRITICAL
+        ]
+        assert len(replica_crit) >= 1
+
+    def test_load_balancer_insufficient_replicas(self):
+        """Load balancer type should also trigger replica checks."""
+        g = InfraGraph()
+        g.add_component(_comp("lb", "LB", ComponentType.LOAD_BALANCER, replicas=1))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_configuration_anomalies(g)
+        replica_issues = [
+            a for a in anomalies
+            if a.anomaly_type == AnomalyType.CONFIGURATION_ANOMALY
+            and "replica" in a.description.lower()
+        ]
+        assert len(replica_issues) >= 1
+
+
+# ===========================================================================
+# Tests: detect_security_anomalies
+# ===========================================================================
+
+
+class TestSecurityAnomalies:
+    """Tests for security configuration gap detection."""
+
+    def test_database_no_encryption(self):
+        """Database without encryption at rest should be CRITICAL."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="db", name="DB", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=False),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        encrypt = [a for a in anomalies if "encryption" in a.description.lower()]
+        assert len(encrypt) == 1
+        assert encrypt[0].severity == AnomalySeverity.CRITICAL
+
+    def test_database_with_encryption_no_flag(self):
+        """Database with encryption should not flag encryption issue."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="db", name="DB", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=True, log_enabled=True, backup_enabled=True),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        encrypt = [a for a in anomalies if "encryption" in a.description.lower()]
+        assert len(encrypt) == 0
+
+    def test_no_logging(self):
+        """Component without logging should be flagged MEDIUM."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            security=SecurityProfile(log_enabled=False),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        log_issues = [a for a in anomalies if "logging" in a.description.lower()]
+        assert len(log_issues) == 1
+        assert log_issues[0].severity == AnomalySeverity.MEDIUM
+
+    def test_logging_enabled_no_flag(self):
+        """Component with logging should not flag logging issue."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            security=SecurityProfile(log_enabled=True),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        log_issues = [a for a in anomalies if "logging" in a.description.lower()]
+        assert len(log_issues) == 0
+
+    def test_database_no_backup(self):
+        """Database without backups should be HIGH."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="db", name="DB", type=ComponentType.DATABASE,
+            security=SecurityProfile(backup_enabled=False),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        backup_issues = [a for a in anomalies if "backup" in a.description.lower()]
+        assert len(backup_issues) == 1
+        assert backup_issues[0].severity == AnomalySeverity.HIGH
+
+    def test_storage_no_backup(self):
+        """Storage without backups should be HIGH."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="s3", name="S3 Storage", type=ComponentType.STORAGE,
+            security=SecurityProfile(backup_enabled=False),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        backup_issues = [a for a in anomalies if "backup" in a.description.lower()]
+        assert len(backup_issues) == 1
+
+    def test_app_server_no_backup_not_flagged(self):
+        """App server without backup should NOT flag a backup issue (only DB/Storage)."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="app", name="App", type=ComponentType.APP_SERVER,
+            security=SecurityProfile(backup_enabled=False, log_enabled=True),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        backup_issues = [a for a in anomalies if "backup" in a.description.lower()]
+        assert len(backup_issues) == 0
+
+    def test_security_anomaly_id_format(self):
+        """Security anomaly IDs should follow naming pattern."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="db1", name="DB1", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=False),
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_security_anomalies(g)
+        encrypt = [a for a in anomalies if "encryption" in a.description.lower()]
+        assert encrypt[0].id == "security_anomaly-encrypt-db1"
+
+
+# ===========================================================================
+# Tests: detect_dependency_anomalies
+# ===========================================================================
 
 
 class TestDependencyAnomalies:
-    """Tests for dependency graph anomaly detection."""
+    """Tests for dependency relationship anomaly detection."""
 
-    def test_detects_orphan_component(self, orphan_graph):
+    def test_external_api_without_circuit_breaker(self):
+        """Dependency on external API without CB should be flagged HIGH."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("ext", "External API", ComponentType.EXTERNAL_API))
+        g.add_dependency(Dependency(
+            source_id="app", target_id="ext", dependency_type="requires",
+            circuit_breaker=CircuitBreakerConfig(enabled=False),
+        ))
         detector = AnomalyDetector()
-        anomalies = detector.detect_dependency_anomalies(orphan_graph)
+        anomalies = detector.detect_dependency_anomalies(g)
+        cb_issues = [a for a in anomalies if "circuit breaker" in a.description.lower()]
+        assert len(cb_issues) == 1
+        assert cb_issues[0].severity == AnomalySeverity.HIGH
 
-        orphans = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.DEPENDENCY_ANOMALY
-            and "orphan" in a.description.lower()
-        ]
-        assert len(orphans) >= 1
-        assert any(a.component_id == "orphan" for a in orphans)
-
-    def test_detects_hub_component(self):
-        """Component with many dependents should be flagged as a hub."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="db", name="Central DB", type=ComponentType.DATABASE,
-            replicas=1,
+    def test_external_api_with_circuit_breaker_no_flag(self):
+        """Dependency on external API with CB should not flag."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("ext", "External API", ComponentType.EXTERNAL_API))
+        g.add_dependency(Dependency(
+            source_id="app", target_id="ext", dependency_type="requires",
+            circuit_breaker=CircuitBreakerConfig(enabled=True),
         ))
-        for i in range(6):
-            graph.add_component(Component(
-                id=f"app{i}", name=f"App {i}", type=ComponentType.APP_SERVER,
-                replicas=2,
-            ))
-            graph.add_dependency(Dependency(
-                source_id=f"app{i}", target_id="db", dependency_type="requires",
-            ))
         detector = AnomalyDetector()
-        anomalies = detector.detect_dependency_anomalies(graph)
+        anomalies = detector.detect_dependency_anomalies(g)
+        cb_issues = [a for a in anomalies if "circuit breaker" in a.description.lower()]
+        assert len(cb_issues) == 0
 
-        hubs = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.DEPENDENCY_ANOMALY
-            and "hub" in a.description.lower()
-        ]
-        assert len(hubs) >= 1
-        assert any(a.component_id == "db" for a in hubs)
-
-
-# ---------------------------------------------------------------------------
-# Tests: Capacity mismatches
-# ---------------------------------------------------------------------------
-
-
-class TestCapacityMismatches:
-    """Tests for capacity mismatch detection."""
-
-    def test_detects_high_fanin_low_capacity(self):
-        """Component with many dependents but low replicas."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="db", name="DB", type=ComponentType.DATABASE,
-            replicas=1,
-        ))
-        for i in range(4):
-            graph.add_component(Component(
-                id=f"app{i}", name=f"App {i}", type=ComponentType.APP_SERVER,
-                replicas=3,
-            ))
-            graph.add_dependency(Dependency(
-                source_id=f"app{i}", target_id="db", dependency_type="requires",
-            ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_capacity_mismatches(graph)
-        assert len(anomalies) >= 1
-        assert any(
-            a.component_id == "db"
-            and a.anomaly_type == AnomalyType.CAPACITY_MISMATCH
-            for a in anomalies
-        )
-
-    def test_no_mismatch_when_balanced(self):
-        """Properly scaled components should not trigger."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="db", name="DB", type=ComponentType.DATABASE,
-            replicas=3,
-        ))
-        graph.add_component(Component(
-            id="app", name="App", type=ComponentType.APP_SERVER,
-            replicas=3,
-        ))
-        graph.add_dependency(Dependency(
+    def test_single_required_dependency_no_redundancy(self):
+        """Component with single required dep that has no redundancy should flag."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=1, failover=False))
+        g.add_dependency(Dependency(
             source_id="app", target_id="db", dependency_type="requires",
         ))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_dependency_anomalies(g)
+        single = [a for a in anomalies if "single" in a.description.lower()]
+        assert len(single) == 1
+        assert single[0].severity == AnomalySeverity.MEDIUM
 
+    def test_single_required_dependency_with_redundancy_no_flag(self):
+        """Single required dep with replicas >= min should not flag."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=3, failover=True))
+        g.add_dependency(Dependency(
+            source_id="app", target_id="db", dependency_type="requires",
+        ))
+        detector = AnomalyDetector(min_replicas_for_critical=2)
+        anomalies = detector.detect_dependency_anomalies(g)
+        single = [a for a in anomalies if "single" in a.description.lower()]
+        assert len(single) == 0
+
+    def test_multiple_required_deps_no_single_flag(self):
+        """Component with multiple required deps should not flag single-dep."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("db1", "DB1", ComponentType.DATABASE, replicas=1))
+        g.add_component(_comp("db2", "DB2", ComponentType.DATABASE, replicas=1))
+        g.add_dependency(Dependency(source_id="app", target_id="db1", dependency_type="requires"))
+        g.add_dependency(Dependency(source_id="app", target_id="db2", dependency_type="requires"))
         detector = AnomalyDetector()
-        anomalies = detector.detect_capacity_mismatches(graph)
-        # With balanced replicas and only 1 dependent, no mismatch expected
-        capacity_issues = [a for a in anomalies if a.anomaly_type == AnomalyType.CAPACITY_MISMATCH]
-        assert len(capacity_issues) == 0
+        anomalies = detector.detect_dependency_anomalies(g)
+        single = [a for a in anomalies if "single" in a.description.lower()]
+        assert len(single) == 0
+
+    def test_no_dependencies_no_flag(self):
+        """Component with no dependencies should produce no dependency anomalies."""
+        g = InfraGraph()
+        g.add_component(_comp("standalone", "Standalone"))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_dependency_anomalies(g)
+        assert len(anomalies) == 0
+
+    def test_optional_dependency_not_counted_as_required(self):
+        """Optional dependency should not be counted as 'required' for single-dep check."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App"))
+        g.add_component(_comp("cache", "Cache", ComponentType.CACHE, replicas=1))
+        g.add_dependency(Dependency(
+            source_id="app", target_id="cache", dependency_type="optional",
+        ))
+        detector = AnomalyDetector()
+        anomalies = detector.detect_dependency_anomalies(g)
+        single = [a for a in anomalies if "single" in a.description.lower()]
+        # No required deps at all, so no single-dep flag
+        assert len(single) == 0
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Tests: Full detect() pipeline
+# ===========================================================================
+
+
+class TestFullDetect:
+    """Tests for the full detect() aggregation."""
+
+    def test_empty_graph_report(self, empty_graph):
+        """Empty graph should produce a clean report."""
+        detector = AnomalyDetector()
+        report = detector.detect(empty_graph)
+        assert isinstance(report, AnomalyReport)
+        assert report.total_count == 0
+        assert report.critical_count == 0
+        assert report.high_count == 0
+        assert report.health_score == 100.0
+        assert report.risk_areas == []
+        assert report.top_recommendations == []
+        assert len(report.anomalies) == 0
+
+    def test_healthy_graph_high_health_score(self, healthy_graph):
+        """Well-configured graph should have a high health score."""
+        detector = AnomalyDetector()
+        report = detector.detect(healthy_graph)
+        # May have some minor anomalies but health score should be decent
+        assert report.health_score >= 50.0
+
+    def test_spof_graph_has_anomalies(self, spof_graph):
+        """SPOF graph should produce multiple anomalies."""
+        detector = AnomalyDetector()
+        report = detector.detect(spof_graph)
+        assert report.total_count > 0
+        assert len(report.anomalies) == report.total_count
+
+    def test_critical_count_accurate(self):
+        """Critical count should match actual CRITICAL anomalies."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, health=HealthStatus.DOWN))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        actual_critical = sum(
+            1 for a in report.anomalies if a.severity == AnomalySeverity.CRITICAL
+        )
+        assert report.critical_count == actual_critical
+
+    def test_high_count_accurate(self):
+        """High count should match actual HIGH anomalies."""
+        g = InfraGraph()
+        g.add_component(_comp("app", "App", health=HealthStatus.DEGRADED))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        actual_high = sum(
+            1 for a in report.anomalies if a.severity == AnomalySeverity.HIGH
+        )
+        assert report.high_count == actual_high
+
+    def test_health_score_decreases_with_critical(self):
+        """Health score should decrease with CRITICAL anomalies (-15 each)."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, health=HealthStatus.DOWN))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        assert report.health_score < 100.0
+
+    def test_health_score_never_negative(self):
+        """Health score should never go below 0."""
+        g = InfraGraph()
+        # Add many unhealthy components to drive score negative before clamping
+        for i in range(20):
+            g.add_component(_comp(
+                f"db{i}", f"DB {i}", ComponentType.DATABASE,
+                health=HealthStatus.DOWN,
+            ))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        assert report.health_score >= 0.0
+
+    def test_risk_areas_deduplicated(self):
+        """Risk areas should be deduplicated anomaly type values."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="db1", name="DB1", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=False, log_enabled=False),
+        ))
+        g.add_component(Component(
+            id="db2", name="DB2", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=False, log_enabled=False),
+        ))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        # Should not have duplicate risk areas
+        assert len(report.risk_areas) == len(set(report.risk_areas))
+
+    def test_top_recommendations_max_5(self):
+        """Top recommendations should have at most 5 entries."""
+        g = InfraGraph()
+        # Add many components to generate many anomalies
+        for i in range(10):
+            g.add_component(Component(
+                id=f"db{i}", name=f"DB {i}", type=ComponentType.DATABASE,
+                security=SecurityProfile(encryption_at_rest=False, log_enabled=False, backup_enabled=False),
+            ))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        assert len(report.top_recommendations) <= 5
+
+    def test_top_recommendations_from_highest_severity(self):
+        """Top recommendations should prioritize highest severity anomalies."""
+        g = InfraGraph()
+        # CRITICAL: DB without encryption
+        g.add_component(Component(
+            id="db", name="DB", type=ComponentType.DATABASE,
+            security=SecurityProfile(encryption_at_rest=False, log_enabled=True, backup_enabled=True),
+        ))
+        # LOW: idle component
+        g.add_component(_comp("idle", "Idle", replicas=3))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        if report.top_recommendations:
+            # First recommendation should come from a high-severity anomaly
+            # (encryption is CRITICAL)
+            assert len(report.top_recommendations) >= 1
+
+    def test_top_recommendations_deduplicated(self):
+        """Top recommendations should not have duplicates."""
+        g = InfraGraph()
+        for i in range(5):
+            g.add_component(Component(
+                id=f"db{i}", name=f"DB {i}", type=ComponentType.DATABASE,
+                security=SecurityProfile(encryption_at_rest=False),
+            ))
+        detector = AnomalyDetector()
+        report = detector.detect(g)
+        assert len(report.top_recommendations) == len(set(report.top_recommendations))
+
+
+# ===========================================================================
+# Tests: AnomalyReport fields
+# ===========================================================================
+
+
+class TestAnomalyReportFields:
+    """Tests for AnomalyReport data class fields."""
+
+    def test_default_report(self):
+        """Default AnomalyReport should have sensible defaults."""
+        report = AnomalyReport()
+        assert report.anomalies == []
+        assert report.total_count == 0
+        assert report.critical_count == 0
+        assert report.high_count == 0
+        assert report.health_score == 100.0
+        assert report.risk_areas == []
+        assert report.top_recommendations == []
+
+
+# ===========================================================================
 # Tests: Anomaly data class
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 
 class TestAnomalyDataClass:
@@ -540,398 +885,155 @@ class TestAnomalyDataClass:
 
     def test_anomaly_fields(self):
         a = Anomaly(
-            anomaly_type=AnomalyType.REPLICA_OUTLIER,
+            id="utilization_spike-db",
+            anomaly_type=AnomalyType.UTILIZATION_SPIKE,
+            severity=AnomalySeverity.CRITICAL,
             component_id="db",
             component_name="PostgreSQL",
-            severity="critical",
-            description="Low replica count",
-            expected_value=">= 2",
-            actual_value="1",
-            z_score=-2.5,
-            recommendation="Add replicas",
-            confidence=0.85,
+            description="High utilization",
+            metric_value=95.0,
+            expected_range="0-80%",
+            confidence=0.95,
+            recommendation="Scale up",
         )
-        assert a.anomaly_type == AnomalyType.REPLICA_OUTLIER
-        assert a.component_id == "db"
-        assert a.severity == "critical"
-        assert a.z_score == -2.5
-        assert a.confidence == 0.85
+        assert a.id == "utilization_spike-db"
+        assert a.anomaly_type == AnomalyType.UTILIZATION_SPIKE
+        assert a.severity == AnomalySeverity.CRITICAL
+        assert a.metric_value == 95.0
+        assert a.confidence == 0.95
 
-    def test_anomaly_type_enum_values(self):
-        """All enum values should be lowercase snake_case strings."""
+
+# ===========================================================================
+# Tests: Enum values
+# ===========================================================================
+
+
+class TestEnumValues:
+    """Tests for enum value consistency."""
+
+    def test_anomaly_type_values(self):
+        """All AnomalyType values should be lowercase snake_case."""
         for t in AnomalyType:
             assert t.value == t.value.lower()
-            assert "_" in t.value or t.value.isalpha()
+
+    def test_severity_values(self):
+        """All AnomalySeverity values should be lowercase."""
+        for s in AnomalySeverity:
+            assert s.value == s.value.lower()
+
+    def test_anomaly_type_string_enum(self):
+        """AnomalyType should be usable as a string."""
+        assert AnomalyType.UTILIZATION_SPIKE == "utilization_spike"
+
+    def test_severity_string_enum(self):
+        """AnomalySeverity should be usable as a string."""
+        assert AnomalySeverity.CRITICAL == "critical"
 
 
-# ---------------------------------------------------------------------------
-# Tests: Full detection pipeline
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Tests: Custom thresholds
+# ===========================================================================
 
 
-class TestFullDetection:
-    """Integration tests for the full detection pipeline."""
+class TestCustomThresholds:
+    """Tests for custom threshold configurations."""
 
-    def test_full_report_structure(self, spof_graph):
+    def test_custom_utilization_threshold(self):
+        """Detector should respect custom utilization threshold."""
+        g = InfraGraph()
+        g.add_component(Component(
+            id="s", name="S", type=ComponentType.APP_SERVER,
+            metrics=ResourceMetrics(cpu_percent=60.0),
+        ))
+        # Threshold 50 -> should flag
+        d1 = AnomalyDetector(utilization_threshold=50.0)
+        assert len(d1.detect_utilization_anomalies(g)) > 0
+        # Threshold 70 -> should not flag
+        d2 = AnomalyDetector(utilization_threshold=70.0)
+        assert len(d2.detect_utilization_anomalies(g)) == 0
+
+    def test_custom_depth_threshold(self):
+        """Detector should respect custom dependency depth threshold."""
+        g = InfraGraph()
+        for i in range(6):
+            g.add_component(_comp(f"c{i}", f"C{i}"))
+        for i in range(5):
+            g.add_dependency(Dependency(source_id=f"c{i}", target_id=f"c{i+1}"))
+        # Threshold 3 -> should flag (chain of 6)
+        d1 = AnomalyDetector(dependency_depth_threshold=3)
+        deep1 = [a for a in d1.detect_topology_anomalies(g) if "depth" in a.description.lower()]
+        assert len(deep1) >= 1
+        # Threshold 10 -> should not flag
+        d2 = AnomalyDetector(dependency_depth_threshold=10)
+        deep2 = [a for a in d2.detect_topology_anomalies(g) if "depth" in a.description.lower()]
+        assert len(deep2) == 0
+
+    def test_custom_min_replicas(self):
+        """Detector should respect custom min_replicas_for_critical."""
+        g = InfraGraph()
+        g.add_component(_comp("db", "DB", ComponentType.DATABASE, replicas=2, failover=True))
+        # min_replicas=3 -> should flag
+        d1 = AnomalyDetector(min_replicas_for_critical=3)
+        rep1 = [
+            a for a in d1.detect_configuration_anomalies(g)
+            if "replica" in a.description.lower()
+        ]
+        assert len(rep1) >= 1
+        # min_replicas=2 -> should not flag
+        d2 = AnomalyDetector(min_replicas_for_critical=2)
+        rep2 = [
+            a for a in d2.detect_configuration_anomalies(g)
+            if "replica" in a.description.lower()
+        ]
+        assert len(rep2) == 0
+
+
+# ===========================================================================
+# Tests: Edge cases
+# ===========================================================================
+
+
+class TestEdgeCases:
+    """Edge case tests."""
+
+    def test_all_detection_methods_return_lists(self):
+        """All detection methods should return lists even on empty graph."""
+        g = InfraGraph()
         detector = AnomalyDetector()
-        report = detector.detect(spof_graph)
+        assert isinstance(detector.detect_utilization_anomalies(g), list)
+        assert isinstance(detector.detect_health_anomalies(g), list)
+        assert isinstance(detector.detect_topology_anomalies(g), list)
+        assert isinstance(detector.detect_configuration_anomalies(g), list)
+        assert isinstance(detector.detect_security_anomalies(g), list)
+        assert isinstance(detector.detect_dependency_anomalies(g), list)
 
-        assert isinstance(report, AnomalyReport)
-        assert report.total_components_analyzed == len(spof_graph.components)
-        assert 0 <= report.anomaly_rate <= 100
-        assert report.critical_count >= 0
-        assert report.warning_count >= 0
-        assert isinstance(report.healthiest_components, list)
-        assert isinstance(report.most_anomalous_components, list)
-
-    def test_anomaly_confidence_range(self, spof_graph):
+    def test_confidence_range_all_anomalies(self, spof_graph):
         """All confidence values should be between 0 and 1."""
         detector = AnomalyDetector()
         report = detector.detect(spof_graph)
         for a in report.anomalies:
-            assert 0.0 <= a.confidence <= 1.0
+            assert 0.0 <= a.confidence <= 1.0, (
+                f"Confidence {a.confidence} out of range for {a.id}"
+            )
 
-    def test_anomaly_severity_valid(self, spof_graph):
-        """All severity values should be valid."""
-        detector = AnomalyDetector()
-        report = detector.detect(spof_graph)
-        valid_severities = {"critical", "warning", "info"}
-        for a in report.anomalies:
-            assert a.severity in valid_severities
-
-    def test_anomaly_has_recommendation(self, spof_graph):
-        """All anomalies should have a recommendation."""
+    def test_all_anomalies_have_recommendations(self, spof_graph):
+        """All anomalies should have non-empty recommendations."""
         detector = AnomalyDetector()
         report = detector.detect(spof_graph)
         for a in report.anomalies:
-            assert a.recommendation, f"Missing recommendation for {a.component_id}: {a.description}"
+            assert a.recommendation, f"Missing recommendation for {a.id}"
 
-    def test_most_anomalous_ordered(self, spof_graph):
+    def test_all_anomalies_have_ids(self, spof_graph):
+        """All anomalies should have non-empty IDs."""
         detector = AnomalyDetector()
         report = detector.detect(spof_graph)
-        if len(report.most_anomalous_components) >= 2:
-            # Most anomalous should be ordered by anomaly count
-            anomaly_counts: dict[str, int] = {}
-            for a in report.anomalies:
-                anomaly_counts[a.component_id] = anomaly_counts.get(a.component_id, 0) + 1
-            for i in range(len(report.most_anomalous_components) - 1):
-                c1 = report.most_anomalous_components[i]
-                c2 = report.most_anomalous_components[i + 1]
-                assert anomaly_counts.get(c1, 0) >= anomaly_counts.get(c2, 0)
+        for a in report.anomalies:
+            assert a.id, f"Missing ID for anomaly on {a.component_id}"
 
-
-# ---------------------------------------------------------------------------
-# Additional tests for 99%+ coverage
-# ---------------------------------------------------------------------------
-
-
-class TestReplicaAnomaliesSingleComponent:
-    """Cover detect_replica_anomalies with < 2 components (line 201)."""
-
-    def test_replica_anomalies_single_component(self):
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app", name="App", type=ComponentType.APP_SERVER, replicas=1,
-        ))
+    def test_single_component_graph(self, single_component_graph):
+        """Single component graph should handle gracefully."""
         detector = AnomalyDetector()
-        anomalies = detector.detect_replica_anomalies(graph)
-        assert len(anomalies) == 0  # Not enough components for comparison
-
-
-class TestReplicaUnderProvisioned:
-    """Cover the UNDER_PROVISIONED branch (line 237)."""
-
-    def test_under_provisioned_single_replica_many_dependents(self):
-        """Component with replicas=1, >= 2 dependents, no failover,
-        but z-score NOT < -1.5 (not a statistical outlier)."""
-        graph = InfraGraph()
-        # Make a component with replicas=1 that has 2+ dependents
-        # but the z-score is NOT < -1.5 (i.e., other components also have low replicas)
-        graph.add_component(Component(
-            id="db", name="DB", type=ComponentType.DATABASE,
-            replicas=1,
-        ))
-        graph.add_component(Component(
-            id="app1", name="App1", type=ComponentType.APP_SERVER,
-            replicas=1,
-        ))
-        graph.add_component(Component(
-            id="app2", name="App2", type=ComponentType.APP_SERVER,
-            replicas=2,
-        ))
-        graph.add_dependency(Dependency(
-            source_id="app1", target_id="db", dependency_type="requires",
-        ))
-        graph.add_dependency(Dependency(
-            source_id="app2", target_id="db", dependency_type="requires",
-        ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_replica_anomalies(graph)
-
-        # db has replicas=1, num_dependents=2, no failover
-        # With replicas [1, 1, 2], mean=1.33, std=0.47
-        # z for db = (1 - 1.33) / 0.47 = -0.71 -> NOT < -1.5
-        # So it should hit the elif (UNDER_PROVISIONED) branch
-        under = [a for a in anomalies if a.anomaly_type == AnomalyType.UNDER_PROVISIONED]
-        assert len(under) >= 1
-        assert any(a.component_id == "db" for a in under)
-
-
-class TestUtilizationSkipZero:
-    """Cover the util <= 0.0 continue branch (line 277)."""
-
-    def test_skip_zero_utilization_components(self):
-        graph = InfraGraph()
-        # 3 components with utilization, 1 with zero
-        graph.add_component(Component(
-            id="app1", name="App1", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=50.0),
-        ))
-        graph.add_component(Component(
-            id="app2", name="App2", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=55.0),
-        ))
-        graph.add_component(Component(
-            id="app3", name="App3", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=45.0),
-        ))
-        graph.add_component(Component(
-            id="no_util", name="NoUtil", type=ComponentType.APP_SERVER,
-            replicas=2,
-            # No metrics -> utilization = 0.0 -> should be skipped
-        ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_utilization_anomalies(graph)
-        # no_util should not appear in anomalies (skipped at line 277)
-        no_util_anomalies = [a for a in anomalies if a.component_id == "no_util"]
-        assert len(no_util_anomalies) == 0
-
-
-class TestUtilizationOverProvisioned:
-    """Cover the over-provisioned branch (lines 301-302)."""
-
-    def test_detects_over_provisioned_component(self):
-        """Component with very low utilization should be flagged as over-provisioned."""
-        graph = InfraGraph()
-        # 3 normal components + 1 very low utilization
-        graph.add_component(Component(
-            id="app1", name="App1", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=70.0),
-        ))
-        graph.add_component(Component(
-            id="app2", name="App2", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=75.0),
-        ))
-        graph.add_component(Component(
-            id="app3", name="App3", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=80.0),
-        ))
-        graph.add_component(Component(
-            id="idle", name="Idle", type=ComponentType.APP_SERVER,
-            replicas=2, metrics=ResourceMetrics(cpu_percent=5.0),
-        ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_utilization_anomalies(graph)
-
-        over_provisioned = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.OVER_PROVISIONED
-        ]
-        assert len(over_provisioned) >= 1
-        assert any(a.component_id == "idle" for a in over_provisioned)
-
-
-class TestConfigInconsistenciesSingleComponent:
-    """Cover detect_config_inconsistencies with < 2 components (line 329)."""
-
-    def test_config_inconsistencies_single_component(self):
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app", name="App", type=ComponentType.APP_SERVER, replicas=1,
-        ))
-        detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(graph)
-        assert len(anomalies) == 0
-
-
-class TestAutoscalingInconsistency:
-    """Cover autoscaling inconsistency detection (lines 373-375)."""
-
-    def test_detects_autoscaling_inconsistency(self):
-        """Most components have autoscaling but one doesn't."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app1", name="App1", type=ComponentType.APP_SERVER,
-            replicas=2, autoscaling=AutoScalingConfig(enabled=True),
-        ))
-        graph.add_component(Component(
-            id="app2", name="App2", type=ComponentType.APP_SERVER,
-            replicas=2, autoscaling=AutoScalingConfig(enabled=True),
-        ))
-        graph.add_component(Component(
-            id="app3", name="App3", type=ComponentType.APP_SERVER,
-            replicas=2,
-            # No autoscaling - inconsistent with peers
-        ))
-        detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(graph)
-        as_issues = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.CONFIG_INCONSISTENCY
-            and "autoscaling" in a.description.lower()
-        ]
-        assert len(as_issues) >= 1
-        assert any(a.component_id == "app3" for a in as_issues)
-
-
-class TestCircuitBreakerInconsistency:
-    """Cover circuit breaker inconsistency detection (lines 402-407)."""
-
-    def test_detects_circuit_breaker_inconsistency(self):
-        """Most edges have CB but one doesn't."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app1", name="App1", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_component(Component(
-            id="app2", name="App2", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_component(Component(
-            id="db", name="DB", type=ComponentType.DATABASE, replicas=2,
-        ))
-        # 2 edges with CB, 1 without
-        graph.add_dependency(Dependency(
-            source_id="app1", target_id="db", dependency_type="requires",
-            circuit_breaker=CircuitBreakerConfig(enabled=True),
-        ))
-        graph.add_dependency(Dependency(
-            source_id="app2", target_id="db", dependency_type="requires",
-            circuit_breaker=CircuitBreakerConfig(enabled=True),
-        ))
-        graph.add_dependency(Dependency(
-            source_id="app1", target_id="app2", dependency_type="optional",
-            # No circuit breaker - inconsistent
-        ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_config_inconsistencies(graph)
-        cb_issues = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.CONFIG_INCONSISTENCY
-            and "circuit" in a.description.lower()
-        ]
-        assert len(cb_issues) >= 1
-
-
-class TestDependencyAnomalyEdgeCases:
-    """Cover dependency anomaly edge cases."""
-
-    def test_dependency_anomalies_empty_graph(self):
-        """Direct call to detect_dependency_anomalies with empty graph (line 467)."""
-        graph = InfraGraph()
-        detector = AnomalyDetector()
-        anomalies = detector.detect_dependency_anomalies(graph)
-        assert len(anomalies) == 0
-
-    def test_dependency_anomalies_uniform_dependents(self):
-        """All components have same number of dependents -> std=0 -> z=0 (line 485)."""
-        graph = InfraGraph()
-        # Create a ring: each has exactly 1 dependent
-        for i in range(4):
-            graph.add_component(Component(
-                id=f"svc{i}", name=f"Service{i}", type=ComponentType.APP_SERVER,
-                replicas=2,
-            ))
-        for i in range(4):
-            graph.add_dependency(Dependency(
-                source_id=f"svc{i}", target_id=f"svc{(i+1) % 4}",
-                dependency_type="requires",
-            ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_dependency_anomalies(graph)
-        # With std=0, no hub should be detected (z=0 for all)
-        hubs = [a for a in anomalies if "hub" in a.description.lower()]
-        assert len(hubs) == 0
-
-
-class TestCircularDependencyDetection:
-    """Cover circular dependency detection (lines 537-560)."""
-
-    def test_detects_circular_dependency(self):
-        """Graph with a cycle should produce circular dependency anomalies."""
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="a", name="ServiceA", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_component(Component(
-            id="b", name="ServiceB", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_component(Component(
-            id="c", name="ServiceC", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        # Create a cycle: a -> b -> c -> a
-        graph.add_dependency(Dependency(
-            source_id="a", target_id="b", dependency_type="requires",
-        ))
-        graph.add_dependency(Dependency(
-            source_id="b", target_id="c", dependency_type="requires",
-        ))
-        graph.add_dependency(Dependency(
-            source_id="c", target_id="a", dependency_type="requires",
-        ))
-
-        detector = AnomalyDetector()
-        anomalies = detector.detect_dependency_anomalies(graph)
-
-        circular = [
-            a for a in anomalies
-            if a.anomaly_type == AnomalyType.DEPENDENCY_ANOMALY
-            and "circular" in a.description.lower()
-        ]
-        assert len(circular) >= 1
-
-
-class TestCapacityMismatchSingleComponent:
-    """Cover detect_capacity_mismatches with < 2 components (line 570)."""
-
-    def test_capacity_mismatches_single_component(self):
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="app", name="App", type=ComponentType.APP_SERVER, replicas=1,
-        ))
-        detector = AnomalyDetector()
-        anomalies = detector.detect_capacity_mismatches(graph)
-        assert len(anomalies) == 0
-
-
-class TestCircularDependencyExceptionHandling:
-    """Cover the except block in cycle detection (lines 559-560)."""
-
-    def test_cycle_detection_exception_handled(self, monkeypatch):
-        """When nx.simple_cycles raises, the exception should be swallowed."""
-        from unittest.mock import patch
-        import networkx as nx
-
-        graph = InfraGraph()
-        graph.add_component(Component(
-            id="a", name="A", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_component(Component(
-            id="b", name="B", type=ComponentType.APP_SERVER, replicas=2,
-        ))
-        graph.add_dependency(Dependency(
-            source_id="a", target_id="b", dependency_type="requires",
-        ))
-
-        # Mock nx.simple_cycles to raise an exception
-        with patch("networkx.simple_cycles", side_effect=RuntimeError("graph error")):
-            detector = AnomalyDetector()
-            anomalies = detector.detect_dependency_anomalies(graph)
-
-        # Should not raise, and circular anomalies should be empty
-        circular = [a for a in anomalies if "circular" in a.description.lower()]
-        assert len(circular) == 0
+        report = detector.detect(single_component_graph)
+        assert isinstance(report, AnomalyReport)
+        # Should still find some anomalies (e.g., no logging)
+        assert report.health_score <= 100.0

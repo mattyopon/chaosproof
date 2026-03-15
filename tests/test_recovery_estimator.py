@@ -1080,3 +1080,37 @@ class TestEdgeCases:
         ]
         assert len(as_steps) == 1
         assert as_steps[0].estimated_minutes == 0.5  # 30s / 60
+
+
+# ---------------------------------------------------------------------------
+# Coverage: cache warm_duration <= 0 (line 435) and empty recoveries (line 568)
+# ---------------------------------------------------------------------------
+
+
+class TestCacheWarmDurationZero:
+    def test_cache_warm_duration_zero_defaults_to_5(self):
+        """When cache_warming.warm_duration_seconds is 0,
+        the fallback duration of 5.0 minutes should be used."""
+        g = InfraGraph()
+        comp = Component(
+            id="cache", name="Cache", type=ComponentType.CACHE, replicas=1,
+        )
+        comp.cache_warming.warm_duration_seconds = 0
+        g.add_component(comp)
+
+        est = RecoveryEstimator()
+        cr = est.estimate_component(comp, g)
+        warm_steps = [
+            s for s in cr.recovery_steps
+            if "warm" in s.action.lower()
+        ]
+        assert len(warm_steps) == 1
+        assert warm_steps[0].estimated_minutes == 5.0
+
+
+class TestIdentifyBottlenecksEmpty:
+    def test_empty_recoveries_list(self):
+        """Line 568: _identify_bottlenecks returns [] for empty list."""
+        g = InfraGraph()
+        result = RecoveryEstimator._identify_bottlenecks([], g)
+        assert result == []

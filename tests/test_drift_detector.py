@@ -1112,3 +1112,398 @@ class TestEdgeCases:
         # Verify it round-trips
         parsed = json.loads(json_str)
         assert parsed["total_drifts"] == report.total_drifts
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests (lines 145-149, 259-260, 366, 405, 416, 422,
+# 425, 436-439, 517, 539, 563, 708, 745, 861, 943)
+# ---------------------------------------------------------------------------
+
+
+class TestSerializeValueBranches:
+    """Lines 145-149: _serialize_value for dict, list/tuple, and fallback."""
+
+    def test_serialize_dict_value(self, detector: DriftDetector, tmp_path: Path):
+        """_serialize_value should recursively serialize dicts."""
+        event = DriftEvent(
+            drift_type=DriftType.CONFIGURATION_CHANGED,
+            severity=DriftSeverity.LOW,
+            component_id="web-api",
+            component_name="Web API",
+            field="config",
+            baseline_value={"nested": {"key": "value"}, "list": [1, 2]},
+            current_value=[("tuple", "value"), 42],
+            description="Config changed",
+            resilience_impact=-1.0,
+            remediation="Check config",
+        )
+        now = datetime.now(timezone.utc)
+        report = DriftReport(
+            baseline_timestamp=now,
+            current_timestamp=now,
+            events=[event],
+            total_drifts=1,
+            critical_drifts=0,
+            high_drifts=0,
+            baseline_resilience_score=95.0,
+            current_resilience_score=94.0,
+            score_delta=-1.0,
+            drift_velocity=0.5,
+            risk_trend="stable",
+            summary="test",
+        )
+        data = report.to_dict()
+        # Dict should be recursively serialized
+        assert data["events"][0]["baseline_value"]["nested"]["key"] == "value"
+        assert data["events"][0]["baseline_value"]["list"] == [1, 2]
+        # Tuple/list should be serialized
+        assert isinstance(data["events"][0]["current_value"], list)
+
+    def test_serialize_non_serializable(self, detector: DriftDetector):
+        """_serialize_value should str() non-standard types."""
+        from infrasim.simulator.drift_detector import _serialize_value
+        result = _serialize_value(object())
+        assert isinstance(result, str)
+
+        result_dict = _serialize_value({"key": object()})
+        assert isinstance(result_dict["key"], str)
+
+        result_tuple = _serialize_value((1, "two", None))
+        assert result_tuple == [1, "two", None]
+
+
+class TestLoadBaselineInvalidTimestamp:
+    """Lines 259-260: Invalid timestamp in baseline JSON falls back to now()."""
+
+    def test_invalid_timestamp_fallback(self, detector: DriftDetector, tmp_path: Path):
+        """Invalid timestamp should fall back to current time."""
+        bl_path = tmp_path / "bl.json"
+        bl_path.write_text(json.dumps({
+            "version": "1.0",
+            "timestamp": "not-a-valid-date",
+            "infrastructure_id": "test",
+            "components": {},
+            "edges": [],
+            "resilience_score": 90.0,
+        }))
+        baseline = detector.load_baseline(bl_path)
+        # Should have a valid timestamp (now-ish)
+        assert baseline.timestamp is not None
+        assert isinstance(baseline.timestamp, datetime)
+
+    def test_missing_timestamp_fallback(self, detector: DriftDetector, tmp_path: Path):
+        """Missing timestamp field should fall back to current time."""
+        bl_path = tmp_path / "bl.json"
+        bl_path.write_text(json.dumps({
+            "version": "1.0",
+            "infrastructure_id": "test",
+            "components": {},
+            "edges": [],
+            "resilience_score": 90.0,
+        }))
+        baseline = detector.load_baseline(bl_path)
+        assert baseline.timestamp is not None
+
+
+class TestDetectFromFileNonYaml:
+    """Line 366: detect_from_file with non-yaml file uses InfraGraph.load."""
+
+    def test_detect_from_json_file(self, detector: DriftDetector, tmp_path: Path):
+        """Non-yaml file should use InfraGraph.load."""
+        graph = _make_graph(components=[_web_api(replicas=3)])
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(graph, bl_path)
+
+        # Save current graph as JSON
+        current_path = tmp_path / "current.json"
+        graph.save(current_path)
+
+        report = detector.detect_from_file(bl_path, current_path)
+        assert report.total_drifts == 0
+
+
+class TestAutoDetectSeverityFallbacks:
+    """Lines 405, 416, 422, 425, 436-439: Fallback severities."""
+
+    def test_replica_reduction_non_numeric(self, detector: DriftDetector):
+        """Line 405: Non-numeric values for REPLICA_REDUCTION -> MEDIUM."""
+        severity = detector.auto_detect_severity(
+            DriftType.REPLICA_REDUCTION, "three", "one"
+        )
+        assert severity == DriftSeverity.MEDIUM
+
+    def test_capacity_reduced_non_numeric(self, detector: DriftDetector):
+        """Line 416: Non-numeric values for CAPACITY_REDUCED -> MEDIUM."""
+        severity = detector.auto_detect_severity(
+            DriftType.CAPACITY_REDUCED, "big", "small"
+        )
+        assert severity == DriftSeverity.MEDIUM
+
+    def test_health_check_removed_severity(self, detector: DriftDetector):
+        """Line 422: HEALTH_CHECK_REMOVED -> MEDIUM."""
+        severity = detector.auto_detect_severity(
+            DriftType.HEALTH_CHECK_REMOVED, True, False
+        )
+        assert severity == DriftSeverity.MEDIUM
+
+    def test_security_weakened_severity(self, detector: DriftDetector):
+        """Line 425: SECURITY_WEAKENED -> MEDIUM."""
+        severity = detector.auto_detect_severity(
+            DriftType.SECURITY_WEAKENED, True, False
+        )
+        assert severity == DriftSeverity.MEDIUM
+
+    def test_component_added_severity(self, detector: DriftDetector):
+        """Line 434: COMPONENT_ADDED -> INFO."""
+        severity = detector.auto_detect_severity(
+            DriftType.COMPONENT_ADDED, None, "new-comp"
+        )
+        assert severity == DriftSeverity.INFO
+
+    def test_configuration_changed_severity(self, detector: DriftDetector):
+        """Lines 436-437: CONFIGURATION_CHANGED -> LOW."""
+        severity = detector.auto_detect_severity(
+            DriftType.CONFIGURATION_CHANGED, "old", "new"
+        )
+        assert severity == DriftSeverity.LOW
+
+    def test_circuit_breaker_disabled_severity(self, detector: DriftDetector):
+        """CIRCUIT_BREAKER_DISABLED -> HIGH."""
+        severity = detector.auto_detect_severity(
+            DriftType.CIRCUIT_BREAKER_DISABLED, True, False
+        )
+        assert severity == DriftSeverity.HIGH
+
+    def test_failover_disabled_severity(self, detector: DriftDetector):
+        """FAILOVER_DISABLED -> CRITICAL."""
+        severity = detector.auto_detect_severity(
+            DriftType.FAILOVER_DISABLED, True, False
+        )
+        assert severity == DriftSeverity.CRITICAL
+
+
+class TestComponentAddedDetection:
+    """Line 517: Added component detection."""
+
+    def test_new_component_detected(self, detector: DriftDetector, tmp_path: Path):
+        """Adding a new component should be detected as COMPONENT_ADDED."""
+        original = _make_graph(components=[_web_api(replicas=3)])
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+
+        current = _make_graph(
+            components=[_web_api(replicas=3), _redis(replicas=2)]
+        )
+        report = detector.detect(baseline, current)
+        added = [e for e in report.events if e.drift_type == DriftType.COMPONENT_ADDED]
+        assert len(added) == 1
+        assert added[0].component_id == "redis"
+
+
+class TestChangedComponentComparison:
+    """Line 539: Changed component comparison (defensive continue)."""
+
+    def test_changed_component_detected(self, detector: DriftDetector, tmp_path: Path):
+        """Changed component (present in both) should be compared."""
+        original = _make_graph(components=[_web_api(replicas=3)])
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+
+        current = _make_graph(components=[_web_api(replicas=1)])
+        report = detector.detect(baseline, current)
+        replica_drifts = [
+            e for e in report.events
+            if e.drift_type == DriftType.REPLICA_REDUCTION
+        ]
+        assert len(replica_drifts) >= 1
+
+
+class TestReplicaReductionCriticalUpgrade:
+    """Line 563: Replica reduction upgraded to CRITICAL with many dependents."""
+
+    def test_replica_critical_with_many_dependents(
+        self, detector: DriftDetector, tmp_path: Path
+    ):
+        """Replica=1 with >2 dependents should be CRITICAL."""
+        db = _postgres(replicas=3, failover=True)
+        original = _make_graph(
+            components=[
+                Component(id="svc-a", name="Service A", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-b", name="Service B", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-c", name="Service C", type=ComponentType.APP_SERVER, replicas=2),
+                db,
+            ],
+            dependencies=[
+                _dep("svc-a", "postgres"),
+                _dep("svc-b", "postgres"),
+                _dep("svc-c", "postgres"),
+            ],
+        )
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+
+        # Reduce postgres to 1 replica with 3 dependents
+        current = _make_graph(
+            components=[
+                Component(id="svc-a", name="Service A", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-b", name="Service B", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-c", name="Service C", type=ComponentType.APP_SERVER, replicas=2),
+                _postgres(replicas=1, failover=True),
+            ],
+            dependencies=[
+                _dep("svc-a", "postgres"),
+                _dep("svc-b", "postgres"),
+                _dep("svc-c", "postgres"),
+            ],
+        )
+        report = detector.detect(baseline, current)
+
+        replica_drifts = [
+            e for e in report.events
+            if e.drift_type == DriftType.REPLICA_REDUCTION
+            and e.component_id == "postgres"
+        ]
+        assert len(replica_drifts) >= 1
+        assert replica_drifts[0].severity == DriftSeverity.CRITICAL
+
+
+class TestCapacityBaselineNone:
+    """Line 708: Capacity field with baseline_val None should skip."""
+
+    def test_capacity_baseline_none_skipped(
+        self, detector: DriftDetector, tmp_path: Path
+    ):
+        """When baseline has no capacity field, no drift should be reported."""
+        original = _make_graph(
+            components=[
+                Component(
+                    id="web-api",
+                    name="Web API",
+                    type=ComponentType.APP_SERVER,
+                    replicas=3,
+                ),
+            ]
+        )
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+        # Remove capacity from baseline manually
+        baseline.components["web-api"].pop("capacity", None)
+
+        current = _make_graph(
+            components=[
+                Component(
+                    id="web-api",
+                    name="Web API",
+                    type=ComponentType.APP_SERVER,
+                    replicas=3,
+                    capacity=Capacity(max_connections=500),
+                ),
+            ]
+        )
+        report = detector.detect(baseline, current)
+        cap_drifts = [
+            e for e in report.events
+            if e.drift_type == DriftType.CAPACITY_REDUCED
+        ]
+        assert len(cap_drifts) == 0
+
+
+class TestSecurityBaselineEmpty:
+    """Line 745: Empty security baseline should skip security drift checks."""
+
+    def test_security_empty_baseline_no_drift(
+        self, detector: DriftDetector, tmp_path: Path
+    ):
+        """When baseline has no security config, no security drift."""
+        original = _make_graph(
+            components=[
+                Component(
+                    id="web-api",
+                    name="Web API",
+                    type=ComponentType.APP_SERVER,
+                    replicas=3,
+                ),
+            ]
+        )
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+        # Remove security from baseline
+        baseline.components["web-api"].pop("security", None)
+
+        current = _make_graph(
+            components=[
+                Component(
+                    id="web-api",
+                    name="Web API",
+                    type=ComponentType.APP_SERVER,
+                    replicas=3,
+                    security=SecurityProfile(encryption_at_rest=False),
+                ),
+            ]
+        )
+        report = detector.detect(baseline, current)
+        sec_drifts = [
+            e for e in report.events
+            if e.drift_type == DriftType.SECURITY_WEAKENED
+        ]
+        assert len(sec_drifts) == 0
+
+
+class TestCircuitBreakerDisabledCritical:
+    """Line 861: CB disabled with many dependents -> CRITICAL."""
+
+    def test_cb_disabled_many_dependents_critical(
+        self, detector: DriftDetector, tmp_path: Path
+    ):
+        """CB disabled on edge with >2 dependents on target -> CRITICAL."""
+        original = _make_graph(
+            components=[
+                Component(id="svc-a", name="A", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-b", name="B", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-c", name="C", type=ComponentType.APP_SERVER, replicas=2),
+                _postgres(replicas=2),
+            ],
+            dependencies=[
+                _dep("svc-a", "postgres", circuit_breaker=True),
+                _dep("svc-b", "postgres"),
+                _dep("svc-c", "postgres"),
+            ],
+        )
+        bl_path = tmp_path / "bl.json"
+        baseline = detector.save_baseline(original, bl_path)
+
+        # Disable circuit breaker
+        current = _make_graph(
+            components=[
+                Component(id="svc-a", name="A", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-b", name="B", type=ComponentType.APP_SERVER, replicas=2),
+                Component(id="svc-c", name="C", type=ComponentType.APP_SERVER, replicas=2),
+                _postgres(replicas=2),
+            ],
+            dependencies=[
+                _dep("svc-a", "postgres", circuit_breaker=False),
+                _dep("svc-b", "postgres"),
+                _dep("svc-c", "postgres"),
+            ],
+        )
+        report = detector.detect(baseline, current)
+        cb_drifts = [
+            e for e in report.events
+            if e.drift_type == DriftType.CIRCUIT_BREAKER_DISABLED
+        ]
+        assert len(cb_drifts) >= 1
+        assert cb_drifts[0].severity == DriftSeverity.CRITICAL
+
+
+class TestDegradingTrendClassification:
+    """Line 943: degrading trend when total_drifts > 0 and score_delta < 0."""
+
+    def test_degrading_trend_minor_negative_delta(self, detector: DriftDetector):
+        """Score delta between -5 and 0 with drifts but no high/critical."""
+        trend = DriftDetector._determine_risk_trend(
+            score_delta=-2.0,
+            critical_count=0,
+            high_count=0,
+            total_drifts=3,
+        )
+        assert trend == "degrading"

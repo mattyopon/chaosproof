@@ -127,7 +127,7 @@ def _build_transition_matrix(
 
     # Ensure row probabilities sum to 1
     # Row 0: HEALTHY
-    p_h_stay = max(0.0, 1.0 - p_h_to_d - p_h_to_down)
+    p_h_stay = 1.0 - p_h_to_d - p_h_to_down
     if p_h_stay < 0:
         # Rescale
         total = p_h_to_d + p_h_to_down
@@ -136,7 +136,7 @@ def _build_transition_matrix(
         p_h_stay = 0.0
 
     # Row 1: DEGRADED
-    p_d_stay = max(0.0, 1.0 - p_d_to_h - p_d_to_down)
+    p_d_stay = 1.0 - p_d_to_h - p_d_to_down
     if p_d_stay < 0:
         total = p_d_to_h + p_d_to_down
         p_d_to_h /= total
