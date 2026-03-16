@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [10.2.0] - 2026-03-16
+
+### Added
+- **Cost Impact Engine** — Quantify downtime costs, SLA penalties, recovery costs, reputation impact, and ROI analysis (76 tests)
+- **Security Resilience Engine** — Evaluate security posture against 8 threat categories (DDoS, ransomware, data breach, etc.) with 12 security controls mapping and A+ to F grading (110 tests)
+- **Multi-Region DR Engine** — Evaluate 4 DR strategies (active-active/passive, pilot light, backup-restore), simulate failover with RTO/RPO assessment, compare strategies (125 tests)
+- **Compliance Frameworks Engine** — Multi-regulation compliance: SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR with 41 controls and automated evidence evaluation (120 tests)
+- **Predictive Engine** — Statistical failure prediction (Poisson MTBF/MTTR), capacity forecasting, SLA achievement probability with trend detection (115 tests)
+- **OpenAPI v1 API** — Structured API with Pydantic models, Swagger UI at /docs, ReDoc at /redoc, endpoints for simulation, compliance, cost analysis (45 tests)
+- **CLI: faultray cost-report** — Rich terminal output with cost breakdown, annual projections, ROI analysis
+- CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md (bilingual EN/JP)
+- py.typed PEP 561 marker
+- .github/dependabot.yml (pip/actions/docker auto-updates)
+- .github/ISSUE_TEMPLATE/ (GitHub Forms: bug report, feature request)
+- GitHub Pages deployment workflow (site/)
+- Landing page integrated into main repo (site/)
+
+### Changed
+- Version: 10.0.0 → 10.2.0
+- Development Status: Beta → Production/Stable
+- pyproject.toml keywords: 7 → 15
+- Homepage URL: github.com → faultray.com
+- Dockerfile: multi-stage build, non-root user, OCI labels, HEALTHCHECK
+- docker-compose.yml: restart policy, start_period
+- CI: Python 3.11/3.12/3.13 matrix, pip cache
+- release.yml: test gate + Docker publish to ghcr.io
+- LICENSE: 2025 → 2025-2026 FaultRay Contributors
+- README: Community section, Enterprise Features, Architecture diagram
+
+### Fixed
+- Flaky test assertions (idempotency_analyzer, cold_start_analyzer, data_sovereignty_analyzer)
+- Removed dead CSS (.hero-title-chaos/proof)
+- Complete infrasim→faultray migration (src/infrasim/ removed)
+- Workflow rename: infrasim-pr-check.yml → faultray-pr-check.yml
+
 ## [10.1.0] - 2026-03-16
 
 ### Added
