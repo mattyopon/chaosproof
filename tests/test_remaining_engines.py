@@ -128,20 +128,24 @@ class TestBacktestEngine:
 
     def test_backtest_perfect_prediction(self):
         from faultray.simulator.backtest_engine import BacktestEngine, RealIncident
+        from faultray.simulator.cascade import CascadeEngine
+        from faultray.simulator.scenarios import Fault, FaultType
 
         graph = _demo_graph()
         engine = BacktestEngine(graph)
 
-        # Get actual affected components
-        affected = graph.get_all_affected("postgres")
-        affected_list = sorted(affected)
+        # Get predicted affected components via CascadeEngine (matches backtest internals)
+        cascade_engine = CascadeEngine(graph)
+        fault = Fault(target_component_id="postgres", fault_type=FaultType.COMPONENT_DOWN, severity=1.0)
+        chain = cascade_engine.simulate_fault(fault)
+        predicted_list = sorted([e.component_id for e in chain.effects])
 
         incidents = [
             RealIncident(
                 incident_id="INC-PERF",
                 timestamp="2024-01-20T10:00:00Z",
                 failed_component="postgres",
-                actual_affected_components=affected_list,
+                actual_affected_components=predicted_list,
                 actual_downtime_minutes=45.0,
                 actual_severity="critical",
             ),
@@ -176,8 +180,8 @@ class TestBacktestEngine:
         assert "avg_precision" in summary
         assert "avg_recall" in summary
         assert "avg_f1" in summary
-        assert len(summary["results"]) == 1
-        assert summary["results"][0]["incident_id"] == "INC-S1"
+        assert len(summary["per_incident"]) == 1
+        assert summary["per_incident"][0]["incident_id"] == "INC-S1"
 
     def test_backtest_summary_empty(self):
         from faultray.simulator.backtest_engine import BacktestEngine
