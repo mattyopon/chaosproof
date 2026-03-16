@@ -10,7 +10,7 @@ class TestSDKVersion:
 
     def test_version_is_10_1_0(self):
         import faultray
-        assert faultray.__version__ == "10.2.0"
+        assert faultray.__version__ == "10.3.0"
 
 
 class TestSDKAllExports:

@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-19%2C757%20passed-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/version-10.2.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-10.3.0-blue.svg)]()
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](Dockerfile)
 [![PyPI](https://img.shields.io/pypi/v/faultray)](https://pypi.org/project/faultray/)
 [![Downloads](https://img.shields.io/pypi/dm/faultray)](https://pypi.org/project/faultray/)
