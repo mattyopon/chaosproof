@@ -64,12 +64,20 @@ The invention provides a computer-implemented system and method comprising:
 
 2. **An automated fault scenario generation engine** that algorithmically generates a comprehensive set of failure scenarios from the topology model, including single-component failures, pairwise combinations, triple failures, component-type-specific faults, traffic spike scenarios at multiple magnitudes, and specialized scenarios based on component semantics (database replication lag, cache stampede, queue backpressure, etc.), producing 2,000 or more distinct scenarios from a typical topology.
 
-3. **A multi-engine simulation architecture** comprising five complementary simulation engines:
+3. **A multi-engine simulation architecture** comprising thirteen complementary simulation engines:
    - A **Cascade Engine** that propagates failure effects through the dependency graph using breadth-first search (BFS), computing severity scores based on impact and spread metrics, and modeling dependency-type-aware propagation (required vs. optional vs. asynchronous dependencies)
    - A **Dynamic Engine** that executes time-stepped simulations with traffic pattern injection, autoscaling response modeling, circuit breaker activation, failover sequence simulation, and latency cascade tracking
    - An **Operations Engine** that simulates multi-day operational scenarios incorporating MTBF/MTTR-based stochastic event generation, deployment events, and gradual degradation patterns
    - A **What-If Engine** that performs parametric sensitivity analysis by varying system parameters (MTTR, MTBF, traffic multipliers, replica counts) and measuring resilience response
    - A **Capacity Engine** that predicts resource saturation points and evaluates high-availability configurations including quorum-based systems
+   - A **Bayesian Network Engine** that computes conditional failure probabilities using Bayes' theorem with dependency-type-based impact factors, enabling probabilistic what-if analysis
+   - A **Markov Chain Engine** that computes steady-state availability using a three-state continuous-time Markov chain (HEALTHY/DEGRADED/DOWN) with transition rates derived from component operational profiles
+   - A **Discrete Event Simulation (DES) Engine** that processes time-stamped events from a priority queue with asynchronous event-driven propagation, providing exact temporal resolution
+   - A **Genetic Algorithm Optimizer** that discovers worst-case failure scenarios through population-based evolutionary search over binary chromosome encodings of simultaneous multi-fault combinations
+   - A **Fault Tree Analysis (FTA) Engine** that performs top-down deductive failure analysis using AND/OR/VOTING gates to compute system failure probability and minimal cut sets
+   - A **Survival Analysis Engine** that estimates remaining useful life using Kaplan-Meier survival curves, Weibull distribution fitting, and hazard function computation
+   - A **Petri Net Engine** that models concurrent failure propagation using Place/Transition nets with reachability analysis and deadlock detection
+   - A **Cellular Automata Engine** that models deterministic failure propagation using threshold-based local rules with pattern classification (stable/oscillating/chaotic)
 
 4. **A multi-layer availability limit model** (the "N-Layer Model") that computes mathematically distinct availability ceilings:
    - **Layer 1 (Software Limit):** Accounts for deployment downtime frequency, human error rate, and configuration drift probability. Computed as: `A_sw = 1 - (deploy_frequency × avg_deploy_downtime / period + human_error_rate + config_drift_rate)`, bounded by the hardware limit.
@@ -1166,6 +1174,382 @@ The ML failure predictor is novel in that it:
 - Operates entirely within the Python standard library, implementing logistic regression, sigmoid activation, and SGD optimization from first principles without external ML framework dependencies.
 - Provides actionable output (risk level, time-to-failure estimate) that enables proactive infrastructure hardening before failures occur.
 
+### 4.31 Bayesian Network Failure Probability
+
+The system provides a Bayesian network engine that computes conditional failure probabilities for each infrastructure component using Bayes' theorem applied to the dependency graph structure. Unlike the deterministic BFS cascade engine described in Section 4.4, which propagates a single failure state through dependency edges, the Bayesian engine computes the *probability* that each component will fail given the observed or hypothesized states of its dependencies, enabling probabilistic what-if analysis without executing a full cascade simulation.
+
+#### 4.31.1 Prior Failure Probability
+
+For each component $c_i$ in the directed graph, a prior failure probability is computed from the component's steady-state unavailability:
+
+$$P(\text{fail}_i) = \left(\frac{\text{MTTR}_i}{\text{MTBF}_i + \text{MTTR}_i}\right)^{r_i}$$
+
+Where $\text{MTBF}_i$ is the mean time between failures in hours, $\text{MTTR}_i$ is the mean time to repair in hours, and $r_i$ is the replica count. The exponentiation by replica count models parallel redundancy under the assumption of independent replica failures: $P(\text{all replicas fail}) = P(\text{single fail})^{r_i}$.
+
+#### 4.31.2 Conditional Impact Computation
+
+For each component $c_i$ and each of its dependencies $c_j$ (components on which $c_i$ depends), the system computes the conditional failure probability $P(\text{fail}_i \mid \text{fail}_j)$ using dependency-type-based impact factors:
+
+$$P(\text{fail}_i \mid \text{fail}_j) = \min\!\left(1.0,\; P(\text{fail}_i) + f(d_{ij}) \cdot (1 - P(\text{fail}_i))\right)$$
+
+Where $f(d_{ij})$ is the impact factor for the dependency type $d_{ij}$ between components $c_i$ and $c_j$:
+
+- `requires` dependency: $f = 0.9$ (near-certain failure propagation)
+- `optional` dependency: $f = 0.3$ (partial impact)
+- `async` dependency: $f = 0.1$ (minimal immediate impact)
+
+This formulation ensures that $P(\text{fail}_i \mid \text{fail}_j) \geq P(\text{fail}_i)$, i.e., a dependency failure never *decreases* the probability of the dependent component's failure.
+
+#### 4.31.3 Posterior Probability with Evidence
+
+The system supports evidence-based querying: given a set of observed component states (healthy, degraded, or down), it computes the updated posterior failure probability for all components. The posterior is computed using the law of total probability across all dependency relationships:
+
+$$P(\text{fail}_i \mid \text{evidence}) = \min\!\left(1.0,\; P(\text{fail}_i) + e_{\max} \cdot (1 - P(\text{fail}_i))\right)$$
+
+Where $e_{\max}$ is the maximum combined effect across all dependencies, incorporating both observed evidence (known-down dependencies contribute their full impact factor) and uncertain evidence (healthy or unknown dependencies contribute their impact factor weighted by their own prior failure probability).
+
+#### 4.31.4 Differentiation from Other Engines
+
+The Bayesian engine is complementary to other simulation engines in the following respects:
+
+- Unlike the **BFS cascade engine** (Section 4.4), which computes deterministic binary outcomes (affected/unaffected), the Bayesian engine produces continuous probability distributions.
+- Unlike the **ABM engine** (Section 4.27), which uses stochastic simulation with fixed probabilistic rules, the Bayesian engine derives probabilities analytically from the graph structure and operational profiles.
+- Unlike the **GNN cascade predictor** (Section 4.29), which learns propagation patterns from training data, the Bayesian engine computes probabilities from first principles using Bayes' theorem without requiring training.
+- Unlike the **ML failure predictor** (Section 4.30), which predicts failure from current resource metrics using logistic regression, the Bayesian engine predicts failure from dependency structure and observed component states.
+
+### 4.32 Markov Chain Availability Model
+
+The system provides a continuous-time Markov chain (CTMC) availability model that computes steady-state availability for each infrastructure component using a three-state Markov process. Unlike the N-Layer Availability Limit Model described in Section 4.9, which computes static availability ceilings from closed-form expressions, the Markov model captures the *dynamic transition behavior* between component health states, including degradation-before-failure paths that the N-Layer model does not represent.
+
+#### 4.32.1 Three-State Model
+
+Each component is modeled as a continuous-time Markov chain with three states:
+
+- **HEALTHY** (state 0): The component is operating normally.
+- **DEGRADED** (state 1): The component is experiencing partial impairment but remains operational.
+- **DOWN** (state 2): The component has failed and is not serving requests.
+
+The state transitions form the following structure:
+
+```
+HEALTHY ←→ DEGRADED → DOWN → HEALTHY
+```
+
+That is:
+- HEALTHY may transition to DEGRADED (gradual degradation) or directly to DOWN (catastrophic failure).
+- DEGRADED may recover to HEALTHY or deteriorate to DOWN.
+- DOWN recovers to HEALTHY (repair).
+
+#### 4.32.2 Transition Rate Parameterization
+
+The transition rates are derived from each component's operational profile:
+
+- **HEALTHY → DEGRADED:** Degradation rate $\lambda_{H \to D}$, derived from the component's degradation profile (memory leak rate, disk fill rate). Components exhibiting resource leaks receive a higher degradation rate (default $0.05$/hour) than stable components (default $0.01$/hour).
+- **HEALTHY → DOWN:** Direct failure rate $\lambda_{H \to \text{DOWN}} = 0.3 / \text{MTBF}$, reflecting catastrophic failures that bypass the degraded state.
+- **DEGRADED → DOWN:** Accelerated failure rate $\lambda_{D \to \text{DOWN}} = 3.0 / \text{MTBF}$, reflecting the increased failure risk of degraded components (three times the base rate).
+- **DEGRADED → HEALTHY:** Recovery rate $\lambda_{D \to H}$, representing automated recovery from degradation (default $0.1$/hour).
+- **DOWN → HEALTHY:** Repair rate $\lambda_{\text{DOWN} \to H} = 1 / \text{MTTR}$.
+
+Rates are converted to discrete-time transition probabilities using the exponential complementary CDF: $P(\text{transition}) = 1 - e^{-\lambda \cdot \Delta t}$, where $\Delta t = 1$ hour.
+
+#### 4.32.3 Steady-State Distribution
+
+The steady-state probability vector $\pi = [\pi_H, \pi_D, \pi_{\text{DOWN}}]$ is computed using the iterative power method:
+
+$$\pi^{(t+1)} = \pi^{(t)} \cdot P$$
+
+Where $P$ is the $3 \times 3$ row-stochastic transition matrix. The iteration continues until convergence: $\|\pi^{(t+1)} - \pi^{(t)}\|_\infty < \epsilon$ (default $\epsilon = 10^{-12}$).
+
+#### 4.32.4 Derived Metrics
+
+From the steady-state distribution, the following metrics are computed:
+
+- **Availability:** $A = \pi_H + \pi_D$ (probability of not being DOWN).
+- **Nines of availability:** $N = -\log_{10}(1 - A)$, expressing availability in the standard "nines" notation.
+- **Mean sojourn time:** For each state $i$, the expected time spent in that state before transitioning: $\bar{T}_i = 1 / (1 - P_{ii})$.
+
+#### 4.32.5 Differentiation from N-Layer Model
+
+The Markov model is complementary to the N-Layer Availability Limit Model (Section 4.9) in the following respects:
+
+- The **N-Layer model** computes static availability ceilings and identifies the binding constraint layer; the **Markov model** computes the dynamic equilibrium availability accounting for state transition paths.
+- The N-Layer model treats each component as binary (available/unavailable); the Markov model explicitly represents the DEGRADED intermediate state.
+- The Markov model captures the effect of degradation rate on availability: components with high degradation rates (e.g., memory leaks) have lower steady-state availability even when their MTBF/MTTR ratio is favorable.
+- The Markov model provides sojourn times, enabling prediction of how long a component is expected to remain in each state — information not available from the N-Layer model.
+
+### 4.33 Discrete Event Simulation (DES) Engine
+
+The system provides a discrete event simulation (DES) engine that models infrastructure failure propagation as a sequence of time-stamped events processed from a priority queue. Unlike the ABM engine described in Section 4.27, which uses synchronous discrete-time steps where all agents update simultaneously, the DES engine processes events asynchronously in strict chronological order, enabling precise modeling of temporal dynamics including propagation delays, timeout-triggered cascades, and MTTR-based recovery timing.
+
+#### 4.33.1 Event Model
+
+Each event in the simulation is a tuple $(t, c, \tau, D)$ where:
+
+- $t$ is the timestamp (simulation time in seconds).
+- $c$ is the target component identifier.
+- $\tau$ is the event type: one of `FAULT` (initial failure injection), `CASCADE` (failure propagation from a dependency), or `RECOVERY` (component restoration).
+- $D$ is an arbitrary metadata dictionary carrying event-specific information (source component, dependency type, reason string, severity).
+
+Events are ordered by timestamp using a min-heap (priority queue), ensuring that the earliest event is always processed first regardless of insertion order.
+
+#### 4.33.2 Event-Driven Processing Loop
+
+The simulation proceeds as follows:
+
+1. **Initialization:** All components are set to HEALTHY. The initial fault is scheduled as a `FAULT` event at $t = 0$.
+2. **Main loop:** The earliest event is popped from the priority queue. If its timestamp exceeds the simulation duration, the simulation terminates. Otherwise, the event is processed according to its type:
+   - **FAULT event:** The target component is set to DOWN. For each component that depends on the target, a `CASCADE` event is scheduled at time $t + \delta$, where the propagation delay $\delta$ is computed as $\max(\text{edge\_latency}, 0.1) + \text{timeout} \times 0.1$. A `RECOVERY` event is scheduled at time $t + \text{MTTR}$.
+   - **CASCADE event:** The target component's state is updated based on dependency type (`requires` → DOWN or DEGRADED based on replica count; `optional` → DEGRADED; `async` → DEGRADED). If the component transitions to DOWN, further cascade events are scheduled for its dependents. A recovery event is scheduled based on MTTR.
+   - **RECOVERY event:** The target component is restored to HEALTHY.
+3. **Termination:** The simulation ends when the event queue is empty or the simulation clock exceeds the configured duration.
+
+#### 4.33.3 Temporal Precision
+
+The DES engine's event-driven paradigm provides temporal precision that is not achievable with the time-stepped approaches used by the Dynamic Engine (Section 4.5, 30-second steps) or the ABM Engine (Section 4.27, 5-second steps):
+
+- Events are processed at their exact scheduled time, not rounded to the nearest time step.
+- Cascade propagation delays reflect actual network latency and timeout configurations, producing realistic time-to-impact estimates.
+- Recovery events fire at the precise MTTR-derived time, enabling accurate modeling of overlapping failure and recovery dynamics.
+
+#### 4.33.4 Severity Computation
+
+The DES engine computes severity using the same formula as the Cascade Engine (Section 4.4.5):
+
+$$\text{severity} = \frac{\text{DOWN} \times 1.0 + \text{OVERLOADED} \times 0.5 + \text{DEGRADED} \times 0.25}{\text{affected}} \times \frac{\text{affected}}{\text{total}} \times 10.0$$
+
+With the same caps applied (single-component ≤ 3.0; spread < 30% ≤ 6.0; degraded-only ≤ 4.0).
+
+#### 4.33.5 Differentiation from Other Engines
+
+- Unlike the **BFS cascade engine** (Section 4.4), which computes a single instantaneous propagation, the DES engine produces a full event timeline with realistic propagation delays.
+- Unlike the **Dynamic Engine** (Section 4.5), which uses fixed-interval time steps, the DES engine processes events at arbitrary time granularity.
+- Unlike the **ABM engine** (Section 4.27), which uses synchronous update (all agents evaluate simultaneously), the DES engine uses asynchronous update (events are processed one at a time in strict chronological order), enabling discovery of timing-dependent failure patterns.
+
+### 4.34 Genetic Algorithm Scenario Optimizer
+
+The system provides a genetic algorithm (GA) optimizer that discovers worst-case failure scenarios through population-based evolutionary search. Unlike the reinforcement learning scenario generator described in Section 4.28, which trains a single agent through sequential trial-and-error episodes, the GA optimizer evolves a *population* of candidate scenarios simultaneously, exploiting crossover between high-fitness individuals to explore the combinatorial failure space more broadly.
+
+#### 4.34.1 Chromosome Encoding
+
+Each candidate scenario is encoded as a binary chromosome (bitstring) of length $N$, where $N$ is the number of components in the infrastructure graph. A `True` at position $i$ indicates that the $i$-th component is injected with a `COMPONENT_DOWN` fault; a `False` indicates no fault. This encoding directly maps the combinatorial failure space ($2^N$ possible scenarios) to the GA's search space.
+
+#### 4.34.2 Fitness Function
+
+The fitness of a chromosome is the total cascade severity produced by simultaneously injecting all flagged faults:
+
+$$\text{fitness}(c) = \min\!\left(10.0,\; \sum_{i : c_i = \text{True}} \text{severity}(\text{cascade}(i))\right)$$
+
+Each fault is individually simulated through the CascadeEngine, and the resulting severities are accumulated, capped at 10.0. Higher fitness indicates greater system damage, steering the GA toward discovering the most impactful failure combinations.
+
+#### 4.34.3 Evolutionary Operators
+
+The GA employs three standard evolutionary operators:
+
+1. **Tournament selection** ($k = 3$): Three individuals are randomly sampled from the population, and the fittest is selected as a parent. This balances selection pressure with diversity preservation.
+
+2. **Single-point crossover:** A random crossover point $p \in [1, N-1]$ is selected. Two parents exchange their chromosome segments at position $p$, producing two offspring that combine failure patterns from both parents.
+
+3. **Bit-flip mutation** (rate = 0.05): Each bit in the offspring chromosome is independently flipped with 5% probability, introducing novel fault combinations not present in either parent.
+
+#### 4.34.4 Evolution Loop
+
+The GA proceeds for a configurable number of generations (default: 100) with a population of configurable size (default: 50):
+
+1. **Initialization:** Random population with ~10% fault density per chromosome.
+2. **Evaluation:** All chromosomes are evaluated via the fitness function.
+3. **Elitism:** The best individual is carried forward unchanged.
+4. **Reproduction:** Remaining slots are filled via tournament selection → crossover → mutation.
+5. **Termination:** The loop ends when the maximum generation count is reached or a chromosome achieves maximum fitness (10.0).
+
+#### 4.34.5 Differentiation from RL Scenario Generator
+
+The GA optimizer is complementary to the RL scenario generator (Section 4.28) in the following respects:
+
+- The **RL agent** explores the scenario space by sequentially injecting faults and observing outcomes, building a Q-table that encodes value estimates for individual (state, action) pairs. The **GA** evolves a *population* of complete scenarios simultaneously, exploiting crossover to combine partial solutions that may never be discovered by sequential exploration.
+- The RL agent discovers *sequential* multi-step attack strategies; the GA discovers *simultaneous* multi-fault combinations that cause maximum damage when all faults occur at once.
+- The GA uses the Cascade Engine as a black-box fitness oracle, while the RL agent uses it as an environment transition function — a philosophical difference in how the simulation engine is coupled to the search process.
+- The GA produces a single best scenario (the highest-fitness chromosome) plus generation-level fitness history; the RL agent produces a reusable Q-table policy.
+
+### 4.35 Fault Tree Analysis (FTA)
+
+The system provides a Fault Tree Analysis (FTA) engine that performs top-down deductive failure analysis on the infrastructure dependency graph. Unlike the FMEA engine described in Section 4.20, which performs a *bottom-up* inductive analysis (enumerating failure modes per component and computing their risk priority numbers), the FTA engine starts from a *top event* (system failure) and deductively decomposes it into combinations of basic events (individual component failures) through Boolean logic gates.
+
+#### 4.35.1 Fault Tree Construction
+
+The Fault Tree is constructed from the infrastructure directed graph by walking the dependency structure:
+
+- **Root node (top event):** Represents system failure. The root is an OR gate over all entry-point components (components with no dependents), reflecting the fact that the failure of any user-facing entry point constitutes a system-level failure.
+- **Intermediate nodes:** Each component with required dependencies generates a subtree. Components with single instances yield an **OR gate** (any single dependency failure impacts the component). Components with multiple replicas yield a **VOTING gate** ($k$-of-$n$, where $k$ failures out of $n$ dependencies are required to cause failure).
+- **Leaf nodes (basic events):** Components with no further required dependencies. Each leaf carries a base failure probability derived from its MTBF: $P(\text{fail}) = 1 - e^{-1/\text{MTBF}}$ (probability of failure within a one-hour window).
+
+Optional dependencies are excluded from the fault tree, as they do not contribute to the critical failure path.
+
+#### 4.35.2 Probability Computation
+
+The top-event probability is computed bottom-up through the tree:
+
+- **OR gate:** $P(\text{OR}) = 1 - \prod_{i}(1 - P_i)$ (at least one child fails).
+- **AND gate:** $P(\text{AND}) = \prod_{i} P_i$ (all children fail).
+- **VOTING gate** ($k$-of-$n$): $P(k\text{-of-}n) = \sum_{r=k}^{n} \sum_{C \in \binom{[n]}{r}} \prod_{i \in C} P_i \prod_{j \notin C} (1 - P_j)$.
+
+#### 4.35.3 Minimal Cut Sets
+
+A *cut set* is a set of basic events (leaf component failures) whose simultaneous occurrence causes the top event. A *minimal cut set* has no proper subset that is also a cut set. The FTA engine computes minimal cut sets by:
+
+- **OR gate:** The union of all children's cut sets.
+- **AND gate:** The Cartesian product of children's cut sets.
+- **VOTING gate:** The union of Cartesian products over all $\binom{n}{k}$ combinations of $k$ children.
+
+Non-minimal cut sets (supersets of other cut sets) are removed in a post-processing step.
+
+#### 4.35.4 Critical Component Ranking
+
+Components are ranked by criticality based on the number of minimal cut sets in which they appear. Components appearing in more minimal cut sets represent higher-leverage points for reliability improvement, as hardening a single such component eliminates multiple failure paths simultaneously.
+
+#### 4.35.5 Differentiation from FMEA and Cascade Engine
+
+- The **FMEA engine** (Section 4.20) is *bottom-up inductive*: it enumerates failure modes per component and computes RPN scores. The **FTA engine** is *top-down deductive*: it starts from the system failure event and decomposes it into contributing causes.
+- The **Cascade Engine** (Section 4.4) computes how a specific fault propagates forward through the graph. The FTA engine computes which *combinations* of basic component failures can cause a system-level failure event — a backward analysis.
+- Minimal cut sets from FTA directly identify the smallest sets of component failures that would bring down the system, providing actionable input for redundancy planning.
+
+### 4.36 Survival Analysis
+
+The system provides a survival analysis engine that estimates the remaining useful life of each infrastructure component using classical statistical methods adapted from reliability engineering. Unlike the ML failure predictor described in Section 4.30, which uses logistic regression trained on synthetic data to estimate failure probability from current metrics, the survival analysis engine applies non-parametric (Kaplan-Meier) and parametric (Weibull distribution) statistical techniques to model the time-to-failure distribution, producing survival curves, hazard functions, and remaining-life predictions grounded in established statistical theory.
+
+#### 4.36.1 Kaplan-Meier Survival Estimation
+
+For each component, the engine generates synthetic failure-time observations from the component's MTBF using the inverse CDF of the exponential distribution:
+
+$$t_k = -\text{MTBF} \cdot \ln\!\left(1 - \frac{k}{n+1}\right), \quad k = 1, \ldots, n$$
+
+The Kaplan-Meier estimator computes the survival function $S(t)$ — the probability of surviving beyond time $t$:
+
+$$S(t) = \prod_{t_i \leq t} \left(1 - \frac{d_i}{n_i}\right)$$
+
+Where $d_i$ is the number of failures at time $t_i$ and $n_i$ is the number of components at risk just before $t_i$. The last observation is treated as right-censored (still operational), following standard survival analysis practice.
+
+#### 4.36.2 Weibull Distribution Fitting
+
+The engine fits a two-parameter Weibull distribution to observed failure times using a simplified maximum likelihood estimation:
+
+- **Scale parameter** ($\lambda$): Derived from the mean failure time via $\lambda = \bar{t} / \Gamma(1 + 1/k)$.
+- **Shape parameter** ($k$): Estimated from the coefficient of variation via $k \approx 1.2 / \text{CV}$, bounded to $[0.5, 5.0]$.
+
+The shape parameter characterizes the failure behavior:
+- $k < 1$: Infant mortality (decreasing hazard rate).
+- $k = 1$: Random failures (constant hazard, equivalent to exponential distribution).
+- $k > 1$: Wear-out (increasing hazard rate — typical of aging infrastructure).
+
+#### 4.36.3 Hazard Function
+
+The Weibull hazard function (instantaneous failure rate) at time $t$ is:
+
+$$h(t) = \frac{k}{\lambda} \left(\frac{t}{\lambda}\right)^{k-1}$$
+
+This provides the instantaneous risk of failure at any given point in time, enabling identification of components entering the wear-out phase ($h(t)$ increasing over time).
+
+#### 4.36.4 Remaining Useful Life Prediction
+
+For each component, the engine predicts remaining useful life by computing an effective MTBF adjusted for current operational stress:
+
+$$\text{MTBF}_{\text{eff}} = \frac{\text{MTBF}}{\text{stress} \times \text{degrade}}$$
+
+Where:
+- $\text{stress} = 1 + (\text{utilization} / 100) \times 2$, modeling the life-shortening effect of high resource utilization (up to 3× acceleration at 100% utilization).
+- $\text{degrade}$ accounts for active degradation patterns (memory leaks approaching OOM, disk fill approaching capacity).
+
+The predicted remaining life is $\text{MTBF}_{\text{eff}} \times \Gamma(1 + 1/k)$ hours, where $k = 1.5$ (wear-out assumption).
+
+#### 4.36.5 Differentiation from ML Failure Predictor
+
+- The **ML failure predictor** (Section 4.30) uses logistic regression trained on synthetic data, outputting a binary failure probability and categorical risk level. The **survival analysis engine** provides continuous survival curves, hazard functions, and quantitative remaining-life estimates in hours.
+- The ML predictor relies on current metric snapshots; survival analysis incorporates the full time-to-failure distribution.
+- Survival analysis is a well-established statistical methodology (Kaplan & Meier, 1958; Weibull, 1951) with known properties and confidence interval theory, providing a principled complement to the ML predictor's data-driven approach.
+
+### 4.37 Petri Net Modeling
+
+The system provides a Petri Net modeling engine that represents the infrastructure as a formal Place/Transition net, enabling reachability analysis and deadlock detection. Unlike the DES engine described in Section 4.33, which models failures as discrete events processed from a priority queue, the Petri Net engine models the *concurrency structure* of the system explicitly through token flow, enabling formal verification of properties such as reachability, liveness, and deadlock freedom that event-based simulation cannot guarantee.
+
+#### 4.37.1 Place/Transition Net Construction
+
+The infrastructure directed graph is automatically converted into a Petri Net:
+
+- **Places:** Each component $c_i$ generates three places: `{c_i}_healthy` (initial token count = 1), `{c_i}_degraded` (initial token count = 0), and `{c_i}_down` (initial token count = 0). The token in `{c_i}_healthy` represents the component's initial operational state. The conservation of one token per component across its three places ensures that a component is in exactly one state at any time.
+
+- **Transitions:** Dependency edges generate transitions that model failure propagation:
+  - For `requires` dependencies: Two transitions — (1) `cascade_degrade` fires when the dependency is DOWN and the dependent is HEALTHY, moving the dependent to DEGRADED; (2) `cascade_down` fires when the dependency is DOWN and the dependent is already DEGRADED, moving the dependent to DOWN.
+  - For `optional` dependencies: One `opt_degrade` transition that moves the dependent from HEALTHY to DEGRADED when the dependency is DOWN.
+  - For `async` dependencies: One `async_degrade` transition with the same topology as optional.
+  - For each component: A `recovery` transition that moves the component from DOWN back to HEALTHY.
+
+- **Token semantics:** The dependency's DOWN place serves as both an input and output of cascade transitions (self-loop), ensuring that the dependency remains DOWN while enabling the transition to fire — modeling the persistent effect of an upstream failure.
+
+#### 4.37.2 Simulation
+
+The Petri Net simulation proceeds by repeatedly finding and firing enabled transitions:
+
+1. **Fault injection:** The initial marking is overridden to set a target component's `_healthy` place to 0 tokens and its `_down` place to 1 token.
+2. **Firing loop:** At each step, all enabled transitions (transitions whose input places all have at least one token) are identified. The first enabled transition is fired deterministically. Firing consumes one token from each input place and produces one token in each output place.
+3. **Termination:** The simulation terminates when no transitions are enabled (deadlock), when the marking has been previously visited (cycle detection), or when the maximum step count is reached.
+
+#### 4.37.3 Reachability Analysis
+
+The engine performs full reachability analysis via BFS over the state space:
+
+Starting from the current marking, all possible transition firings are explored. Each unique marking (state) is recorded. The exploration continues until all reachable markings have been visited or a safety cap (default: 10,000 states) is reached.
+
+The reachable state set enables:
+- **Deadlock detection:** A reachable state with no enabled transitions is a deadlock — indicating a failure mode from which the system cannot recover without external intervention.
+- **Safety property verification:** Checking whether any reachable state violates safety constraints (e.g., "no state exists where all database replicas are simultaneously DOWN").
+
+#### 4.37.4 Differentiation from DES and ABM Engines
+
+- The **DES engine** (Section 4.33) processes events asynchronously; the **Petri Net engine** models concurrency explicitly through token flow and transition enablement.
+- The **ABM engine** (Section 4.27) uses probabilistic rules; the Petri Net engine is fully deterministic given the initial marking.
+- The Petri Net formalism enables formal verification (reachability analysis, deadlock detection) that is not possible with event-based or agent-based simulation approaches.
+- The Petri Net's state space is finite and enumerable, enabling exhaustive analysis of all possible system behaviors from a given initial condition.
+
+### 4.38 Cellular Automata Failure Propagation
+
+The system provides a cellular automata (CA) engine that models failure propagation using deterministic local rules applied synchronously across all infrastructure components. Unlike the ABM engine described in Section 4.27, which uses *probabilistic* rules where the cascade probability depends on the fraction of unhealthy neighbors, the CA engine uses *deterministic* threshold rules where state transitions are entirely determined by the count of neighbors in each state, producing fully reproducible results suitable for formal analysis and pattern classification.
+
+#### 4.38.1 Grid Construction
+
+The CA grid is derived from the infrastructure dependency graph, where each component is a *cell* and the neighbor set of each cell comprises both upstream dependencies and downstream dependents (bidirectional adjacency). This contrasts with the ABM engine, which also considers bidirectional dependencies but applies weighted probabilistic rules; the CA engine applies unweighted deterministic threshold rules.
+
+#### 4.38.2 Deterministic Transition Rules
+
+Each cell occupies one of four states, ordered by severity: `HEALTHY` (0) < `DEGRADED` (1) < `OVERLOADED` (2) < `DOWN` (3). On each generation, all cells update simultaneously according to the following deterministic rules (evaluated in priority order):
+
+1. **DOWN is absorbing:** A cell in DOWN state remains DOWN (no recovery within the simulation).
+2. **Rule 1:** If $\geq 2$ neighbors are DOWN → cell becomes DOWN (overwhelming failure pressure).
+3. **Rule 2:** If $\geq 1$ neighbor is DOWN → cell becomes at least DEGRADED. If the cell is already OVERLOADED or worse, it becomes DOWN.
+4. **Rule 3:** If $\geq 3$ neighbors are DEGRADED → cell becomes at least OVERLOADED (cumulative degradation pressure).
+5. **Rule 4:** If $\geq 2$ neighbors are OVERLOADED → cell becomes at least OVERLOADED.
+6. **Default:** Cell retains its current state.
+
+The `max` operator ensures monotonicity: a cell's state never improves during the simulation (states can only worsen or stay the same).
+
+#### 4.38.3 Pattern Classification
+
+After simulation, the engine classifies the observed dynamic into one of three categories:
+
+- **Stable:** The grid converged (last two generation snapshots are identical). This indicates that the failure has reached a fixed point — all affected components have settled into their final states.
+- **Oscillating:** The grid exhibits a repeating cycle of length 2-5. This indicates sustained oscillation in the failure dynamics, analogous to flapping health checks or retry-recovery loops in real infrastructure.
+- **Chaotic:** No convergence or repeating pattern is detected within the simulation horizon. This indicates complex, unpredictable failure dynamics.
+
+This classification is inspired by Wolfram's classification of one-dimensional cellular automata (Classes I-IV) adapted to infrastructure failure dynamics.
+
+#### 4.38.4 Differentiation from ABM Engine
+
+The CA engine is complementary to the ABM engine (Section 4.27) in the following respects:
+
+- The **ABM engine** uses *probabilistic* rules: the probability of cascading depends on the ratio of unhealthy neighbors to total neighbors, introducing stochastic variation. The **CA engine** uses *deterministic threshold* rules: the outcome depends solely on the *count* of neighbors in each state, producing identical results on every run.
+- The ABM engine requires multiple runs for statistical significance; a single CA run is sufficient for deterministic analysis.
+- The CA engine's deterministic nature enables formal analysis: the exact conditions under which a failure propagates to a given component can be stated as a logical formula over neighbor state counts.
+- The CA engine's pattern classification (stable/oscillating/chaotic) provides qualitative insight into failure dynamics that the ABM engine does not produce.
+- Both engines use synchronous update (all cells/agents evaluate simultaneously from a snapshot), but they differ in whether the transition function is deterministic (CA) or stochastic (ABM).
+
 ## 5. ALTERNATIVE EMBODIMENTS AND EXTENSIONS
 
 ### 5.1 Machine Learning-Enhanced Scenario Generation
@@ -1372,6 +1756,54 @@ In an alternative embodiment, the system continuously compares simulation predic
 - (c) predicts, for each component, a failure probability, a categorical risk level (critical, high, medium, or low), and an estimated time to failure derived from the current utilization trajectory; and
 - (d) generates an infrastructure-wide prediction report ranking all components by failure probability to enable proactive infrastructure hardening before failures occur.
 
+**Claim 35.** The method of Claim 1, further comprising a Bayesian network failure probability analysis method that:
+- (a) computes, for each component in the directed graph, a prior failure probability from the component's mean time between failures and mean time to repair, adjusted for parallel redundancy by exponentiating by the replica count;
+- (b) computes, for each dependency relationship, a conditional failure probability using Bayes' theorem with dependency-type-based impact factors, wherein `requires` dependencies carry a near-unity impact factor, `optional` dependencies carry a reduced impact factor, and `async` dependencies carry a minimal impact factor;
+- (c) computes posterior failure probabilities for all components given a set of observed component states as evidence, using the law of total probability across all dependency relationships; and
+- (d) identifies the most critical dependency for each component as the dependency whose failure produces the highest conditional failure probability increase, enabling targeted redundancy planning.
+
+**Claim 36.** The method of Claim 1, further comprising a Markov chain availability analysis method that:
+- (a) models each infrastructure component as a three-state continuous-time Markov chain with states HEALTHY, DEGRADED, and DOWN, wherein transition rates between states are derived from the component's MTBF, MTTR, and degradation profile (memory leak rate, disk fill rate);
+- (b) constructs a row-stochastic transition matrix by converting continuous-time rates to discrete-time probabilities using the exponential complementary CDF;
+- (c) computes the steady-state probability distribution using the iterative power method; and
+- (d) derives per-component availability, nines of availability, and mean sojourn time in each state, capturing the dynamic transition behavior between health states including degradation-before-failure paths that static availability models do not represent.
+
+**Claim 37.** The method of Claim 1, further comprising a discrete event simulation (DES) engine that:
+- (a) models infrastructure failure propagation as a sequence of time-stamped events including fault injection, cascade propagation, and recovery events, each carrying a timestamp, target component, event type, and metadata;
+- (b) processes events asynchronously from a min-heap priority queue in strict chronological order, wherein cascade events are scheduled with propagation delays derived from actual network latency and timeout configurations, and recovery events are scheduled at MTTR-derived times;
+- (c) produces a complete event timeline with exact temporal resolution, enabling precise modeling of overlapping failure and recovery dynamics that fixed-interval time-stepped simulation approaches cannot capture; and
+- (d) computes cascade severity from the final component state distribution, providing both temporal dynamics and quantitative impact assessment from a single simulation run.
+
+**Claim 38.** The method of Claim 1, further comprising a genetic algorithm scenario optimization method that:
+- (a) encodes each candidate failure scenario as a binary chromosome of length $N$ (where $N$ is the number of infrastructure components), wherein each bit indicates whether the corresponding component is injected with a failure fault;
+- (b) evaluates the fitness of each chromosome as the total cascade severity produced by simultaneously injecting all flagged faults through the cascade simulation engine;
+- (c) evolves a population of chromosomes over successive generations using tournament selection, single-point crossover, and bit-flip mutation operators; and
+- (d) discovers worst-case simultaneous multi-fault combinations through population-based search, complementing the reinforcement learning scenario generator's sequential fault-injection approach with parallel exploration of the combinatorial failure space.
+
+**Claim 39.** The method of Claim 1, further comprising a Fault Tree Analysis (FTA) method that:
+- (a) constructs a Fault Tree from the infrastructure directed graph by top-down deductive decomposition, wherein the root node represents system failure, intermediate nodes carry Boolean logic gates (OR for single-instance components, VOTING for replicated components), and leaf nodes represent individual component failures with base probabilities derived from MTBF;
+- (b) computes the top-event (system failure) probability by bottom-up evaluation through OR gates using $P = 1 - \prod(1 - P_i)$, AND gates using $P = \prod P_i$, and VOTING gates using combinatorial probability over $k$-of-$n$ failure subsets;
+- (c) computes minimal cut sets — the smallest combinations of basic component failures that cause system failure — by recursive set operations through the tree, followed by removal of non-minimal supersets; and
+- (d) ranks components by criticality based on minimal cut set membership frequency, identifying the highest-leverage points for reliability improvement.
+
+**Claim 40.** The method of Claim 1, further comprising a survival analysis method for infrastructure component lifetime estimation that:
+- (a) generates synthetic failure-time observations from each component's MTBF using the inverse CDF of the exponential distribution and computes a Kaplan-Meier survival curve $S(t) = \prod_{t_i \leq t}(1 - d_i/n_i)$ with right-censoring of the last observation;
+- (b) fits a two-parameter Weibull distribution to observed failure times, estimating the shape parameter from the coefficient of variation and the scale parameter from the mean failure time, wherein the shape parameter characterizes the failure regime (infant mortality, random, or wear-out);
+- (c) computes the Weibull hazard function $h(t) = (k/\lambda)(t/\lambda)^{k-1}$ to determine the instantaneous failure rate at any given time; and
+- (d) predicts remaining useful life for each component by adjusting the effective MTBF for current utilization stress and active degradation patterns (memory leaks, disk fill rate), providing quantitative time-to-failure estimates grounded in established survival analysis theory.
+
+**Claim 41.** The method of Claim 1, further comprising a Petri Net modeling method for concurrent failure analysis that:
+- (a) converts the infrastructure directed graph into a Place/Transition Petri Net, wherein each component generates three places (healthy, degraded, down) with initial token placement reflecting operational state, and each dependency edge generates transitions that propagate failure states through token consumption and production;
+- (b) simulates failure propagation by iteratively firing enabled transitions (transitions whose input places all contain at least one token) according to deterministic priority, consuming tokens from input places and producing tokens in output places;
+- (c) performs reachability analysis via breadth-first search over the state space (set of all reachable markings), detecting deadlock states (markings with no enabled transitions) that represent irrecoverable failure modes; and
+- (d) enables formal verification of safety properties — such as "no reachable state exists where all database replicas are simultaneously DOWN" — through exhaustive state space enumeration, providing guarantees that simulation-based approaches cannot offer.
+
+**Claim 42.** The method of Claim 1, further comprising a cellular automata failure propagation method that:
+- (a) models each infrastructure component as a cell in a grid defined by the bidirectional adjacency structure of the dependency graph, wherein the neighbor set of each cell comprises both upstream dependencies and downstream dependents;
+- (b) applies deterministic threshold transition rules synchronously across all cells on each generation, wherein: two or more DOWN neighbors cause the cell to become DOWN; one or more DOWN neighbors cause the cell to become at least DEGRADED; three or more DEGRADED neighbors cause the cell to become OVERLOADED; and the DOWN state is absorbing;
+- (c) classifies the observed failure propagation dynamics as stable (convergent), oscillating (repeating cycle of length 2-5), or chaotic (no detected pattern), providing qualitative characterization of failure behavior; and
+- (d) produces fully deterministic, reproducible results suitable for formal analysis, complementing the agent-based model's stochastic approach with a deterministic counterpart that identifies the exact conditions under which failures propagate.
+
 ---
 
 ## APPENDIX A: Implementation Reference
@@ -1413,6 +1845,14 @@ Key implementation files corresponding to the described components:
 - RL Scenario Generator: `src/faultray/simulator/rl_scenario_generator.py` (RLScenarioGenerator class — Q-learning agent, ε-greedy exploration, greedy policy replay, top-K scenario extraction)
 - GNN Cascade Predictor: `src/faultray/simulator/gnn_engine.py` (GNNCascadePredictor class — MPNN architecture, self-supervised training from CascadeEngine, per-node failure probability prediction)
 - ML Failure Predictor: `src/faultray/simulator/ml_failure_predictor.py` (MLFailurePredictor class — logistic regression, synthetic training data generation, risk-level classification, time-to-failure estimation)
+- Bayesian Network Engine: `src/faultray/simulator/bayesian_model.py` (BayesianEngine class — conditional failure probability computation, prior/posterior analysis, evidence-based querying, dependency-type-based impact factors)
+- Markov Chain Availability Model: `src/faultray/simulator/markov_model.py` (compute_markov_availability function, compute_system_markov function — three-state CTMC, steady-state distribution via power method, availability nines computation)
+- DES Engine: `src/faultray/simulator/des_engine.py` (DESEngine class — event priority queue, asynchronous event processing, cascade/recovery event scheduling, temporal event timeline)
+- GA Scenario Optimizer: `src/faultray/simulator/ga_scenario_optimizer.py` (GAOptimizer class — binary chromosome encoding, tournament selection, single-point crossover, bit-flip mutation, population-based worst-case scenario discovery)
+- Fault Tree Engine: `src/faultray/simulator/fault_tree_engine.py` (FaultTreeEngine class — top-down fault tree construction, OR/AND/VOTING gate probability computation, minimal cut set extraction, critical component ranking)
+- Survival Analysis Engine: `src/faultray/simulator/survival_engine.py` (SurvivalEngine class — Kaplan-Meier estimation, Weibull distribution fitting, hazard function computation, remaining useful life prediction)
+- Petri Net Engine: `src/faultray/simulator/petri_net_engine.py` (PetriNetEngine class — Place/Transition net construction, token-based simulation, reachability analysis via BFS, deadlock detection)
+- Cellular Automata Engine: `src/faultray/simulator/cellular_automata_engine.py` (CAEngine class — deterministic threshold rules, synchronous grid update, pattern classification as stable/oscillating/chaotic)
 
 ---
 
