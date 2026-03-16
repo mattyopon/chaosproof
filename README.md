@@ -115,6 +115,7 @@ CRITICAL FINDINGS
 | :globe_with_meridians: | **Terraform Integration** | Import from tfstate/plan with change impact analysis |
 | :desktop_computer: | **Web Dashboard** | D3.js interactive graph + Grafana-style dashboard |
 | :mag: | **Multiple Discovery** | Local scan, Prometheus, Terraform, YAML |
+| :moneybag: | **Cost Impact Engine** | Quantify downtime costs, SLA penalties, and ROI of resilience improvements |
 
 ---
 
@@ -576,6 +577,7 @@ FaultRayは、純粋な数学的シミュレーションによるゼロリスク
 - **2,000+シナリオ** — 30カテゴリの障害シナリオをトポロジーから自動生成
 - **Terraform統合** — tfstateインポート、tfplanの影響分析
 - **セキュリティフィード** — CVE/NVD/CISAからシナリオを自動生成
+- **コスト影響エンジン** — ダウンタイムコスト、SLAペナルティ、改善ROIを定量化
 
 ### クイックスタート
 
