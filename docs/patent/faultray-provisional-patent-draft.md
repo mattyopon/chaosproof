@@ -2563,6 +2563,137 @@ The system provides a temporal unified view pipeline that combines current-state
 
 A `TemporalResult` containing: current severity, current resilience score, trend direction (improving/stable/degrading) with change magnitude, forecast values with confidence intervals, and an overall temporal status classification.
 
+### 4.78 Observability Platform Integration (Datadog)
+
+The system provides a bi-directional integration pipeline with observability platforms (exemplified by Datadog) that transforms passive monitoring data into proactive resilience intelligence. Unlike conventional integrations that merely forward alerts or display dashboards, this integration establishes a continuous "Observability-to-Predictability" pipeline wherein real-time infrastructure metrics are automatically consumed, translated into simulation model state, and used to trigger predictive cascade analysis without human intervention.
+
+#### 4.78.1 Continuous Metrics-Driven Simulation Pipeline
+
+The integration operates as a four-stage closed-loop pipeline:
+
+1. **Pull:** The system periodically queries the external observability platform's Metrics API (e.g., Datadog Metrics API v2) to retrieve real-time infrastructure metrics including CPU utilization, memory consumption, disk usage, and custom application metrics for all monitored hosts and services within a configurable time window.
+2. **Map:** Retrieved metric series are automatically mapped to the corresponding `ResourceMetrics` fields of components in the in-memory `InfraGraph` topology model. The mapping engine resolves external host identifiers (e.g., Datadog scope tags such as `host:web-1`) to internal graph component identifiers through multi-strategy matching against component name, host attribute, and unique identifier. Fractional metrics (0.0-1.0 scale) are automatically normalized to percentage scale (0-100) for consistency with the simulation model's internal representation.
+3. **Simulate:** Upon completion of the metric-to-graph mapping, the system automatically invokes the full simulation pipeline — including the CascadeEngine (Section 4.3), the Financial Risk Engine (Section 4.11), and any additional configured analysis engines — on the updated graph state, producing a comprehensive `SimulationReport` with resilience scores, cascade predictions, critical findings, and warnings.
+4. **Push:** Simulation results are automatically transmitted back to the observability platform as both custom metrics (e.g., `faultray.resilience_score`, `faultray.critical_findings`, `faultray.warnings`) and structured events. When critical cascade risks are detected (i.e., the number of critical findings exceeds zero), the system generates an event with severity classification and detailed cascade analysis, enabling the observability platform's native alerting and escalation mechanisms to act on predictive intelligence.
+
+#### 4.78.2 Continuous Polling and Real-Time Resilience Monitoring
+
+The pipeline supports continuous polling operation at configurable intervals, establishing a persistent monitoring loop that automatically detects infrastructure state changes and produces updated resilience predictions. Each polling cycle executes the complete pull-map-simulate-push sequence, ensuring that resilience scores and failure predictions remain current with the actual infrastructure state. This continuous operation transforms the observability platform from a reactive monitoring tool into a predictive resilience management system.
+
+#### 4.78.3 Dashboard Export
+
+The system generates observability platform-native dashboard widget definitions (e.g., Datadog Dashboard API JSON) containing pre-configured visualizations for resilience score trend lines, critical finding counters with conditional formatting, and event streams filtered to FaultRay predictions, enabling seamless integration into existing operational dashboards.
+
+### 4.79 Incident Management Integration (PagerDuty)
+
+The system provides an incident-triggered cascade analysis integration with incident management platforms (exemplified by PagerDuty) that automatically transforms incoming incident notifications into comprehensive blast radius assessments, financial impact estimates, and auto-generated runbook documents. The inventive aspect lies not in the incident reception itself, but in the automatic invocation of the simulation engine pipeline upon incident arrival to provide enrichment data that no incident management platform can generate independently.
+
+#### 4.79.1 Incident-to-Cascade Pipeline
+
+When an incident webhook payload is received (supporting both V2 `event.data` and V3 generic webhook formats), the system executes the following pipeline:
+
+1. **Parse:** The system extracts incident metadata (identifier, title, urgency/severity, service name) from the webhook payload using a multi-format parser that accommodates varying webhook structures.
+2. **Resolve:** The system maps the incident's affected service to a specific component in the `InfraGraph` through multi-strategy resolution: (a) matching the PagerDuty service name against component names and identifiers, (b) inspecting custom details fields for explicit component identifier references, and (c) scanning the incident title for component name or identifier substrings.
+3. **Cascade:** The `CascadeEngine` (Section 4.3) is automatically invoked with a fault injected at the resolved component, computing the full downstream blast radius — i.e., which additional components transition to DOWN, DEGRADED, or OVERLOADED states as a consequence of the incident.
+4. **Cost:** For each affected component in the cascade chain, the system computes the estimated financial impact by multiplying the component's configured revenue-per-minute rate by the estimated downtime duration (derived from the component's MTTR operational profile), producing a total cost impact in currency units.
+5. **Enrich:** The computed blast radius, financial impact, affected component list, severity assessment, and resolution recommendations are automatically posted back to the incident management platform as enrichment notes via the platform's REST API, augmenting the incident record with predictive intelligence.
+
+#### 4.79.2 Runbook Auto-Generation
+
+Upon cascade analysis completion, the system automatically generates a structured Markdown runbook document containing: incident metadata, blast radius summary, cost impact estimate, enumerated affected components with identifiers, prioritized resolution steps (derived from component failover, autoscaling, and replica configurations), cascade chain details with per-component health status and causation reasoning, and a verification checklist for confirming resolution.
+
+#### 4.79.3 Resolution Recommendation Engine
+
+The system generates prioritized resolution recommendations by analyzing the cascade chain and component configurations:
+- If the root-cause component has failover enabled, a failover trigger recommendation is generated with the expected promotion time.
+- If autoscaling is enabled, a recommendation to verify autoscaling activation is generated with minimum and maximum replica bounds.
+- If the component has multiple replicas, a recommendation to inspect surviving replica health is generated.
+- For downstream components in DEGRADED or OVERLOADED state, a monitoring recommendation is generated.
+- Dependency edges lacking circuit breakers are identified, and circuit breaker addition recommendations are generated.
+
+### 4.80 AI Operations Platform Integration (Dynatrace)
+
+The system provides a topology-aware integration with AI operations platforms (exemplified by Dynatrace) that converts auto-discovered production topology into the simulation model's graph representation, enabling predictive analysis on infrastructure that was previously only passively monitored. The inventive aspect is the bidirectional conversion between an external topology representation (Smartscape) and the simulation engine's `InfraGraph`, combined with the export of simulation predictions in a format consumable by the external platform's AI engine (Davis AI).
+
+#### 4.80.1 Smartscape-to-InfraGraph Conversion
+
+The system queries the external platform's Entity API (e.g., Dynatrace Environment API v2) to retrieve the complete auto-discovered topology, including entities of type HOST, SERVICE, PROCESS_GROUP, APPLICATION, and DATABASE, along with their properties and inter-entity relationships. The conversion pipeline:
+
+1. **Entity Mapping:** Each external entity is converted to an `InfraGraph` `Component` with the entity's identifier, display name, and a component type determined by a configurable type mapping (e.g., HOST → APP_SERVER, SERVICE → WEB_SERVER, entities with database vendor properties → DATABASE).
+2. **Relationship Mapping:** External entity relationships (e.g., `isNetworkClientOfHost`, `calls`, `runsOn`) are converted to `Dependency` edges in the `InfraGraph`, preserving the directional dependency semantics required by the `CascadeEngine`.
+3. **Metric Calibration:** The system queries the external platform's Metrics API (e.g., Dynatrace Metrics API v2) for entity-level metrics (CPU usage, memory usage, disk usage) and applies them to the corresponding `ResourceMetrics` of the converted components, calibrating the simulation model with actual infrastructure state.
+
+#### 4.80.2 Simulation-to-AI-Ops Export
+
+After executing the simulation pipeline on the converted graph, the system exports results in a format compatible with the external platform's AI engine:
+
+- **Predictions:** Each critical or warning simulation result is exported as a structured prediction object containing title, severity classification (CRITICAL/WARNING), risk score, list of affected entity identifiers, description, and cascade trigger.
+- **Topology Risks:** Components identified as single points of failure (single replica with one or more dependents) are exported as topology risk objects with entity identifiers, risk type classification, dependent count, and redundancy recommendations.
+- **Problems API:** Failure predictions exceeding a configurable severity threshold are automatically submitted to the external platform's Problems/Events API (e.g., Dynatrace Events Ingest API v2) as custom alert events, enabling the platform's native AI-driven correlation and root cause analysis to incorporate simulation-derived predictions.
+
+### 4.81 Security Vulnerability Impact Integration (Snyk)
+
+The system provides a vulnerability-to-infrastructure-impact integration with security scanning platforms (exemplified by Snyk) that converts abstract CVE vulnerability data into concrete infrastructure failure scenarios, simulates their cascading impact, and re-prioritizes vulnerabilities based on actual business impact rather than generic CVSS severity scores. The inventive aspect is the automated conversion of security vulnerability data into simulation-executable failure scenarios and the subsequent business-impact-based re-ranking that supersedes traditional CVSS-only prioritization.
+
+#### 4.81.1 CVE-to-Scenario Conversion
+
+The system retrieves vulnerability data from the security platform's API (e.g., Snyk API v1) and converts each vulnerability into one or more executable fault scenarios:
+
+1. **Severity Mapping:** Vulnerability severity levels are mapped to specific fault types: critical → COMPONENT_DOWN (complete compromise), high → CPU_SATURATION (resource exhaustion attack), medium/low → LATENCY_SPIKE (degraded performance).
+2. **Target Resolution:** For each vulnerability, the system identifies affected components through: (a) matching the vulnerable package name against component tags, (b) matching against component names, (c) for web framework vulnerabilities (express, flask, django, etc.), targeting all WEB_SERVER and APP_SERVER components, and (d) as a fallback, targeting all components.
+3. **Scenario Generation:** For each (vulnerability, target component) pair, the system generates a `Scenario` containing a `Fault` with the mapped fault type, a severity proportional to the CVSS score (normalized to 0.0-1.0), and metadata linking back to the original vulnerability identifier and package information.
+
+#### 4.81.2 Multi-Engine Impact Simulation
+
+The generated scenarios are executed through a combined simulation pipeline:
+
+1. **Cascade Analysis:** The `CascadeEngine` (Section 4.3) computes the blast radius for each vulnerability exploitation scenario.
+2. **Security Posture Factor:** The `SecurityResilienceEngine` (Section 4.10) computes an infrastructure-wide security posture score. The cascade severity for each scenario is amplified by a security posture factor: `combined_risk = cascade_severity * (1.0 + (1.0 - security_score/100) * 0.5)`, reflecting that weaker overall security posture increases the real-world impact of any individual vulnerability exploitation.
+3. **Financial Impact:** The `FinancialRiskEngine` (Section 4.11) computes the aggregate financial cost across all vulnerability exploitation scenarios.
+
+#### 4.81.3 Business-Impact-Based Vulnerability Re-Prioritization
+
+The system re-ranks vulnerabilities using a composite business impact score (0-100) computed from four weighted factors:
+
+- **CVSS Component (0-40 points):** Normalized CVSS score contribution.
+- **Blast Radius Component (0-30 points):** Ratio of affected components to total infrastructure components, reflecting infrastructure-specific cascade amplification.
+- **Exploit Maturity Component (0-20 points):** Weighted by exploit availability (mature: 20, proof-of-concept: 15, no-known-exploit: 5).
+- **Downtime Cost Component (0-10 points):** Estimated downtime duration normalized to a 60-minute reference, reflecting the temporal dimension of business impact.
+
+The re-prioritized output includes: original CVSS score, business impact score, infrastructure blast radius, estimated cost in currency units, priority rank, and a human-readable reasoning string decomposing the score into its constituent factors. This enables security teams to allocate remediation effort based on actual infrastructure-contextualized risk rather than abstract severity ratings.
+
+### 4.82 Chaos Engineering Bridge (Gremlin)
+
+The system provides a bridge integration with real-environment chaos engineering platforms (exemplified by Gremlin) that enables a "predict-then-verify" hybrid workflow: FaultRay first predicts the impact of failure scenarios through fast, safe, in-memory simulation, and then the predictions are validated against actual chaos experiment results, with continuous accuracy measurement and calibration. The inventive aspect is the systematic comparison framework that measures prediction accuracy (precision, recall, F1, severity match) and uses the comparison data to identify simulation model deficiencies.
+
+#### 4.82.1 Scenario Import and Prediction
+
+The system imports chaos experiment definitions from the external platform's API (e.g., Gremlin REST API v1):
+
+1. **Attack-to-Scenario Conversion:** External attack definitions are converted to FaultRay `Scenario` objects through a configurable attack type mapping: `cpu` → CPU_SATURATION, `memory` → MEMORY_EXHAUSTION, `disk` → DISK_FULL, `shutdown`/`process_killer` → COMPONENT_DOWN, `latency` → LATENCY_SPIKE, `packet_loss`/`blackhole`/`dns` → NETWORK_PARTITION. Target host names are resolved to `InfraGraph` component identifiers through name, host, and identifier matching.
+2. **Prediction Execution:** For each imported scenario, the `CascadeEngine` executes a simulation producing a `PredictionResult` containing: predicted affected components, per-component severity scores (mapped from health status: DOWN → 10.0, OVERLOADED → 6.0, DEGRADED → 3.0, HEALTHY → 0.0), overall severity, and the complete cascade chain.
+
+#### 4.82.2 Prediction-vs-Reality Comparison
+
+After the actual chaos experiment is executed on real infrastructure, the system imports the observed results and computes accuracy metrics:
+
+- **Precision:** The fraction of predicted-affected components that were actually affected (i.e., among all components FaultRay predicted would be impacted, what fraction was confirmed by the real experiment). Precision < 1.0 indicates over-prediction (false positives).
+- **Recall:** The fraction of actually-affected components that were predicted (i.e., among all components observed to be impacted in the real experiment, what fraction had been predicted by FaultRay). Recall < 1.0 indicates under-prediction (false negatives).
+- **F1 Score:** The harmonic mean of precision and recall, providing a single balanced accuracy metric.
+- **Severity Match:** For components that were both predicted and observed as affected, the normalized accuracy of severity magnitude predictions, computed as `1.0 - |predicted_severity - observed_severity| / 10.0`, averaged across all correctly predicted components.
+
+The comparison report additionally enumerates: components predicted but not observed (potential false positives suggesting over-conservative cascade rules), components observed but not predicted (potential blind spots suggesting missing dependencies or under-estimated cascade propagation), and components correctly predicted (validated predictions).
+
+#### 4.82.3 Hybrid Workflow and Continuous Calibration
+
+The bridge enables a structured hybrid resilience assessment workflow:
+
+1. **Simulate Broadly:** FaultRay executes thousands of failure scenarios in-memory (fast, safe, zero production impact).
+2. **Prioritize for Verification:** Scenarios with high predicted severity, wide blast radius, or single-point-of-failure involvement are recommended for real chaos experiment verification.
+3. **Verify Selectively:** The highest-priority predictions are validated through real chaos experiments on the external platform.
+4. **Calibrate:** Comparison metrics (precision, recall, F1, severity match) identify systematic prediction errors. Low recall triggers review of dependency graph completeness and cascade propagation rules. Low precision triggers review of circuit breaker and failover configurations. Severity mismatch triggers calibration of component capacity thresholds and metric sensitivity parameters.
+5. **Report:** A unified hybrid report summarizes overall accuracy across all compared scenarios, per-scenario breakdowns, and calibration recommendations, enabling continuous improvement of simulation fidelity.
+
 ## 5. ALTERNATIVE EMBODIMENTS AND EXTENSIONS
 
 ### 5.1 Machine Learning-Enhanced Scenario Generation
@@ -3045,6 +3176,36 @@ In an alternative embodiment, the system continuously compares simulation predic
 - (c) propagates resilience assessments upward through the hierarchy, computing how component-level vulnerabilities aggregate into service-level and system-level risks; and
 - (d) generates a hierarchical resilience map showing risk concentration at each level, enabling both top-down strategic planning and bottom-up detailed analysis, wherein the multi-level decomposition with bidirectional resilience propagation constitutes the inventive step.
 
+**Claim 81.** The method of Claim 1, further comprising a continuous observability-to-predictability pipeline method that:
+- (a) periodically retrieves real-time infrastructure metrics from an external observability platform (e.g., Datadog Metrics API) including host-level CPU utilization, memory consumption, and disk usage within a configurable polling interval;
+- (b) automatically maps the retrieved metric series to corresponding resource metric fields of components in the in-memory infrastructure graph by resolving external host identifiers to internal component identifiers through multi-strategy matching (name, host attribute, unique identifier);
+- (c) upon completion of the metric-to-graph mapping, automatically invokes the cascade simulation engine and financial risk engine on the updated graph state to produce a simulation report with resilience scores, cascade predictions, and critical findings; and
+- (d) transmits the simulation results back to the external observability platform as custom metrics and structured events, wherein critical cascade risk detections trigger alert events that enable the observability platform's native alerting mechanisms to act on predictive simulation intelligence, thereby transforming passive observability into proactive resilience prediction through continuous closed-loop integration between real-time metrics and simulated cascade analysis, wherein the automatic metrics-driven simulation invocation and bidirectional closed-loop integration constitute the inventive step.
+
+**Claim 82.** The method of Claim 1, further comprising a real-time incident-triggered cascade analysis pipeline method that:
+- (a) receives an incident notification from an external incident management platform (e.g., PagerDuty webhook) and resolves the affected service to a specific component in the in-memory infrastructure graph through multi-strategy matching against service names, custom detail fields, and incident title content;
+- (b) automatically invokes the cascade simulation engine with a fault injected at the resolved component to compute the full downstream blast radius, identifying all components that transition to DOWN, DEGRADED, or OVERLOADED states;
+- (c) computes the estimated financial impact for each affected component by multiplying the component's configured revenue-per-minute rate by the estimated downtime duration derived from the component's mean-time-to-repair operational profile; and
+- (d) automatically generates and posts back to the incident management platform: (i) enrichment notes containing blast radius, financial impact, and resolution recommendations, and (ii) a structured runbook document containing incident metadata, prioritized resolution steps derived from component failover, autoscaling, and replica configurations, cascade chain details, and a verification checklist, wherein the automatic incident-to-cascade-to-runbook pipeline with real-time financial impact computation constitutes the inventive step.
+
+**Claim 83.** The method of Claim 1, further comprising a topology conversion and AI operations export method that:
+- (a) retrieves an auto-discovered infrastructure topology from an external AI operations platform (e.g., Dynatrace Smartscape via Environment API v2), including entity types (HOST, SERVICE, PROCESS_GROUP, APPLICATION, DATABASE), entity properties, and inter-entity relationships;
+- (b) converts the external topology into the in-memory infrastructure graph by mapping external entity types to internal component types and converting external entity relationships into directed dependency edges preserving cascade propagation semantics;
+- (c) calibrates the converted graph by querying the external platform's metrics API for entity-level metrics and applying them to the corresponding resource metrics of converted components; and
+- (d) exports simulation results in a format compatible with the external platform's AI engine, including structured prediction objects with severity classification and affected entity lists, topology risk objects identifying single points of failure, and automatic submission of failure predictions exceeding a configurable severity threshold to the external platform's Problems/Events API for AI-driven correlation and root cause analysis, wherein the bidirectional topology-to-graph conversion with simulation-to-AI-ops export constitutes the inventive step.
+
+**Claim 84.** The method of Claim 1, further comprising a vulnerability-to-business-impact re-prioritization method that:
+- (a) retrieves vulnerability data (CVE identifiers, CVSS scores, severity levels, affected package names, exploit maturity) from an external security scanning platform (e.g., Snyk API);
+- (b) converts each vulnerability into one or more executable fault scenarios by mapping vulnerability severity to fault types (critical → COMPONENT_DOWN, high → CPU_SATURATION, medium/low → LATENCY_SPIKE) and resolving affected components through package-name-to-component matching, component tag matching, framework-type matching, or infrastructure-wide targeting;
+- (c) executes the generated scenarios through a combined simulation pipeline comprising the cascade engine, the security resilience engine (which amplifies cascade severity by a security posture factor reflecting overall infrastructure security weakness), and the financial risk engine; and
+- (d) re-ranks the vulnerabilities by a composite business impact score (0-100) computed from four weighted factors: CVSS score (0-40), infrastructure-specific blast radius (0-30), exploit maturity (0-20), and estimated downtime cost (0-10), producing a prioritized vulnerability list with per-vulnerability business impact scores, infrastructure blast radii, estimated costs, and human-readable scoring decompositions that supersede generic CVSS-only prioritization, wherein the automated conversion of security vulnerabilities into simulated infrastructure failure scenarios with business-impact-based re-ranking constitutes the inventive step.
+
+**Claim 85.** The method of Claim 1, further comprising a prediction-verification hybrid workflow method that:
+- (a) imports chaos experiment definitions from an external chaos engineering platform (e.g., Gremlin REST API) and converts them to executable simulation scenarios by mapping external attack types (cpu, memory, shutdown, latency, packet_loss, etc.) to internal fault types and resolving target identifiers to infrastructure graph components;
+- (b) executes the cascade simulation engine on each imported scenario to produce predictions of affected components and per-component severity scores;
+- (c) after real chaos experiments are executed on production infrastructure, imports the observed results and computes prediction accuracy metrics including precision (fraction of predicted impacts confirmed), recall (fraction of actual impacts predicted), F1 score (harmonic mean), and severity match (normalized accuracy of severity magnitude predictions for correctly predicted components); and
+- (d) generates a comparison report identifying false positives (predicted but not observed, suggesting over-conservative cascade rules), false negatives (observed but not predicted, suggesting missing dependencies), and calibration recommendations (low recall → review dependency graph completeness; low precision → review failover configurations; severity mismatch → calibrate capacity thresholds), enabling continuous improvement of simulation fidelity through systematic comparison of in-memory predictions against real-world chaos experiment outcomes, wherein the structured predict-then-verify framework with accuracy metrics and model calibration feedback constitutes the inventive step.
+
 ---
 
 ## APPENDIX A: Implementation Reference
@@ -3102,6 +3263,11 @@ Key implementation files corresponding to the described components:
 - Queueing Theory Engine: `src/faultray/simulator/queueing_theory_engine.py` (QueueingTheoryEngine class — M/M/1 steady-state metrics, M/M/c Erlang-C computation, Little's Law cross-validation, bottleneck analysis, saturation prediction)
 - Generative Engines (GAN / VAE / Clustering): `src/faultray/simulator/generative_engines.py` (SimpleGAN class — adversarial scenario generation; SimpleVAE class — ELBO-optimized latent-space scenario generation with reparameterization trick; FailurePatternClustering class — K-means++ clustering with elbow-method optimal cluster selection)
 - Time-Series & Ensemble (ARIMA / AdaBoost / PSO): `src/faultray/simulator/timeseries_and_ensemble.py` (ARIMAPredictor class — Levinson-Durbin AR fitting, MA residual estimation, differencing; BoostingPredictor class — AdaBoost with decision stumps, adaptive sample reweighting; ParticleSwarmOptimizer class — PSO with inertia decay, cognitive/social coefficients)
+- Datadog Integration (Observability Platform): `src/faultray/integrations/datadog_integration.py` (DatadogIntegration class — bi-directional Datadog integration with continuous metrics pull via Metrics API v2, InfraGraph ResourceMetrics mapping with host-to-component resolution, automatic CascadeEngine simulation invocation, custom metric and event push-back via Events/Series API v1, dashboard widget JSON export, configurable continuous polling loop)
+- PagerDuty Integration (Incident Management): `src/faultray/integrations/pagerduty_integration.py` (PagerDutyIntegration class — incident webhook parsing supporting V2/V3 formats, multi-strategy component resolution, automatic CascadeEngine blast radius computation, FinancialRiskEngine cost impact estimation, incident note enrichment via REST API, Markdown runbook auto-generation, prioritized resolution recommendation engine)
+- Dynatrace Integration (AI Operations Platform): `src/faultray/integrations/dynatrace_integration.py` (DynatraceIntegration class — Smartscape topology pull via Environment API v2, entity-to-Component type mapping, relationship-to-Dependency edge conversion, Metrics API v2 calibration, SimulationEngine execution, Davis AI-compatible prediction/topology-risk export, Problems API failure prediction submission)
+- Snyk Integration (Security Vulnerability Impact): `src/faultray/integrations/snyk_integration.py` (SnykIntegration class — vulnerability pull via Snyk API v1, severity-to-FaultType mapping, package-to-component target resolution, CascadeEngine + SecurityResilienceEngine + FinancialRiskEngine combined simulation, four-factor business impact score computation, CVSS-superseding vulnerability re-prioritization)
+- Gremlin Bridge (Chaos Engineering): `src/faultray/integrations/gremlin_bridge.py` (GremlinBridge class — Gremlin attack-to-Scenario import via REST API v1, attack-type-to-FaultType mapping, CascadeEngine prediction execution, Gremlin result import, precision/recall/F1/severity-match comparison, hybrid workflow report generation, next-test recommendation engine)
 - Domain-Specific Engines (Pareto / BayesOpt / CCF / GameTheory / Fuzzy / Causal): `src/faultray/simulator/domain_specific_engines.py` (ParetoOptimizer class — NSGA-II non-dominated sorting, crowding distance; BayesianOptimizer class — GP surrogate with RBF kernel, Expected Improvement acquisition; CommonCauseFailureAnalyzer class — beta-factor CCF groups; GameTheoryAnalyzer class — Nash equilibrium, minimax, mixed strategies; FuzzyResilienceEngine class — Mamdani inference, centroid defuzzification; CausalInferenceEngine class — SCM, do-calculus, counterfactual reasoning)
 - Integration Pipelines (16 pipelines): `src/faultray/simulator/integration_pipelines.py` (MultiEngineConsensus, ComplianceAuditPipeline, CascadeCostRemediationPipeline, BacktestCalibrationLoop, CrossMethodValidator, MultiCloudAnalyzer, FullLifecycleAutomation, GenomeEvolutionMonitor, ThreatFeedSimulationBridge, UnifiedSecurityResilienceScore, InverseOptimizer, ComparativeSimulator, CompoundWhatIf, EnsemblePredictor, HierarchicalAnalyzer, TemporalUnifiedView)
 
