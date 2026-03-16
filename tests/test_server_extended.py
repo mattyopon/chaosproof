@@ -361,7 +361,11 @@ class TestApiVersioning:
         assert "edges" in data
 
     async def test_v1_simulate(self, client):
-        resp = await client.post("/api/v1/simulate")
+        resp = await client.post("/api/v1/simulate", json={
+            "topology_yaml": "services:\n  - name: api\n    replicas: 3",
+            "scenarios": "all",
+            "engines": ["cascade"],
+        })
         assert resp.status_code == 200
 
 

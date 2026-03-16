@@ -118,6 +118,7 @@ CRITICAL FINDINGS
 | :moneybag: | **Cost Impact Engine** | Quantify downtime costs, SLA penalties, and ROI of resilience improvements |
 | :shield: | **Security Resilience Engine** | Assess security posture against 8 threat categories with control gap analysis |
 | :earth_americas: | **Multi-Region DR** | Evaluate DR strategies, simulate failover, compare RTO/RPO across regions |
+| :crystal_ball: | **Predictive Engine** | Statistical failure prediction, capacity forecasting, SLA projection |
 
 ---
 
@@ -133,6 +134,7 @@ CRITICAL FINDINGS
 | Slack & PagerDuty | Real-time notification of critical findings |
 | Security Feed | Auto-generate scenarios from CVE/NVD/CISA feeds |
 | AI-Powered Analysis | Architecture recommendations and root cause analysis |
+| OpenAPI / Swagger | Auto-generated API docs at /docs and /redoc with full schema |
 
 ---
 
@@ -583,6 +585,7 @@ FaultRayは、純粋な数学的シミュレーションによるゼロリスク
 - **セキュリティ耐性エンジン** — 8種の脅威カテゴリに対するセキュリティ態勢を評価
 - **コンプライアンスエンジン** — SOC 2/ISO 27001/PCI DSS/DORA/HIPAA/GDPR準拠評価
 - **マルチリージョンDR** — DR戦略の評価、フェイルオーバーシミュレーション、RTO/RPO比較
+- **予測エンジン** — 統計ベースの障害予測、キャパシティ予測、SLA達成率予測
 
 ### クイックスタート
 
