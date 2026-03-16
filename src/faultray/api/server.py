@@ -93,12 +93,19 @@ async def lifespan(application: FastAPI):
         await _prom_monitor.stop()
 
 
+from faultray.api.openapi_config import OPENAPI_CONFIG, OPENAPI_TAGS
+from faultray.api.v1.routes import router as v1_router
+
 app = FastAPI(
-    title="FaultRay API",
-    description="Zero-risk infrastructure chaos engineering platform — simulate failures without touching production",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    title=OPENAPI_CONFIG["title"],
+    description=OPENAPI_CONFIG["description"],
+    version=OPENAPI_CONFIG["version"],
+    contact=OPENAPI_CONFIG["contact"],
+    license_info=OPENAPI_CONFIG["license_info"],
+    docs_url=OPENAPI_CONFIG["docs_url"],
+    redoc_url=OPENAPI_CONFIG["redoc_url"],
+    openapi_url=OPENAPI_CONFIG["openapi_url"],
+    openapi_tags=OPENAPI_TAGS,
     lifespan=lifespan,
 )
 
@@ -2691,6 +2698,12 @@ async def api_anomalies(
         ],
     })
 
+
+# ---------------------------------------------------------------------------
+# API v1 typed routes (OpenAPI schema with Pydantic models)
+# Must be included before _v1_router so typed routes take precedence
+# ---------------------------------------------------------------------------
+app.include_router(v1_router)
 
 app.include_router(_v1_router)
 

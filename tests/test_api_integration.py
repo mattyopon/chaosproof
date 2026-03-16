@@ -1075,7 +1075,11 @@ class TestV1VersionedAPI:
         assert "nodes" in data
 
     def test_v1_simulate(self, demo_client):
-        resp = demo_client.post("/api/v1/simulate")
+        resp = demo_client.post("/api/v1/simulate", json={
+            "topology_yaml": "services:\n  - name: api\n    replicas: 3",
+            "scenarios": "all",
+            "engines": ["cascade"],
+        })
         assert resp.status_code == 200
 
     def test_v1_runs(self, client):
