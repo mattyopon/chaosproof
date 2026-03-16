@@ -1,0 +1,14 @@
+# Quick start: Run FaultRay with Docker
+# Usage: docker compose -f docker-quickstart.yaml up
+
+services:
+  faultray-demo:
+    image: ghcr.io/mattyopon/faultray:latest
+    ports:
+      - "8000:8000"
+    command: ["faultray", "demo", "--web"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

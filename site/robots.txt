@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://faultray.dev/sitemap.xml
+Sitemap: https://faultray.com/sitemap.xml

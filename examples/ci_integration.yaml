@@ -1,0 +1,46 @@
+# Example: FaultRay chaos gate in your CI/CD pipeline
+# Add this to your .github/workflows/ directory
+
+name: Resilience Gate
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/**'
+      - 'terraform/**'
+      - '*.yaml'
+
+jobs:
+  chaos-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install FaultRay
+        run: pip install faultray
+
+      - name: Run Chaos Simulation
+        run: |
+          faultray load infrastructure/infra.yaml
+          faultray simulate --html report.html --json results.json
+
+      - name: Check Resilience Score
+        run: |
+          SCORE=$(python3 -c "import json; print(json.load(open('results.json'))['resilience_score'])")
+          echo "Resilience Score: $SCORE"
+          if [ $(echo "$SCORE < 60" | bc) -eq 1 ]; then
+            echo "::error::Resilience score $SCORE is below threshold (60)"
+            exit 1
+          fi
+
+      - name: Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: faultray-report
+          path: report.html

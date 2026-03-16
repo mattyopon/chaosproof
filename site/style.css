@@ -36,6 +36,13 @@
   --max-width: 1200px;
 }
 
+/* --- Font Display --- */
+@font-face {
+  font-family: system-ui;
+  font-display: swap;
+  src: local("system-ui");
+}
+
 /* --- Reset --- */
 *,
 *::before,
@@ -58,6 +65,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  text-rendering: optimizeSpeed;
 }
 
 a {
