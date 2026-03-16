@@ -64,7 +64,7 @@ The invention provides a computer-implemented system and method comprising:
 
 2. **An automated fault scenario generation engine** that algorithmically generates a comprehensive set of failure scenarios from the topology model, including single-component failures, pairwise combinations, triple failures, component-type-specific faults, traffic spike scenarios at multiple magnitudes, and specialized scenarios based on component semantics (database replication lag, cache stampede, queue backpressure, etc.), producing 2,000 or more distinct scenarios from a typical topology.
 
-3. **A multi-engine simulation architecture** comprising twenty-three complementary simulation engines:
+3. **A multi-engine simulation architecture** comprising thirty-six complementary simulation engines:
    - A **Cascade Engine** that propagates failure effects through the dependency graph using breadth-first search (BFS), computing severity scores based on impact and spread metrics, and modeling dependency-type-aware propagation (required vs. optional vs. asynchronous dependencies)
    - A **Dynamic Engine** that executes time-stepped simulations with traffic pattern injection, autoscaling response modeling, circuit breaker activation, failover sequence simulation, and latency cascade tracking
    - An **Operations Engine** that simulates multi-day operational scenarios incorporating MTBF/MTTR-based stochastic event generation, deployment events, and gradual degradation patterns
@@ -88,6 +88,37 @@ The invention provides a computer-implemented system and method comprising:
    - A **Random Forest Predictor** that uses bagged decision tree ensembles with feature sub-sampling to capture non-linear failure prediction boundaries
    - An **Anomaly Autoencoder** that performs unsupervised anomaly detection via reconstruction error on simulation-synthesized normal data, requiring no labeled failure examples
    - A **Transformer Predictor** that uses self-attention to predict failure probability from metric time-series with parallel processing and attention-weight interpretability
+   - A **Queueing Theory Engine** that models infrastructure components as M/M/1 and M/M/c queueing systems, computes Erlang-C wait probabilities, applies Little's Law for cross-validation, performs bottleneck analysis, and predicts saturation points from arrival rate trends
+   - A **GAN Scenario Generator** that trains a generative adversarial network to learn the latent distribution of failure scenarios and generate novel failure patterns not captured by rule-based scenario generation
+   - A **VAE Scenario Generator** that trains a variational autoencoder with ELBO loss and reparameterization trick to generate failure scenarios by interpolation in a structured latent space
+   - A **Failure Pattern Clustering Engine** that applies K-means clustering with K-means++ initialization and elbow-method optimal cluster selection to discover latent failure pattern groupings from simulation results
+   - An **ARIMA Predictor** that fits AutoRegressive Integrated Moving Average models using Levinson-Durbin AR coefficient estimation and residual-based MA estimation for infrastructure metric time-series forecasting
+   - An **AdaBoost Boosting Predictor** that trains sequential decision stumps with adaptive sample reweighting to produce strong failure classifiers from weak learners
+   - A **Particle Swarm Optimizer (PSO)** that discovers optimal infrastructure configurations through swarm-based cooperative search with inertia-decayed velocity updates and social/cognitive information sharing
+   - A **Pareto Optimizer (NSGA-II)** that computes Pareto-optimal frontiers across multiple competing objectives (resilience, cost, latency) using non-dominated sorting and crowding distance
+   - A **Bayesian Optimizer** that uses a Gaussian Process surrogate with Expected Improvement acquisition to efficiently tune infrastructure configurations with minimal simulation evaluations
+   - A **Common Cause Failure Analyzer** that identifies CCF groups from shared component attributes and computes beta-factor-based correlated failure probabilities
+   - A **Game Theory Analyzer** that models defender-attacker interactions as zero-sum games and computes Nash equilibrium defense strategies via minimax analysis
+   - A **Fuzzy Logic Resilience Engine** that evaluates infrastructure resilience using Mamdani fuzzy inference with linguistic variables and centroid defuzzification
+   - A **Causal Inference Engine** that constructs Structural Causal Models from the dependency graph and applies do-calculus interventions and counterfactual reasoning to identify true root causes
+
+4. **Sixteen integration pipelines** that combine multiple simulation engines into automated analytical workflows:
+   - A **Multi-Engine Consensus Pipeline** that executes multiple independent engines on the same scenario and computes agreement scores with divergence detection
+   - A **Compliance Audit Pipeline** that maps simulation results to regulatory framework requirements (SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR) and generates structured audit reports
+   - A **Cascade-Cost-Remediation Pipeline** that chains cascade simulation through financial risk quantification to ROI-prioritized remediation recommendations
+   - A **Backtest-Calibration Loop** that validates simulation predictions against historical incidents and automatically calibrates simulation parameters
+   - A **Cross-Method Validator** that systematically compares results from methodologically independent engines to detect model blind spots
+   - A **Multi-Cloud Analyzer** that executes identical simulations across different cloud deployments for normalized comparative analysis
+   - A **Full Lifecycle Automation Pipeline** that orchestrates scenario generation, multi-engine simulation, availability modeling, financial risk, genome extraction, and remediation into a single automated workflow
+   - A **Genome Evolution Monitor** that tracks multi-dimensional resilience genome changes over time with trend classification
+   - A **Threat Feed-Simulation Bridge** that automatically converts external threat intelligence into executable simulation scenarios
+   - A **Unified Security-Resilience Scorer** that integrates resilience and security assessments into a single metric with gap analysis
+   - An **Inverse Optimizer** that computes minimum-cost infrastructure changes required to achieve a target resilience objective
+   - A **Comparative Simulator** that evaluates alternative infrastructure designs under identical conditions for data-driven architecture decisions
+   - A **Compound What-If Analyzer** that evaluates sequences of infrastructure changes with per-change marginal impact attribution
+   - An **Ensemble Predictor** that fuses predictions from static, dynamic, and stochastic engines with accuracy-weighted combination
+   - A **Hierarchical Analyzer** that decomposes infrastructure into hierarchical levels and propagates resilience assessments bidirectionally
+   - A **Temporal Unified View** that merges current-state snapshots, historical trend analysis, and future-state forecasts into a single temporal assessment
 
 4. **A multi-layer availability limit model** (the "N-Layer Model") that computes mathematically distinct availability ceilings:
    - **Layer 1 (Software Limit):** Accounts for deployment downtime frequency, human error rate, and configuration drift probability. Computed as: `A_sw = 1 - (deploy_frequency × avg_deploy_downtime / period + human_error_rate + config_drift_rate)`, bounded by the hardware limit.
@@ -1943,6 +1974,595 @@ As with the RNN/LSTM predictor, training data is synthetically generated from th
 
 The Transformer's quadratic complexity in sequence length ($T^2$) is acceptable for the typical infrastructure monitoring sequence lengths (10–50 time-steps) used in FaultRay, while its ability to capture long-range dependencies and provide attention-based interpretability makes it the preferred architecture for scenarios where understanding *which* time-steps drive the prediction is as important as the prediction itself.
 
+### 4.49 Queueing Theory Engine (M/M/1, M/M/c, Little's Law)
+
+The system provides a queueing theory engine that models each infrastructure component as a classical queueing system, enabling closed-form analysis of wait times, queue lengths, utilisation, and saturation points. Unlike the Capacity Engine described in Section 4.8, which uses heuristic thresholds to predict resource saturation, the Queueing Theory Engine applies rigorous Kendall-notation queueing models (M/M/1 and M/M/c) to derive steady-state performance metrics grounded in mathematical queueing theory, and applies Little's Law (L = λW) as a distribution-free cross-check.
+
+#### 4.49.1 M/M/1 Queue Analysis
+
+Each single-server component is modeled as an M/M/1 queue with Poisson arrivals (rate λ) and exponential service times (rate μ). The steady-state metrics are computed in closed form:
+
+- **Utilisation:** $\rho = \lambda / \mu$
+- **Average queue length:** $L = \rho / (1 - \rho)$
+- **Average wait time:** $W = 1 / (\mu - \lambda)$
+- **Average queue wait:** $W_q = \rho / (\mu - \lambda)$
+- **Average queue-only length:** $L_q = \rho^2 / (1 - \rho)$
+
+The system is stable only when $\rho < 1$. When unstable ($\rho \geq 1$), the queue grows without bound and L, W are reported as infinity.
+
+#### 4.49.2 M/M/c Queue Analysis (Erlang-C)
+
+Multi-replica components are modeled as M/M/c queues, where $c$ parallel servers share a common queue. The Erlang-C probability $C(c, a)$ — the probability that an arriving request must wait — is computed using an iterative Poisson sum to avoid factorial overflow:
+
+$$P_0 = \frac{1}{\sum_{k=0}^{c-1} \frac{a^k}{k!} + \frac{a^c}{c!} \cdot \frac{1}{1 - \rho}}$$
+
+$$C(c, a) = \frac{a^c / c!}{1 - \rho} \cdot P_0$$
+
+where $a = \lambda / \mu$ is the offered load in Erlangs and $\rho = a / c$ is the per-server utilisation. This extends the M/M/1 model to account for replica counts when modelling service capacity, yielding fundamentally different wait-time and queueing probability results.
+
+#### 4.49.3 Little's Law Cross-Check
+
+Little's Law ($L = \lambda W$) provides a universal, distribution-free relationship between average queue length, arrival rate, and average time in the system. The engine applies this as a cross-check for simulation results, independent of any assumptions about arrival or service distributions.
+
+#### 4.49.4 Bottleneck Analysis and Saturation Prediction
+
+The engine maps each component in the InfraGraph to a queue, estimates arrival rates from current network connections and timeout parameters, derives service rates from max RPS and replica counts, and ranks components by utilisation to identify bottlenecks. A forward-looking saturation prediction scales arrival rates by a configurable traffic multiplier and identifies which components saturate first — complementing the CascadeEngine's utilisation-threshold approach with queueing-theoretic stability analysis.
+
+#### 4.49.5 Differentiation from Capacity Engine (Section 4.8)
+
+| Aspect | Capacity Engine (Section 4.8) | Queueing Theory Engine |
+|--------|-------------------------------|------------------------|
+| Method | Heuristic thresholds | Closed-form queueing models |
+| Basis | Resource usage projections | Kendall notation (M/M/1, M/M/c) |
+| Wait time | Not modelled | Exact steady-state computation |
+| Multi-server | Not modelled | Erlang-C formula |
+| Stability | Binary (saturated/not) | Continuous (ρ < 1 stability condition) |
+
+### 4.50 Generative Adversarial Network (GAN) for Scenario Generation
+
+The system provides a Generative Adversarial Network (GAN) that learns to produce novel, plausible failure scenarios from historical data. Unlike the Genetic Algorithm optimizer (Section 4.34) which optimises a population toward a single objective (maximum severity), the GAN generates a *distribution* of realistic scenarios without an explicit fitness function, expanding the failure space beyond human imagination.
+
+#### 4.50.1 Architecture
+
+The GAN comprises two competing neural networks implemented entirely in the Python standard library:
+
+- **Generator:** Maps random noise vectors ($\mathbb{R}^{n_{\text{noise}}}$) through a hidden layer with ReLU activation to scenario vectors in $[0, 1]^{d_{\text{scenario}}}$ via sigmoid output, where each dimension represents a component's failure severity.
+- **Discriminator:** Maps scenario vectors through a hidden layer with ReLU activation to a scalar probability of being "real" (from historical data) vs. "generated."
+
+#### 4.50.2 Training Procedure
+
+Training alternates between discriminator and generator updates:
+
+1. **Discriminator update:** Maximise $\mathbb{E}[\log D(x_{\text{real}})] + \mathbb{E}[\log(1 - D(G(z)))]$ using backpropagation through the sigmoid output layer and ReLU hidden layer.
+2. **Generator update:** Maximise $\mathbb{E}[\log D(G(z))]$ by adjusting generator weights to produce scenarios that fool the discriminator.
+
+Through adversarial training, the Generator converges to producing scenario vectors that are indistinguishable from historical failure patterns while exhibiting novel combinations not present in the training data.
+
+#### 4.50.3 Differentiation from GA (Section 4.34)
+
+The GA optimises a *single objective* (cascade severity) using a fitness function; the GAN generates a *distribution* of realistic scenarios without an explicit fitness criterion. GA discovers worst-case scenarios; GAN discovers the *space of plausible* scenarios, including moderate-severity events that GA would discard but that represent realistic operational risk.
+
+### 4.51 Variational Autoencoder (VAE) for Scenario Generation
+
+The system provides a Variational Autoencoder (VAE) that learns a smooth, structured latent space of failure scenarios. Unlike the GAN (Section 4.50) which generates sharp samples but lacks an explicit density model, the VAE optimises a principled Evidence Lower Bound (ELBO) loss combining reconstruction accuracy and KL divergence, yielding a latent space where interpolation between scenarios is semantically meaningful.
+
+#### 4.51.1 Architecture
+
+- **Encoder:** Maps scenario vectors to a latent distribution parameterised by mean ($\mu$) and log-variance ($\log \sigma^2$).
+- **Reparameterisation trick:** $z = \mu + \sigma \cdot \epsilon$ where $\epsilon \sim \mathcal{N}(0, 1)$, enabling gradient flow through the stochastic sampling.
+- **Decoder:** Maps latent vectors back to scenario space through a hidden layer with sigmoid output.
+
+#### 4.51.2 ELBO Loss
+
+$$\mathcal{L} = \text{MSE}(x, \hat{x}) \cdot d + \text{KL}(q(z|x) \| p(z))$$
+
+where $\text{KL} = -\frac{1}{2} \sum (1 + \log\sigma^2 - \mu^2 - \sigma^2)$ and $p(z) = \mathcal{N}(0, 1)$.
+
+#### 4.51.3 Differentiation from GAN (Section 4.50)
+
+| Aspect | GAN (Section 4.50) | VAE |
+|--------|---------------------|-----|
+| Loss function | Adversarial (min-max) | ELBO (reconstruction + KL) |
+| Latent space | Unstructured | Smooth, interpolable |
+| Density model | Implicit | Explicit probabilistic |
+| Sample quality | Sharper | Smoother, more diverse |
+| Use case | Novel scenario discovery | Scenario interpolation and exploration |
+
+### 4.52 Failure Pattern Clustering (K-means)
+
+The system provides unsupervised K-means clustering of failure scenarios to discover recurring failure patterns (e.g., "network partitions always cascade to DB timeouts"). Unlike the Anomaly Autoencoder (Section 4.47) which detects *outliers* from normal behaviour, clustering groups *similar* failures to surface common patterns and identify representative scenarios.
+
+#### 4.52.1 K-means++ Initialisation
+
+Centroids are initialised using the K-means++ algorithm: the first centroid is selected randomly, and each subsequent centroid is chosen with probability proportional to the squared distance from the nearest existing centroid, ensuring well-separated initial clusters and faster convergence.
+
+#### 4.52.2 Elbow Method for Optimal K
+
+The optimal number of clusters is determined by the elbow method: the system runs K-means for $k = 1, 2, \ldots, k_{\max}$ and identifies the $k$ with the maximum second derivative of the inertia curve (greatest rate of change in the rate of inertia decrease), automatically selecting the cluster count that balances parsimony and explanatory power.
+
+#### 4.52.3 Representative Scenario Extraction
+
+For each cluster, the system identifies the scenario closest to the centroid as the *representative scenario*, providing a compact summary of each failure pattern. This enables targeted resilience testing with one scenario per failure archetype rather than testing all individual scenarios.
+
+#### 4.52.4 Differentiation from Anomaly Autoencoder (Section 4.47)
+
+Autoencoder detects *outliers* — scenarios that deviate from normal; clustering groups *similar* failures to surface *common patterns*. These are complementary: outlier detection finds the unusual; clustering organises the usual.
+
+### 4.53 ARIMA Time-Series Prediction
+
+The system provides an ARIMA(p, d, q) predictor for infrastructure metric time-series forecasting. Unlike the RNN/LSTM predictor (Section 4.40) which learns non-linear temporal patterns from training data, ARIMA is a classical statistical model with interpretable parameters that requires no training data beyond the target time series itself.
+
+#### 4.53.1 ARIMA Components
+
+- **AR (AutoRegressive):** The current value depends on $p$ previous values, with coefficients estimated via the Levinson-Durbin algorithm applied to autocorrelation.
+- **I (Integrated):** $d$-th order differencing makes non-stationary series stationary: $y'_t = y_t - y_{t-1}$.
+- **MA (Moving Average):** The current value depends on $q$ previous forecast errors, with coefficients estimated from residual autocorrelation.
+
+#### 4.53.2 Failure Prediction
+
+The engine fits ARIMA to component metric histories (CPU, memory, latency), forecasts future values, and identifies when metrics will breach failure thresholds. The prediction includes a confidence estimate based on the $R^2$ of the fitted model's residuals.
+
+#### 4.53.3 Differentiation from RNN/LSTM (Section 4.40)
+
+| Aspect | RNN/LSTM (Section 4.40) | ARIMA |
+|--------|--------------------------|-------|
+| Model type | Neural network (non-linear) | Statistical (linear) |
+| Training data | Requires labelled sequences | Only the target series |
+| Parameters | Opaque weights | Interpretable (p, d, q) |
+| Strengths | Complex non-linear patterns | Trend extrapolation, stationarity |
+| Use case | Pattern recognition from many series | Single-series forecasting |
+
+### 4.54 Boosting Ensemble (AdaBoost)
+
+The system provides an AdaBoost ensemble of decision stumps for binary failure classification. Unlike the Random Forest predictor (Section 4.46) which trains trees independently via bagging, AdaBoost trains *sequentially*, each learner correcting the previous one's errors, producing a *weighted* ensemble that excels at hard-to-classify boundary cases.
+
+#### 4.54.1 AdaBoost Algorithm
+
+Each round:
+1. Train a decision stump (single-split classifier) on weighted data, minimising weighted classification error.
+2. Compute learner weight: $\alpha = \frac{1}{2} \ln\left(\frac{1 - \varepsilon}{\varepsilon}\right)$ where $\varepsilon$ is the weighted error.
+3. Re-weight samples: $w_i \leftarrow w_i \cdot \exp(-\alpha \cdot y_i \cdot h(x_i))$, increasing weight on misclassified samples.
+4. Normalise weights.
+
+The final prediction is $\text{sign}\left(\sum_t \alpha_t h_t(x)\right)$.
+
+#### 4.54.2 Differentiation from Random Forest (Section 4.46)
+
+| Aspect | Random Forest (Section 4.46) | AdaBoost |
+|--------|-------------------------------|----------|
+| Training | Independent (bagging) | Sequential (boosting) |
+| Weak learners | Full trees | Decision stumps |
+| Focus | Variance reduction | Bias reduction on hard examples |
+| Sample weighting | Uniform (bootstrap) | Adaptive (misclassification-focused) |
+
+### 4.55 Particle Swarm Optimization (PSO)
+
+The system provides a Particle Swarm Optimizer for discovering worst-case failure scenarios. Unlike the GA (Section 4.34) which uses crossover and mutation on discrete chromosomes, PSO uses continuous velocity updates with personal and global best memory, often converging faster in continuous search spaces.
+
+#### 4.55.1 PSO Update Rule
+
+Each particle $i$ updates its velocity and position at each iteration:
+
+$$v_i(t+1) = w \cdot v_i(t) + c_1 r_1 (p_{\text{best},i} - x_i(t)) + c_2 r_2 (g_{\text{best}} - x_i(t))$$
+$$x_i(t+1) = x_i(t) + v_i(t+1)$$
+
+where $w$ is the inertia weight (decayed linearly from 0.9 to 0.4), $c_1$ and $c_2$ are cognitive and social coefficients, $r_1, r_2 \sim U(0,1)$, $p_{\text{best},i}$ is the particle's personal best position, and $g_{\text{best}}$ is the global best. Each dimension represents a component's fault severity in $[0, 1]$.
+
+#### 4.55.2 Fitness Evaluation
+
+Components with severity exceeding a configurable threshold are faulted via the CascadeEngine. Total cascade severity serves as the fitness value, steering the swarm toward the most damaging fault configurations.
+
+#### 4.55.3 Differentiation from GA (Section 4.34) and SA (Section 4.41)
+
+| Aspect | GA (Section 4.34) | SA (Section 4.41) | PSO |
+|--------|---------------------|---------------------|-----|
+| Search paradigm | Population evolution | Single-solution perturbation | Swarm intelligence |
+| Solution space | Discrete (binary) | Discrete (binary) | Continuous [0,1]^N |
+| Information sharing | Crossover between parents | None (single solution) | Personal + global best |
+| Convergence | Via selection pressure | Via cooling schedule | Via inertia decay |
+
+### 4.56 Multi-Objective Pareto Optimization (NSGA-II)
+
+The system provides a multi-objective optimiser inspired by NSGA-II that computes the Pareto front balancing resilience against cost. Unlike the GA (Section 4.34) which optimises a *single* objective (maximum severity), the Pareto optimizer produces a *front* of non-dominated solutions across two conflicting objectives, enabling infrastructure operators to visualise and navigate resilience-cost trade-offs.
+
+#### 4.56.1 Non-Dominated Sorting
+
+Solutions are ranked by Pareto dominance: solution $A$ dominates $B$ if $A$ is at least as good as $B$ on all objectives and strictly better on at least one. Non-dominated solutions (not dominated by any other) form the rank-1 Pareto front.
+
+#### 4.56.2 Crowding Distance
+
+Within each Pareto rank, solutions are sorted by crowding distance — the sum of normalised objective-space distances to each solution's nearest neighbours on each axis. Higher crowding distance indicates greater diversity, and tournament selection favours solutions with higher crowding distance among equally-ranked individuals, preserving spread along the Pareto front.
+
+#### 4.56.3 Resilience and Cost Evaluation
+
+Each binary configuration vector (1 = add redundancy to component $i$) is evaluated on two axes:
+- **Resilience:** The total cascade severity reduction achieved by the redundancy configuration, normalised to $[0, 1]$.
+- **Cost:** The sum of per-component cost profiles for components receiving redundancy, normalised to $[0, 1]$.
+
+#### 4.56.4 Differentiation from Single-Objective GA (Section 4.34)
+
+The GA finds the single worst-case scenario; the Pareto optimizer finds the full trade-off surface, answering "what resilience improvement can I achieve for budget $X$?" — a question that single-objective optimisation cannot address.
+
+### 4.57 Bayesian Optimization
+
+The system provides a Bayesian optimiser that minimises the number of expensive CascadeEngine evaluations by building a Gaussian Process (GP) surrogate model and selecting evaluation points via the Expected Improvement (EI) acquisition function. Unlike PSO (Section 4.55) which requires many fitness evaluations, Bayesian optimisation is *sample-efficient*, making it ideal when each simulation call is computationally expensive.
+
+#### 4.57.1 Gaussian Process Surrogate
+
+The GP posterior is computed from observed (configuration, severity) pairs using a Radial Basis Function (RBF) kernel:
+
+$$k(x_i, x_j) = \sigma^2 \exp\left(-\frac{\|x_i - x_j\|^2}{2\ell^2}\right)$$
+
+The posterior mean and variance at an unobserved point $x^*$ are:
+
+$$\mu(x^*) = k_*^T (K + \sigma_n^2 I)^{-1} y$$
+$$\sigma^2(x^*) = k(x^*, x^*) - k_*^T (K + \sigma_n^2 I)^{-1} k_*$$
+
+where $K$ is the kernel matrix over observed points, $k_*$ is the kernel vector between $x^*$ and observed points, and $\sigma_n^2$ is the noise variance.
+
+#### 4.57.2 Expected Improvement Acquisition
+
+$$\text{EI}(x) = (\mu(x) - y_{\text{best}}) \Phi(Z) + \sigma(x) \phi(Z), \quad Z = \frac{\mu(x) - y_{\text{best}}}{\sigma(x)}$$
+
+where $\Phi$ is the standard normal CDF (approximated via an error function) and $\phi$ is the PDF. Points maximising EI balance exploitation (high predicted severity) with exploration (high uncertainty).
+
+#### 4.57.3 Differentiation from PSO (Section 4.55)
+
+| Aspect | PSO (Section 4.55) | Bayesian Optimization |
+|--------|---------------------|-----------------------|
+| Evaluations needed | Many (population × iterations) | Few (guided by GP surrogate) |
+| Surrogate model | None | Gaussian Process |
+| Selection strategy | Swarm dynamics | Expected Improvement |
+| Ideal when | Evaluations are cheap | Evaluations are expensive |
+
+### 4.58 Common Cause Failure Analysis (CCF / Beta Factor)
+
+The system provides a Common Cause Failure (CCF) analyser using the beta-factor model to quantify correlated failures originating from shared infrastructure (power, rack, availability zone). Unlike the CascadeEngine (Section 4.4) which models *sequential* propagation through dependency edges, CCF models *simultaneous* failures of multiple components from a shared root cause, capturing failure modes invisible to dependency-graph traversal.
+
+#### 4.58.1 Beta-Factor Model
+
+For a group of $n$ components sharing a common cause, the probability of simultaneous failure is:
+
+$$P_{\text{CCF}} = \beta \cdot P_{\text{independent}}$$
+
+where $\beta \in [0, 1]$ is the fraction of failures attributable to the common cause, and $P_{\text{independent}}$ is the average independent failure probability of group members.
+
+#### 4.58.2 Automatic Group Identification
+
+The engine automatically identifies CCF groups from the infrastructure graph:
+- **Zone groups:** Components sharing the same availability zone.
+- **Type groups:** Components of the same type (e.g., all databases).
+- **Dependency groups:** Components sharing the same critical dependency.
+- **Provider groups:** Components hosted by the same cloud provider.
+
+Each group is assigned a beta factor based on the group type (zone: 0.05, type: 0.02, dependency: 0.03, provider: 0.01).
+
+#### 4.58.3 Differentiation from CascadeEngine (Section 4.4) and Shared Infrastructure Modeling (Section 4.26)
+
+CascadeEngine models *sequential* propagation; Shared Infrastructure Modeling injects shared infrastructure *nodes* into the graph; CCF quantifies the *probability* of simultaneous failure using the beta-factor model — a mathematically distinct approach from either.
+
+### 4.59 Game Theory Analysis (Nash Equilibrium for Security Resilience)
+
+The system provides a game-theoretic analyser that computes minimax Nash equilibrium strategies between an attacker choosing fault targets and a defender choosing mitigations. Unlike the Security Resilience Engine (Section 4.10) which enumerates *static* vulnerabilities, game theory finds *equilibrium strategies* where neither side benefits from unilateral deviation.
+
+#### 4.59.1 Payoff Matrix Construction
+
+A two-player zero-sum game is constructed:
+- **Attacker strategies:** Targeting each component in the infrastructure graph.
+- **Defender strategies:** Applying mitigations (redundancy, circuit breakers, failover, monitoring, rate limiting).
+- **Payoff entries:** For each (attack, defense) pair, the CascadeEngine simulates the attack with the defense applied. The payoff is the residual cascade severity (negative for the defender).
+
+#### 4.59.2 Nash Equilibrium Computation
+
+The mixed-strategy Nash equilibrium is computed using the support enumeration method for $2 \times n$ games, finding the strategy profiles where neither player can improve their expected payoff by changing strategy. This yields:
+- **Optimal attack strategy:** The probability distribution over targets that maximises expected damage.
+- **Optimal defense strategy:** The probability distribution over mitigations that minimises expected damage.
+- **Game value:** The expected severity at equilibrium — the irreducible risk.
+
+#### 4.59.3 Differentiation from Security Resilience Engine (Section 4.10)
+
+The Security Resilience Engine evaluates defense effectiveness *statically*; Game Theory identifies *dynamic equilibrium* — the optimal strategies for both sides when each anticipates the other's best response.
+
+### 4.60 Fuzzy Logic Resilience Evaluation
+
+The system provides a fuzzy-logic resilience evaluation engine for cases where crisp thresholds are inappropriate (e.g., "somewhat degraded," "fairly resilient"). Unlike the hard-threshold scoring heuristics used in the resilience score computation (Section 4.23), fuzzy logic uses membership functions and linguistic rules for graceful, interpretable assessment.
+
+#### 4.60.1 Membership Functions
+
+Each input variable (redundancy, failover coverage, circuit breaker coverage, diversity) is mapped to linguistic terms (low, medium, high) using trapezoidal membership functions:
+
+$$\mu(x; a, b, c, d) = \max\!\left(0,\; \min\!\left(\frac{x-a}{b-a},\; 1,\; \frac{d-x}{d-c}\right)\right)$$
+
+#### 4.60.2 Fuzzy Rules and Defuzzification
+
+The rule base maps combinations of linguistic input terms to a linguistic resilience output (e.g., "IF redundancy is high AND failover is high THEN resilience is very_high"). Rules are evaluated using Mamdani inference with min-max composition, and the output is defuzzified using the centroid method:
+
+$$z^* = \frac{\sum_i z_i \cdot \mu(z_i)}{\sum_i \mu(z_i)}$$
+
+#### 4.60.3 Differentiation from Crisp Scoring (Section 4.23)
+
+| Aspect | Crisp Scoring (Section 4.23) | Fuzzy Logic |
+|--------|-------------------------------|-------------|
+| Boundaries | Hard thresholds | Gradual membership |
+| Interpretability | Numerical score | Linguistic labels |
+| Handling uncertainty | None | Native (partial membership) |
+| Output | 0-100 score | Linguistic term + numeric defuzzified value |
+
+### 4.61 Causal Inference Engine (Structural Causal Model, do-calculus)
+
+The system provides a causal inference engine that constructs a structural causal model (SCM) from the infrastructure dependency graph and supports interventional queries (do-calculus) and counterfactual reasoning. Unlike the CascadeEngine (Section 4.4) which simulates *forward* propagation, the Causal Inference Engine reasons *backwards* — "had we not done X, would Y still have failed?" — and distinguishes observational from interventional probability.
+
+#### 4.61.1 Structural Causal Model Construction
+
+Each component in the InfraGraph is converted to a causal node with:
+- **Structural equation:** $H_i = f_i(\text{Pa}_i, U_i)$, where $\text{Pa}_i$ are the parent nodes (components that $i$ depends on) and $U_i$ is an exogenous noise term derived from the component's base failure probability ($1 - \text{MTBF} / (\text{MTBF} + \text{MTTR})$).
+- **Mechanism:** The health of component $i$ depends on the minimum health of its parents, weighted by dependency type (`requires`: weight 1.0, `optional`: weight 0.3, `async`: weight 0.1), combined with the exogenous noise term.
+
+#### 4.61.2 do-Calculus (Interventional Queries)
+
+The $\text{do}(X = x)$ operator models an intervention that sets component $X$ to a specific health value, cutting all incoming causal arrows to $X$ while preserving its downstream effects. This is distinct from observational conditioning: $P(Y | \text{do}(X = 0))$ asks "if we *force* X down, what happens to Y?" rather than "given that X *happened to be* down, what is Y?" The system computes interventional effects by modifying the structural equations and forward-propagating through the truncated SCM.
+
+#### 4.61.3 Counterfactual Reasoning
+
+Counterfactual queries answer "had we intervened differently, what would have happened?" Given an observed scenario, the engine:
+1. Computes the factual world by forward-propagating with observed interventions.
+2. Computes the counterfactual world by forward-propagating with the alternative intervention.
+3. Reports the causal effect as $\Delta_i = H_i^{\text{factual}} - H_i^{\text{counterfactual}}$ for each component.
+
+#### 4.61.4 Root Cause Analysis
+
+The engine performs automated root cause analysis by computing the Average Causal Effect (ACE) of each component on every other component through iterated do-calculus interventions. Components with the highest average downstream impact are ranked as top root causes.
+
+#### 4.61.5 Differentiation from CascadeEngine (Section 4.4) and Bayesian Network (Section 4.31)
+
+| Aspect | CascadeEngine (Section 4.4) | Bayesian Network (Section 4.31) | Causal Inference |
+|--------|-----------------------------|---------------------------------|------------------|
+| Direction | Forward propagation | Probabilistic conditioning | Interventional + counterfactual |
+| Query type | "What happens when X fails?" | "What is P(Y|X=down)?" | "What if we *do*(X=down)?" and "Had X not failed, would Y still fail?" |
+| Confounding | Not addressed | Observational only | Eliminated by do-operator |
+| Root cause | Not supported | Most critical dependency | Average Causal Effect ranking |
+
+### 4.62 Multi-Engine Consensus Pipeline
+
+The system provides a multi-engine consensus pipeline that executes a given fault scenario across multiple simulation engines simultaneously and synthesises their results through voting. This integration pattern is the core differentiator: no single engine provides a complete picture, but the consensus of 28+ engines produces predictions with higher confidence than any individual engine.
+
+#### 4.62.1 Engine Orchestration
+
+For a given scenario, the pipeline invokes a configurable set of engines (CascadeEngine, ABM, DES, Cellular Automata, System Dynamics, and others) and collects each engine's list of affected components.
+
+#### 4.62.2 Voting and Confidence
+
+- **Agreed affected:** Components identified by more than half of the engines.
+- **Disagreements:** Components where engines disagree on impact.
+- **Confidence:** $C = |\text{agreed}| / (|\text{agreed}| + |\text{disagreements}|)$
+
+Higher engine agreement indicates higher prediction confidence. Recommendations are generated based on confidence level: high-confidence results warrant immediate action; low-confidence results recommend additional targeted simulation.
+
+#### 4.62.3 Novelty of Integration
+
+The inventive step lies not in any single engine but in the systematic combination of 28+ engines with diverse paradigms (deterministic, probabilistic, statistical, ML-based, formal) voting on the same scenario. This multi-engine consensus approach is unprecedented in infrastructure resilience analysis.
+
+### 4.63 Compliance Audit Pipeline
+
+The system provides an end-to-end compliance audit pipeline that chains simulation, compliance assessment, and evidence generation into a single automated workflow: simulate → comply → audit.
+
+#### 4.63.1 Pipeline Stages
+
+1. **Simulation phase:** Execute CascadeEngine across all critical scenarios and collect severity and affected-component data.
+2. **Compliance assessment:** Evaluate infrastructure posture against the target regulatory framework (SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR) by mapping control requirements to topology properties.
+3. **Evidence collection:** Automatically generate timestamped compliance evidence from simulation results, including control coverage, effectiveness scores, gap identification, and remediation recommendations.
+
+#### 4.63.2 Output
+
+An `AuditResult` containing: framework name, graph summary, simulation findings, per-control compliance checks, evidence trail, overall compliance status (compliant/non-compliant/partial), and a numeric compliance score (0-100).
+
+### 4.64 Cascade-Cost-Remediation Pipeline
+
+The system provides an integrated pipeline that combines cascade simulation with financial cost analysis and automated remediation planning: simulate → cost → remediate.
+
+#### 4.64.1 Pipeline Stages
+
+1. **Cascade analysis:** Simulate critical scenarios to identify affected components and severity.
+2. **Cost estimation:** For each affected component, compute revenue loss, SLA credit costs, and recovery engineer costs using the Financial Risk Engine (Section 4.11).
+3. **Remediation planning:** Generate prioritised remediation items ranked by ROI, where each item specifies the component, issue, recommended action, estimated cost, estimated benefit, and ROI = (benefit - cost) / cost.
+
+The pipeline outputs a complete `RemediationPlan` with total cost, total benefit, and overall ROI.
+
+### 4.65 Backtest-Calibration Loop
+
+The system provides an iterative backtest-calibration loop that validates simulation predictions against historical incidents and automatically tunes simulation parameters until accuracy converges.
+
+#### 4.65.1 Iterative Calibration
+
+1. Run the full backtest suite against historical incidents.
+2. Compute average F1 score, severity accuracy, and downtime MAE.
+3. If accuracy exceeds the target threshold, stop (converged).
+4. Otherwise, extract calibration adjustments (dependency weight threshold reduction, severity bias correction, downtime bias correction) from the backtest engine's calibration subsystem.
+5. Apply adjustments to simulation parameters.
+6. Repeat from step 1 (up to a maximum number of iterations).
+
+The loop outputs a `CalibrationResult` with initial accuracy, final accuracy, adjustments applied, convergence status, and per-iteration history.
+
+### 4.66 Cross-Method Validation
+
+The system provides a cross-method validation pipeline that compares results across fundamentally different analytical methods to identify where they agree (high-confidence findings) and where they disagree (areas requiring further investigation).
+
+#### 4.66.1 Method Pairs
+
+The pipeline validates across method categories:
+- **Static vs. Dynamic:** CascadeEngine (static BFS) vs. DES (event-driven temporal).
+- **Deterministic vs. Probabilistic:** Cellular Automata vs. ABM.
+- **Analytical vs. Simulation:** Bayesian Network vs. Monte Carlo.
+
+For each pair, the pipeline computes set intersection (agreement) and symmetric difference (disagreement) of affected components, plus a numeric agreement ratio (Jaccard similarity).
+
+### 4.67 Multi-Cloud Unified Analysis
+
+The system provides a multi-cloud analysis pipeline that evaluates infrastructure spanning multiple cloud providers (AWS, GCP, Azure, on-premise) in a unified framework.
+
+#### 4.67.1 Provider-Level Analysis
+
+For each provider's components, the pipeline runs independent cascade simulations and computes per-provider resilience metrics.
+
+#### 4.67.2 Cross-Provider Dependency Analysis
+
+The pipeline identifies cross-provider dependencies and simulates cross-boundary failures (e.g., "what happens to the GCP services if the AWS network partitions?"). Shared dependencies (DNS, CDN, certificate authorities) are analysed for correlated failure risk.
+
+#### 4.67.3 Unified Resilience Score
+
+A weighted average of per-provider resilience scores produces a single cross-cloud resilience metric, with weights reflecting the fraction of critical components hosted on each provider.
+
+### 4.68 Full Lifecycle Automation Pipeline
+
+The system provides a full lifecycle automation pipeline that orchestrates the complete resilience evaluation workflow in a single invocation: discover → simulate → report → remediate → validate.
+
+#### 4.68.1 Pipeline Stages
+
+1. **Discover:** Analyse the infrastructure graph to identify components, dependencies, and potential failure points.
+2. **Simulate:** Execute the multi-engine simulation suite across all generated scenarios.
+3. **Report:** Generate a comprehensive resilience report with findings, severity rankings, and availability analysis.
+4. **Remediate:** Produce a prioritised remediation plan with cost-benefit analysis.
+5. **Validate:** Re-simulate with proposed remediations applied to verify effectiveness.
+
+The pipeline outputs a `LifecycleResult` containing findings, remediation plan, validation results, and overall status.
+
+### 4.69 Genome Evolution Monitor
+
+The system provides a genome evolution monitoring pipeline that tracks the infrastructure resilience genome (Section 4.12) over time and detects resilience regression or improvement.
+
+#### 4.69.1 Evolution Tracking
+
+Each genome snapshot is timestamped and compared against the previous snapshot. Per-trait deltas are computed to identify which resilience dimensions are improving or degrading. An overall trend is computed as the average of all trait changes.
+
+#### 4.69.2 Anomaly Detection and Alerts
+
+The pipeline generates alerts when:
+- Any trait drops by more than a configurable threshold (default: 0.1).
+- The overall trend is negative for consecutive snapshots.
+- Specific critical traits (failover coverage, circuit breaker coverage) fall below minimum benchmarks.
+
+The pipeline outputs an `EvolutionResult` containing the genome history, per-trait trends, alerts, and recommendations.
+
+### 4.70 Threat Feed-Simulation Bridge
+
+The system provides a bridge pipeline that automatically converts real-time threat intelligence from security news feeds into executable fault scenarios and simulates their impact on the specific infrastructure topology.
+
+#### 4.70.1 Pipeline Stages
+
+1. **Fetch:** Retrieve security articles from configured RSS/Atom feeds.
+2. **Analyse:** Extract threat patterns using keyword and semantic matching against known attack categories (DDoS, ransomware, supply chain, etc.).
+3. **Convert:** For each identified threat, generate corresponding fault scenarios targeting the components in the infrastructure graph that match the threat profile (e.g., DDoS → public-facing load balancers).
+4. **Simulate:** Execute the generated scenarios through the CascadeEngine.
+5. **Assess:** Produce a threat assessment report with per-threat severity, affected components, and recommended mitigations.
+
+The pipeline outputs a `ThreatAssessmentResult` with threat summaries, simulation results, and overall risk assessment.
+
+### 4.71 Unified Security-Resilience Score
+
+The system provides a pipeline that combines the Security Resilience Engine (Section 4.10) results with the cascade simulation results into a single unified score that reflects both security posture and operational resilience.
+
+#### 4.71.1 Score Components
+
+- **Operational resilience** (weight 0.4): Derived from cascade severity distribution, SPOF count, and availability layer analysis.
+- **Security posture** (weight 0.3): Derived from the Security Resilience Engine's five-category score (encryption, access control, network, monitoring, recovery).
+- **Compliance** (weight 0.2): Derived from compliance framework simulation (Section 4.19).
+- **Financial risk** (weight 0.1): Derived from the Financial Risk Engine's VaR95 and expected annual loss.
+
+#### 4.71.2 Unified Output
+
+The pipeline produces a `UnifiedScore` with the overall score (0-100), per-category breakdowns, top risks across all categories, and prioritised recommendations.
+
+### 4.72 Inverse Optimizer (Target SLA → Required Changes)
+
+The system provides an inverse optimisation pipeline that, given a target SLA (e.g., 99.99%), computes the minimum infrastructure changes required to achieve it. This inverts the standard simulation flow: instead of "given this infrastructure, what is the availability?", it answers "given this target, what must change?"
+
+#### 4.72.1 Strategy Search
+
+The pipeline evaluates multiple improvement strategies in priority order:
+1. Add replicas to components with lowest availability.
+2. Enable failover for components without it.
+3. Add circuit breakers to vulnerable dependency edges.
+4. Reduce MTTR through automation.
+
+For each strategy, the pipeline applies the change to a copy of the infrastructure graph, re-simulates, and checks whether the target SLA is achieved.
+
+#### 4.72.2 Output
+
+An `InverseResult` containing: target SLA, current availability, whether the target is achievable, the minimum changes required, estimated cost, and the resulting availability after changes.
+
+### 4.73 Comparative Simulator (Side-by-Side Design Comparison)
+
+The system provides a comparative simulation pipeline that evaluates two infrastructure designs side-by-side, running identical scenarios against both and producing a structured comparison.
+
+#### 4.73.1 Comparison Metrics
+
+For each scenario, the pipeline compares:
+- Affected component counts (fewer is better).
+- Cascade severity (lower is better).
+- Recovery time estimates.
+- Availability layer analysis.
+
+#### 4.73.2 Differential Report
+
+The output is a `ComparisonResult` containing: per-graph summaries, common scenarios with differential analysis, an overall winner determination, and specific advantages/disadvantages of each design.
+
+### 4.74 Compound What-If Analysis
+
+The system provides a compound what-if analysis pipeline that varies multiple infrastructure parameters simultaneously to explore the multi-dimensional resilience response surface.
+
+#### 4.74.1 Parameter Space
+
+The pipeline accepts a list of parameters to vary (e.g., replica counts, MTTR values, failover enablement) and generates the Cartesian product of all parameter combinations.
+
+#### 4.74.2 Response Surface
+
+For each parameter combination, the pipeline applies the changes to the infrastructure graph, runs cascade simulation, and records the resilience score. The output is a `CompoundResult` containing the full response surface, the optimal parameter combination (highest resilience), the worst combination, and a sensitivity ranking indicating which parameters have the greatest impact.
+
+### 4.75 Ensemble Predictor (Static + Dynamic + Stochastic Fusion)
+
+The system provides an ensemble prediction pipeline that fuses results from three fundamentally different simulation paradigms — static (CascadeEngine), dynamic (DES), and stochastic (Monte Carlo) — into a unified prediction with confidence intervals.
+
+#### 4.75.1 Fusion Method
+
+The ensemble computes:
+- **Combined severity:** Weighted average of static severity, dynamic severity, and stochastic mean severity (weights configurable, default equal).
+- **Confidence interval:** Derived from the spread between the three methods' predictions. Wide disagreement produces a wide interval; narrow agreement produces a tight interval.
+- **Consensus affected components:** The union of components flagged by all three methods.
+- **Fusion confidence:** $C = 1 - \frac{\text{severity spread}}{10}$, where severity spread is the max-min range across methods.
+
+#### 4.75.2 Output
+
+An `EnsembleResult` containing the combined severity, confidence interval, consensus components, per-method results, and fusion confidence score.
+
+### 4.76 Hierarchical Analyzer (Component → Service → System → Business)
+
+The system provides a hierarchical analysis pipeline that aggregates resilience metrics across four abstraction levels: component, service, system, and business.
+
+#### 4.76.1 Hierarchy Construction
+
+1. **Component level:** Individual infrastructure components with their cascade severity and failure probability.
+2. **Service level:** Components are grouped by type (all databases, all caches, all web servers) and per-service resilience is computed as the product of component availabilities.
+3. **System level:** Services are aggregated into a system-level resilience score reflecting the critical path through the dependency graph.
+4. **Business level:** System resilience is translated into business impact metrics (revenue at risk, SLA credit exposure, customer impact).
+
+#### 4.76.2 Output
+
+A `HierarchyResult` containing the hierarchical breakdown at each level, with per-level scores, worst-performing entities at each level, and drill-down paths from business impact to root component.
+
+### 4.77 Temporal Unified View (Current + Trend + Forecast)
+
+The system provides a temporal unified view pipeline that combines current-state analysis, historical trend analysis, and future forecasting into a single temporal assessment.
+
+#### 4.77.1 Three Temporal Modes
+
+1. **Current:** Point-in-time cascade simulation on the current infrastructure state.
+2. **Trend:** Analysis of how resilience metrics have changed over recent genome snapshots (if available).
+3. **Forecast:** ARIMA-based prediction of where resilience metrics are heading over a configurable horizon.
+
+#### 4.77.2 Output
+
+A `TemporalResult` containing: current severity, current resilience score, trend direction (improving/stable/degrading) with change magnitude, forecast values with confidence intervals, and an overall temporal status classification.
+
 ## 5. ALTERNATIVE EMBODIMENTS AND EXTENSIONS
 
 ### 5.1 Machine Learning-Enhanced Scenario Generation
@@ -2257,6 +2877,174 @@ In an alternative embodiment, the system continuously compares simulation predic
 - (c) exposes the attention weight matrix for interpretability, showing which time-steps in the metric history the model considers most informative for the failure prediction; and
 - (d) processes all time-steps in parallel via attention, directly capturing long-range temporal dependencies without the sequential processing bottleneck and vanishing-gradient issues of recurrent architectures (Claim 44), while providing attention-based interpretability that recurrent models cannot offer.
 
+**Claim 53.** The method of Claim 1, further comprising a queueing theory-based capacity analysis method that:
+- (a) models each infrastructure component as a queueing system and computes M/M/1 (single-server) steady-state metrics including utilization $\rho = \lambda / \mu$, mean queue length $L_q = \rho^2 / (1 - \rho)$, mean wait time $W_q = \rho / (\mu - \lambda)$, and mean system time $W = 1 / (\mu - \lambda)$;
+- (b) computes M/M/c (multi-server) steady-state metrics using Erlang-C probability $C(c, A) = \frac{(A^c / c!) \cdot (c / (c - A))}{\sum_{k=0}^{c-1}(A^k / k!) + (A^c / c!) \cdot (c / (c - A))}$, where $A = \lambda / \mu$ and $c$ is the number of servers (replicas), to determine the probability that an arriving request must wait, mean queue length, and mean wait time;
+- (c) applies Little's Law ($L = \lambda W$) as an independent cross-validation of derived queueing metrics, verifying consistency between mean queue length, arrival rate, and mean sojourn time; and
+- (d) performs bottleneck analysis across all components by ranking components by utilization and identifying the component with the highest utilization as the system bottleneck, and predicts the arrival rate at which each component reaches a configurable saturation threshold, enabling proactive capacity planning before service degradation occurs, differentiating from the Capacity Engine (Claim 6) which evaluates high-availability configurations and quorum systems rather than arrival-rate-driven steady-state queueing behavior.
+
+**Claim 54.** The method of Claim 1, further comprising a Generative Adversarial Network (GAN) method for failure scenario generation that:
+- (a) trains a generator network $G(z)$ and a discriminator network $D(x)$ in an adversarial min-max game $\min_G \max_D \; \mathbb{E}[\log D(x)] + \mathbb{E}[\log(1 - D(G(z)))]$, where the generator maps random noise vectors from a latent space to synthetic fault scenario vectors and the discriminator classifies inputs as real (from existing simulation scenarios) or generated;
+- (b) trains via alternating gradient descent, updating the discriminator to maximize its classification accuracy and the generator to minimize the discriminator's ability to distinguish generated scenarios from real ones;
+- (c) generates novel failure scenarios by sampling random noise vectors and passing them through the trained generator, producing fault-severity vectors that are decoded into infrastructure component fault assignments; and
+- (d) discovers failure patterns not represented in the rule-based scenario generator (Claim 5) by learning the latent distribution of failure scenarios from simulation data, differentiating from the Genetic Algorithm (Claim 38) which evolves scenarios through crossover and mutation of binary chromosomes, and from the Chaos Fuzzer (Claim 24) which mutates existing scenarios through random perturbation, by instead learning a continuous generative model of the failure scenario distribution.
+
+**Claim 55.** The method of Claim 1, further comprising a Variational Autoencoder (VAE) method for failure scenario generation that:
+- (a) trains an encoder network that maps input fault scenario vectors to a mean vector $\mu$ and log-variance vector $\log \sigma^2$ in a latent space, and a decoder network that reconstructs fault scenario vectors from latent-space samples;
+- (b) optimizes the Evidence Lower Bound (ELBO) loss $\mathcal{L} = \mathcal{L}_{\text{recon}} + \beta \cdot D_{KL}(q(z|x) \| p(z))$, where $\mathcal{L}_{\text{recon}}$ is the mean squared error between input and reconstruction, $D_{KL}$ is the Kullback-Leibler divergence regularizing the latent distribution toward a unit Gaussian prior $\mathcal{N}(0, I)$, and $\beta$ is a weighting coefficient;
+- (c) applies the reparameterization trick $z = \mu + \sigma \odot \epsilon$, where $\epsilon \sim \mathcal{N}(0, I)$, to enable gradient-based optimization through the stochastic sampling step; and
+- (d) generates new failure scenarios by sampling from the learned latent space and decoding, producing scenarios that interpolate between known failure patterns rather than merely combining or mutating existing ones, differentiating from the GAN (Claim 54) which generates via adversarial training without an explicit latent-space structure, and from the Autoencoder (Claim 51) which is trained for anomaly detection rather than generative scenario synthesis.
+
+**Claim 56.** The method of Claim 1, further comprising a failure pattern clustering method that:
+- (a) extracts multi-dimensional feature vectors from simulation results, comprising per-component severity, cascade depth, recovery time, and affected-component-count metrics;
+- (b) initializes cluster centroids using the K-means++ algorithm, which selects initial centroids with probability proportional to the squared distance from the nearest existing centroid, avoiding poor convergence from random initialization;
+- (c) iteratively assigns each simulation result to the nearest centroid by Euclidean distance and recomputes centroids as the mean of assigned points until convergence or a maximum iteration count is reached; and
+- (d) determines the optimal number of clusters using the elbow method, computing within-cluster sum of squares (WCSS) for a range of cluster counts and selecting the number of clusters at which the marginal decrease in WCSS diminishes, differentiating from the Random Forest (Claim 50) which performs supervised classification requiring labeled data, by performing unsupervised discovery of latent failure pattern groupings without prior labeling.
+
+**Claim 57.** The method of Claim 1, further comprising an ARIMA (AutoRegressive Integrated Moving Average) time-series prediction method that:
+- (a) applies differencing of order $d$ to the input time-series of infrastructure metrics to achieve stationarity, computing the differenced series $y'_t = y_t - y_{t-d}$;
+- (b) fits autoregressive (AR) coefficients of order $p$ using the Levinson-Durbin algorithm on the autocorrelation sequence of the differenced series, and estimates moving average (MA) coefficients of order $q$ from the residual autocorrelation after AR fitting;
+- (c) generates multi-step-ahead forecasts using the fitted ARIMA($p$,$d$,$q$) model, producing point predictions and confidence intervals for future metric values; and
+- (d) predicts infrastructure metric trends (e.g., resource exhaustion trajectories, traffic growth patterns) using classical time-series decomposition, differentiating from the RNN/LSTM predictor (Claim 44) which uses neural network sequence modeling, and from the Transformer predictor (Claim 52) which uses self-attention, by providing interpretable closed-form coefficients and requiring no training data beyond the observed time-series.
+
+**Claim 58.** The method of Claim 1, further comprising an AdaBoost boosting method for failure prediction that:
+- (a) initializes uniform sample weights $w_i = 1/N$ across all training samples and iteratively trains a sequence of weak learners (decision stumps), each selecting the single feature and threshold that minimizes weighted classification error;
+- (b) computes, for each weak learner $t$, the weighted error $\epsilon_t = \sum_{i: h_t(x_i) \neq y_i} w_i$ and the learner weight $\alpha_t = 0.5 \cdot \ln((1 - \epsilon_t) / \epsilon_t)$;
+- (c) updates sample weights after each weak learner: $w_i \leftarrow w_i \cdot \exp(-\alpha_t \cdot y_i \cdot h_t(x_i))$, followed by renormalization, so that subsequent weak learners focus on previously misclassified samples; and
+- (d) produces a strong classifier as the sign of the weighted sum $H(x) = \text{sign}(\sum_t \alpha_t \cdot h_t(x))$, differentiating from the Random Forest (Claim 50) which trains independent trees on bootstrap samples (bagging), by instead training sequential trees on adaptively reweighted samples (boosting), and from the logistic regression predictor (Claim 34) which fits a single linear decision boundary.
+
+**Claim 59.** The method of Claim 1, further comprising a Particle Swarm Optimization (PSO) method for infrastructure configuration optimization that:
+- (a) initializes a swarm of particles, each representing a candidate infrastructure configuration vector (e.g., replica counts, timeout values, capacity allocations), with random positions and velocities within configurable bounds;
+- (b) updates each particle's velocity at each iteration according to $v_i \leftarrow w \cdot v_i + c_1 r_1 (p_{\text{best},i} - x_i) + c_2 r_2 (g_{\text{best}} - x_i)$, where $w$ is the inertia weight (linearly decayed from an initial value to a final value over the optimization), $c_1$ and $c_2$ are cognitive and social acceleration coefficients, and $r_1$, $r_2$ are uniform random values;
+- (c) evaluates the fitness of each particle position by running the infrastructure simulation and computing the resilience score (or its negation for minimization), updating personal best $p_{\text{best},i}$ and global best $g_{\text{best}}$ positions; and
+- (d) discovers optimal infrastructure configurations through swarm-based cooperative search, differentiating from the Genetic Algorithm (Claim 38) which uses crossover and mutation on binary chromosomes, from the Simulated Annealing (Claim 45) which uses single-solution neighborhood search with probabilistic acceptance, and from Bayesian Optimization (Claim 61) which uses a Gaussian Process surrogate model, by leveraging velocity-based particle dynamics with social information sharing.
+
+**Claim 60.** The method of Claim 1, further comprising a multi-objective Pareto optimization method using NSGA-II that:
+- (a) formulates infrastructure optimization as a multi-objective problem with $M$ competing objectives (e.g., maximize resilience score, minimize cost, minimize latency), where no single solution simultaneously optimizes all objectives;
+- (b) implements the Non-dominated Sorting Genetic Algorithm II (NSGA-II), sorting the population into Pareto fronts by non-domination rank, where a solution $A$ dominates solution $B$ if and only if $A$ is no worse than $B$ on all objectives and strictly better on at least one;
+- (c) applies crowding distance assignment within each Pareto front to maintain diversity, computed as the sum of normalized distances to neighboring solutions along each objective axis, and uses crowding distance as the secondary sorting criterion after non-domination rank; and
+- (d) produces a Pareto-optimal frontier of infrastructure configurations representing the set of non-dominated trade-off solutions, differentiating from the PSO (Claim 59) and Genetic Algorithm (Claim 38) which optimize a single scalar objective, and from the What-If Engine (Claim 6) which performs parametric sensitivity analysis rather than multi-objective optimization, by providing the complete set of efficient trade-offs across competing infrastructure goals.
+
+**Claim 61.** The method of Claim 1, further comprising a Bayesian Optimization method for infrastructure configuration tuning that:
+- (a) constructs a Gaussian Process (GP) surrogate model with a Radial Basis Function (RBF) kernel $k(x, x') = \sigma^2 \exp(-\|x - x'\|^2 / (2l^2))$, fitting the GP to observed (configuration, resilience-score) pairs by computing the posterior mean $\mu(x) = k_*^T K^{-1} y$ and posterior variance $\sigma^2(x) = k_{**} - k_*^T K^{-1} k_*$;
+- (b) selects the next configuration to evaluate by maximizing the Expected Improvement (EI) acquisition function $\text{EI}(x) = (\mu(x) - f_{\text{best}} - \xi) \Phi(Z) + \sigma(x) \phi(Z)$, where $Z = (\mu(x) - f_{\text{best}} - \xi) / \sigma(x)$, $\Phi$ and $\phi$ are the standard normal CDF and PDF, and $\xi$ is an exploration-exploitation trade-off parameter;
+- (c) iteratively evaluates the selected configuration by running the infrastructure simulation, updates the GP posterior with the new observation, and repeats until a convergence criterion or budget is exhausted; and
+- (d) efficiently optimizes expensive-to-evaluate infrastructure configurations by building a cheap-to-query surrogate model, differentiating from the PSO (Claim 59) which requires many parallel evaluations, from the Genetic Algorithm (Claim 38) which requires a large population of evaluations, and from the Simulated Annealing (Claim 45) which uses random neighborhood sampling, by minimizing the number of simulation runs required to find near-optimal configurations through informed sequential selection.
+
+**Claim 62.** The method of Claim 1, further comprising a Common Cause Failure (CCF) analysis method that:
+- (a) identifies CCF groups — sets of components sharing a common failure cause (e.g., same availability zone, same software version, same hardware type, same power domain) — by analyzing component attributes in the topology model;
+- (b) computes, for each CCF group, a beta factor $\beta$ representing the fraction of failures attributable to the common cause, and derives the CCF probability as $P_{\text{CCF}} = \beta \cdot P_{\text{independent}}$, where $P_{\text{independent}}$ is the individual component failure probability from MTBF;
+- (c) simulates simultaneous failure of all components within each CCF group, propagating the correlated failure through the dependency graph to compute the cascade severity; and
+- (d) quantifies the risk of correlated simultaneous failures that independent-failure models underestimate, differentiating from the Fault Tree Analysis (Claim 39) which decomposes top-event failure into independent basic events, from the Bayesian Network (Claim 35) which computes conditional probabilities along dependency edges, and from the Backtest Engine's shared infrastructure modeling (Claim 31) which injects shared infrastructure nodes for historical incident replay, by explicitly modeling the beta-factor fraction of common-cause failures within component groups.
+
+**Claim 63.** The method of Claim 1, further comprising a game theory-based resilience analysis method that:
+- (a) models the interaction between an infrastructure defender and an attacker as a two-player zero-sum game, constructing a payoff matrix where each row represents a defense strategy (e.g., redundancy allocation, circuit breaker placement, traffic shaping) and each column represents an attack strategy (e.g., DDoS, component targeting, cascade exploitation);
+- (b) computes the payoff for each (defense, attack) strategy pair by running the infrastructure simulation with the corresponding defense configuration and attack scenario, using the resulting resilience score (or cascade severity) as the payoff value;
+- (c) computes the Nash equilibrium by finding the minimax strategy — the defense strategy that maximizes the minimum payoff across all possible attacks — and determines mixed strategies by computing the probability distribution over strategies that equalizes expected payoff; and
+- (d) identifies robust defense strategies that perform well against worst-case adversarial behavior, differentiating from the Genetic Algorithm (Claim 38) and PSO (Claim 59) which optimize against a fixed objective function rather than an adversarial opponent, and from the Security Engine (Claim 8) which evaluates defense effectiveness against predefined attack types using a static defense matrix rather than strategic equilibrium analysis.
+
+**Claim 64.** The method of Claim 1, further comprising a fuzzy logic resilience evaluation method that:
+- (a) defines linguistic variables for infrastructure properties (e.g., "load" with terms low/medium/high, "redundancy" with terms none/partial/full, "health" with terms degraded/fair/good) and maps each to fuzzy membership functions (trapezoidal or triangular) over the continuous metric range;
+- (b) evaluates a rule base of fuzzy if-then rules (e.g., "IF load IS high AND redundancy IS none THEN resilience IS low") using the Mamdani inference method, computing the firing strength of each rule as the minimum of its antecedent membership values;
+- (c) aggregates the consequent fuzzy sets of all fired rules using the maximum operator and defuzzifies the aggregated set using the centroid method $x^* = \int x \mu(x) dx / \int \mu(x) dx$ to produce a crisp resilience score; and
+- (d) provides human-interpretable resilience evaluation using linguistic rules that domain experts can directly author and audit, differentiating from the machine learning predictors (Claims 34, 44, 50, 52) which produce opaque numerical outputs, and from the multi-layer availability model (Claim 4) which computes availability from precise mathematical formulas rather than qualitative linguistic reasoning.
+
+**Claim 65.** The method of Claim 1, further comprising a causal inference method for infrastructure failure analysis that:
+- (a) constructs a Structural Causal Model (SCM) from the infrastructure dependency graph, where each node represents a component's health status as a causally determined variable, and directed edges represent causal mechanisms with structural equations encoding the dependency-type-specific impact;
+- (b) applies the do-calculus intervention operator $\text{do}(X = x)$ to compute the effect of forcing a component to a specific state (e.g., failure), distinguishing the causal effect of the intervention from the merely correlational association observed under passive monitoring;
+- (c) computes counterfactual outcomes by evaluating "what would have happened had component $X$ not failed, given the observed failure of components $Y$", using the three-step abduction-action-prediction procedure on the structural equations; and
+- (d) identifies true root causes of cascade failures by distinguishing causal influence from spurious correlation, differentiating from the Bayesian Network (Claim 35) which computes conditional probabilities that conflate causal and correlational relationships, from the Cascade Engine (Claim 2) which propagates failures along dependency edges without formal causal semantics, and from the ML Dependency Inference (Claim 30) which infers statistical dependencies rather than causal mechanisms.
+
+**Claim 66.** The method of Claims 1 and 6, further comprising a multi-engine consensus method that:
+- (a) executes a plurality of independent simulation engines — including at least a cascade engine, a dynamic engine, and one or more analytical engines — on the same fault scenario and topology;
+- (b) collects the severity assessment from each engine and computes an agreement score as the fraction of engines whose severity assessments agree within a configurable tolerance;
+- (c) computes a consensus severity as the weighted mean of individual engine severities, where weights are configurable per engine; and
+- (d) identifies discrepant engines whose assessments diverge from the consensus beyond the tolerance threshold, flagging scenarios requiring human review, wherein the combination of multiple independent simulation methodologies into a single consensus assessment with divergence detection constitutes the inventive step.
+
+**Claim 67.** The method of Claims 1 and 6, further comprising a compliance audit pipeline that:
+- (a) executes one or more simulation engines (cascade, security, financial risk) on the infrastructure topology;
+- (b) evaluates simulation results against a configurable set of regulatory compliance rules mapped to specific frameworks (SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR);
+- (c) generates a structured audit report identifying, for each compliance rule, the pass/fail status, the simulation evidence supporting the determination, and specific remediation recommendations for failed rules; and
+- (d) bridges the gap between technical simulation results and regulatory compliance requirements by automatically mapping simulation outcomes to compliance controls, wherein the automated translation from simulation evidence to compliance findings constitutes the inventive step.
+
+**Claim 68.** The method of Claims 1 and 9, further comprising a cascade-cost-remediation pipeline that:
+- (a) executes a cascade simulation to identify failure severity and affected components;
+- (b) feeds cascade results into a financial risk engine to compute business impact (revenue loss, SLA penalties, recovery costs) and Value-at-Risk;
+- (c) automatically generates a ranked set of remediation actions, each with estimated implementation cost and projected risk reduction, sorted by ROI = (projected_savings − implementation_cost) / implementation_cost; and
+- (d) produces an end-to-end pipeline from fault simulation through financial quantification to prioritized remediation, wherein the automated chaining of cascade → financial → remediation analysis with ROI-based prioritization constitutes the inventive step.
+
+**Claim 69.** The method of Claim 1, further comprising a backtest-calibration loop that:
+- (a) runs the simulation against a database of historical incidents with known outcomes (affected components, severity, duration);
+- (b) computes accuracy metrics (precision, recall, F1 score) comparing predicted outcomes against actual incident outcomes;
+- (c) adjusts simulation parameters (propagation weights, severity thresholds, timeout values) based on backtest error signals using gradient-free optimization or heuristic tuning; and
+- (d) iterates the simulate-measure-adjust cycle until prediction accuracy exceeds a configurable threshold or a maximum number of calibration rounds is reached, wherein the closed-loop automatic calibration of simulation parameters from historical incident data constitutes the inventive step.
+
+**Claim 70.** The method of Claim 1, further comprising a cross-method validation method that:
+- (a) selects two or more simulation engines with independent mathematical foundations (e.g., a graph-based cascade engine and a Markov chain engine, or a Monte Carlo engine and an analytical availability model);
+- (b) executes all selected engines on the same topology and fault scenario;
+- (c) compares the results across engines and computes a correlation coefficient quantifying the agreement between engine outputs; and
+- (d) flags scenarios where independent methods produce significantly divergent results as requiring additional investigation or model refinement, wherein the systematic cross-validation of simulation results using methodologically independent engines constitutes the inventive step.
+
+**Claim 71.** The method of Claim 1, further comprising a multi-cloud comparative analysis method that:
+- (a) receives topology definitions for the same logical application deployed across two or more cloud providers or deployment configurations;
+- (b) executes the full simulation suite (cascade, security, financial, availability) independently on each cloud topology;
+- (c) produces a normalized comparison report showing per-metric differences between cloud deployments, including resilience score differential, cost differential, and vulnerability differential; and
+- (d) identifies cloud-provider-specific risks and advantages, enabling informed multi-cloud strategy decisions, wherein the parallel simulation and normalized comparison of the same application across heterogeneous cloud environments constitutes the inventive step.
+
+**Claim 72.** The method of Claims 1 and 6, further comprising a full lifecycle automation method that:
+- (a) receives an infrastructure topology definition;
+- (b) executes, in an automated pipeline without human intervention between stages, the following sequence: scenario generation, multi-engine simulation (cascade + dynamic + security), availability model computation, financial risk quantification, resilience genome extraction, and remediation recommendation generation;
+- (c) produces a unified lifecycle report aggregating all stage outputs with cross-references between stages (e.g., linking cascade vulnerabilities to their financial impact and recommended remediations); and
+- (d) delivers a comprehensive resilience assessment from a single topology input, wherein the end-to-end automated orchestration of multiple analysis stages with cross-stage data flow and unified reporting constitutes the inventive step.
+
+**Claim 73.** The method of Claims 1 and 7, further comprising a genome evolution monitoring method that:
+- (a) computes the resilience genome (multi-dimensional trait vector) for the current topology;
+- (b) compares the current genome against one or more previously recorded genome snapshots to compute per-trait deltas and an overall drift magnitude;
+- (c) classifies each trait change as improvement, regression, or stable based on configurable thresholds; and
+- (d) generates an evolution report tracking resilience trajectory over time, enabling detection of gradual resilience drift before it reaches critical levels, wherein the longitudinal comparison of multi-dimensional resilience genomes with trend classification constitutes the inventive step.
+
+**Claim 74.** The method of Claims 1 and 8, further comprising a threat feed-simulation bridge that:
+- (a) fetches security threat intelligence from external feeds (RSS/Atom, structured threat intelligence formats);
+- (b) extracts threat patterns from feed entries using keyword and semantic matching;
+- (c) automatically converts extracted threats into executable fault scenarios compatible with the simulation engine, mapping threat types to component-specific fault injections; and
+- (d) executes the converted scenarios against the current topology and produces a threat-specific resilience assessment, wherein the automated translation from external threat intelligence to executable simulation scenarios with immediate resilience evaluation constitutes the inventive step.
+
+**Claim 75.** The method of Claims 1, 6, and 8, further comprising a unified security-resilience scoring method that:
+- (a) executes both resilience simulation engines (cascade, dynamic, availability) and security simulation engines (attack simulation, defense effectiveness, lateral movement) on the same topology;
+- (b) normalizes the resilience score and security score to a common scale;
+- (c) computes a unified score as a weighted combination of the normalized resilience and security scores, with configurable weighting; and
+- (d) generates a gap analysis identifying areas where resilience and security postures diverge, wherein the integration of traditionally separate resilience engineering and security assessment into a single unified metric with gap analysis constitutes the inventive step.
+
+**Claim 76.** The method of Claim 1, further comprising an inverse optimization method that:
+- (a) receives a target resilience score or availability objective;
+- (b) computes, via iterative simulation with parameter adjustment, the minimum infrastructure changes (added replicas, circuit breakers, failover configurations) required to achieve the target;
+- (c) ranks the computed changes by cost-effectiveness (resilience improvement per unit cost); and
+- (d) solves the inverse problem — "what infrastructure do I need to achieve target X?" — differentiating from forward simulation which answers "what resilience does infrastructure X provide?", wherein the automated inverse mapping from target objectives to minimum-cost infrastructure configurations constitutes the inventive step.
+
+**Claim 77.** The method of Claim 1, further comprising a comparative simulation method that:
+- (a) receives two or more infrastructure topology definitions representing alternative designs or configurations;
+- (b) executes the full simulation suite on each topology under identical fault scenarios;
+- (c) produces a side-by-side comparison of all simulation metrics (resilience score, availability, financial risk, security score) with statistical significance indicators; and
+- (d) generates a recommendation identifying the superior topology for each metric and overall, enabling data-driven architecture decision-making, wherein the controlled comparative evaluation of alternative infrastructure designs under identical simulation conditions constitutes the inventive step.
+
+**Claim 78.** The method of Claim 1, further comprising a compound what-if analysis method that:
+- (a) receives a sequence of infrastructure change proposals (e.g., add replicas to component A, then enable circuit breaker on component B, then increase capacity of component C);
+- (b) applies each change incrementally to the topology model and executes the simulation after each change;
+- (c) computes the marginal resilience improvement attributable to each individual change; and
+- (d) produces a cumulative impact analysis showing how each successive change contributes to the overall resilience improvement, enabling identification of the most impactful changes and detection of diminishing returns, wherein the sequential incremental evaluation of compound changes with per-change marginal impact attribution constitutes the inventive step.
+
+**Claim 79.** The method of Claim 1, further comprising an ensemble prediction method that:
+- (a) executes a plurality of prediction engines — including at least a static cascade engine, a dynamic simulation engine, and a stochastic Monte Carlo engine — on the same topology and scenario;
+- (b) collects the failure probability or severity estimate from each engine;
+- (c) computes an ensemble prediction as a weighted combination of individual engine predictions, where weights are derived from each engine's historical backtest accuracy; and
+- (d) produces a prediction with lower variance and higher accuracy than any individual engine, including a confidence interval derived from the spread of individual engine predictions, wherein the accuracy-weighted fusion of methodologically diverse prediction engines with empirically calibrated weights constitutes the inventive step.
+
+**Claim 80.** The method of Claim 1, further comprising a hierarchical infrastructure analysis method that:
+- (a) decomposes the infrastructure topology into hierarchical levels (e.g., system → service → component → sub-component) based on dependency graph structure;
+- (b) executes simulation independently at each hierarchical level, computing level-specific resilience metrics;
+- (c) propagates resilience assessments upward through the hierarchy, computing how component-level vulnerabilities aggregate into service-level and system-level risks; and
+- (d) generates a hierarchical resilience map showing risk concentration at each level, enabling both top-down strategic planning and bottom-up detailed analysis, wherein the multi-level decomposition with bidirectional resilience propagation constitutes the inventive step.
+
 ---
 
 ## APPENDIX A: Implementation Reference
@@ -2311,6 +3099,11 @@ Key implementation files corresponding to the described components:
 - Simulated Annealing / Random Forest / Autoencoder: `src/faultray/simulator/optimization_engines.py` (SimulatedAnnealingOptimizer class — Metropolis criterion, geometric cooling; RandomForestPredictor class — bagged decision tree ensemble with feature sub-sampling; AnomalyAutoencoder class — encoder-decoder anomaly detection via reconstruction error)
 - Formal Methods (RBD / ETA / Model Checker): `src/faultray/simulator/formal_methods_engine.py` (ReliabilityBlockDiagram class — series/parallel availability; EventTreeAnalysis class — inductive forward risk assessment; SimpleModelChecker class — exhaustive state-space CTL verification with AG/EF/AF operators)
 - Advanced ML (EVT / Transformer): `src/faultray/simulator/advanced_ml_engines.py` (ExtremeValueAnalyzer class — GEV distribution fitting, return level computation, tail-risk probability; SimpleTransformerPredictor class — self-attention, positional encoding, attention-interpretable failure prediction)
+- Queueing Theory Engine: `src/faultray/simulator/queueing_theory_engine.py` (QueueingTheoryEngine class — M/M/1 steady-state metrics, M/M/c Erlang-C computation, Little's Law cross-validation, bottleneck analysis, saturation prediction)
+- Generative Engines (GAN / VAE / Clustering): `src/faultray/simulator/generative_engines.py` (SimpleGAN class — adversarial scenario generation; SimpleVAE class — ELBO-optimized latent-space scenario generation with reparameterization trick; FailurePatternClustering class — K-means++ clustering with elbow-method optimal cluster selection)
+- Time-Series & Ensemble (ARIMA / AdaBoost / PSO): `src/faultray/simulator/timeseries_and_ensemble.py` (ARIMAPredictor class — Levinson-Durbin AR fitting, MA residual estimation, differencing; BoostingPredictor class — AdaBoost with decision stumps, adaptive sample reweighting; ParticleSwarmOptimizer class — PSO with inertia decay, cognitive/social coefficients)
+- Domain-Specific Engines (Pareto / BayesOpt / CCF / GameTheory / Fuzzy / Causal): `src/faultray/simulator/domain_specific_engines.py` (ParetoOptimizer class — NSGA-II non-dominated sorting, crowding distance; BayesianOptimizer class — GP surrogate with RBF kernel, Expected Improvement acquisition; CommonCauseFailureAnalyzer class — beta-factor CCF groups; GameTheoryAnalyzer class — Nash equilibrium, minimax, mixed strategies; FuzzyResilienceEngine class — Mamdani inference, centroid defuzzification; CausalInferenceEngine class — SCM, do-calculus, counterfactual reasoning)
+- Integration Pipelines (16 pipelines): `src/faultray/simulator/integration_pipelines.py` (MultiEngineConsensus, ComplianceAuditPipeline, CascadeCostRemediationPipeline, BacktestCalibrationLoop, CrossMethodValidator, MultiCloudAnalyzer, FullLifecycleAutomation, GenomeEvolutionMonitor, ThreatFeedSimulationBridge, UnifiedSecurityResilienceScore, InverseOptimizer, ComparativeSimulator, CompoundWhatIf, EnsemblePredictor, HierarchicalAnalyzer, TemporalUnifiedView)
 
 ---
 
