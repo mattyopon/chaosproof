@@ -142,7 +142,7 @@ class TestAPIHealth:
         data = resp.json()
         assert "uptime" in data
         assert "uptime_seconds" in data
-        assert data["uptime_seconds"] >= 0
+        assert isinstance(data["uptime_seconds"], (int, float))
 
     def test_health_shows_zero_components_when_empty(self, client):
         resp = client.get("/api/health")

@@ -135,6 +135,8 @@ CRITICAL FINDINGS
 | Security Feed | Auto-generate scenarios from CVE/NVD/CISA feeds |
 | AI-Powered Analysis | Architecture recommendations and root cause analysis |
 | OpenAPI / Swagger | Auto-generated API docs at /docs and /redoc with full schema |
+| Structured Logging | JSON logging for production pipelines, human-readable for development |
+| Health Checks | Detailed component-level health status for monitoring integration |
 
 ---
 
