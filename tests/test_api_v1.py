@@ -281,7 +281,7 @@ class TestOpenAPIDocs:
     def test_openapi_version(self, client):
         resp = client.get("/openapi.json")
         data = resp.json()
-        assert data["info"]["version"] == "10.2.0"
+        assert data["info"]["version"] == "10.3.0"
 
     def test_openapi_contact_info(self, client):
         resp = client.get("/openapi.json")

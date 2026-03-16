@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [10.3.0] - 2026-03-16
+
+### Added
+- **Structured Logging** — JSONFormatter for production, HumanFormatter with ANSI colors for dev (49 tests)
+- **Health Check Module** — Component-level health for 8 engines with latency tracking (33 tests)
+- **Japanese Documentation** — 5 comprehensive guides (getting-started, engines, compliance, API, use cases)
+- **SDK Quick Start** — examples/sdk_quickstart.py demonstrating all 6 engines
+- **CI Integration Sample** — examples/ci_integration.yaml for GitHub Actions resilience gate
+- **Docker Quick Start** — examples/docker-quickstart.yaml
+- **SEO Optimization** — JSON-LD structured data, Twitter Cards, expanded meta tags, sitemap.xml
+- Integration tests for SDK quickstart (6 tests)
+
+### Changed
+- Landing page: comprehensive SEO (OG tags, Twitter Card, JSON-LD, preconnect hints, font-display: swap)
+- robots.txt: fixed sitemap URL to faultray.com
+- README: Enterprise Features with Structured Logging and Health Checks
+
+### Fixed
+- Flaky uptime assertion in test_api_docs.py
+
 ## [10.2.0] - 2026-03-16
 
 ### Added

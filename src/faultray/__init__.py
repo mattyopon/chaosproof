@@ -1,6 +1,6 @@
 """FaultRay — Zero-risk infrastructure chaos simulation."""
 
-__version__ = "10.2.0"
+__version__ = "10.3.0"
 
 
 def __getattr__(name: str):
