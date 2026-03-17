@@ -64,7 +64,7 @@ The invention provides a computer-implemented system and method comprising:
 
 2. **An automated fault scenario generation engine** that algorithmically generates a comprehensive set of failure scenarios from the topology model, including single-component failures, pairwise combinations, triple failures, component-type-specific faults, traffic spike scenarios at multiple magnitudes, and specialized scenarios based on component semantics (database replication lag, cache stampede, queue backpressure, etc.), producing 2,000 or more distinct scenarios from a typical topology.
 
-3. **A multi-engine simulation architecture** comprising thirty-six complementary simulation engines:
+3. **A multi-engine simulation architecture** comprising over one hundred complementary simulation and analysis engines, including thirty-six core simulation engines and sixty-five specialized domain engines:
    - A **Cascade Engine** that propagates failure effects through the dependency graph using breadth-first search (BFS), computing severity scores based on impact and spread metrics, and modeling dependency-type-aware propagation (required vs. optional vs. asynchronous dependencies)
    - A **Dynamic Engine** that executes time-stepped simulations with traffic pattern injection, autoscaling response modeling, circuit breaker activation, failover sequence simulation, and latency cascade tracking
    - An **Operations Engine** that simulates multi-day operational scenarios incorporating MTBF/MTTR-based stochastic event generation, deployment events, and gradual degradation patterns
@@ -2693,6 +2693,2723 @@ The bridge enables a structured hybrid resilience assessment workflow:
 3. **Verify Selectively:** The highest-priority predictions are validated through real chaos experiments on the external platform.
 4. **Calibrate:** Comparison metrics (precision, recall, F1, severity match) identify systematic prediction errors. Low recall triggers review of dependency graph completeness and cascade propagation rules. Low precision triggers review of circuit breaker and failover configurations. Severity mismatch triggers calibration of component capacity thresholds and metric sensitivity parameters.
 5. **Report:** A unified hybrid report summarizes overall accuracy across all compared scenarios, per-scenario breakdowns, and calibration recommendations, enabling continuous improvement of simulation fidelity.
+
+### 4.83 Incident Response Simulation Engine
+
+The system provides an incident response simulation engine that models the complete lifecycle of operational incidents -- from detection and severity classification through escalation, recovery, and post-incident review -- without requiring a real incident to occur. The inventive aspect is the ability to evaluate incident response readiness quantitatively by simulating the interplay between infrastructure topology, team escalation chains, runbook coverage, and automation capabilities.
+
+#### 4.83.1 Severity Classification and Escalation Chain Generation
+
+The engine classifies incidents across five severity levels (SEV1 through SEV5) and eight incident categories (infrastructure, application, database, network, security, capacity, deployment, third-party). For each severity level, the engine generates a multi-step escalation chain with configurable time thresholds: SEV1 triggers escalation at 5-minute intervals (page on-call, notify team lead, notify VP engineering, assemble war room, executive briefing), while lower severities use progressively longer thresholds (15, 30, 60, 120 minutes respectively). Each escalation step specifies the action (page, notify, assemble), target role, trigger condition, and expected response time.
+
+#### 4.83.2 MTTR Estimation with Multi-Factor Adjustment
+
+The engine estimates Mean Time To Repair through a multi-factor model. A base MTTR is determined by component type from a lookup table (e.g., database: 45 minutes, load balancer: 10 minutes, cache: 8 minutes). This base value is then adjusted by four multiplicative factors: (1) a team factor based on team size and expertise, (2) an automation factor that reduces MTTR for automatable recovery actions, (3) a runbook factor that penalises uncovered failure modes, and (4) a complexity factor derived from the number of downstream dependents in the infrastructure graph. The adjusted MTTR is computed as: `adjusted_mttr = base_mttr * team_factor * automation_factor * runbook_factor * complexity_factor`.
+
+#### 4.83.3 Runbook Coverage and Automation Opportunity Analysis
+
+The engine evaluates runbook coverage by enumerating known failure modes per component type (e.g., database: connection pool exhaustion, replication lag, disk full, corruption, lock contention, slow query, failover failure) and determining which modes have corresponding runbook entries. An overall coverage percentage is computed as `total_covered / total_failure_modes * 100`. Additionally, the engine identifies automation opportunities by analysing each recovery action (restart, failover, scale-up, rollback, restore backup, drain traffic, clear cache, rotate credentials, patch configuration) and computing a priority score based on `time_savings / automation_complexity`, producing an automation report with total manual time, potential savings, and per-action recommendations.
+
+#### 4.83.4 Differentiation from Operations Engine (Section 4.6)
+
+While the Operations Engine (Section 4.6) simulates multi-day operational scenarios with stochastic failure events and deployment windows, the Incident Response Simulation Engine focuses specifically on the human and organisational dimensions of incident management: escalation chain modelling, on-call fatigue analysis (estimated alerts per week, pages per night, fatigue score 0-100), war room coordination, communication plan effectiveness scoring, post-incident review template generation with five-whys analysis, and timeline reconstruction with phase decomposition (time to detect, acknowledge, mitigate, resolve).
+
+### 4.84 Disaster Recovery Orchestration Engine
+
+The system provides a disaster recovery orchestration engine that generates, sequences, and virtually executes step-by-step recovery procedures across the entire infrastructure graph. Unlike basic DR assessment engines that evaluate readiness at a summary level, this engine models the actual procedural orchestration -- step dependencies, parallel vs. sequential execution, critical path analysis, data consistency validation, and checkpoint verification -- producing an executable recovery runbook.
+
+#### 4.84.1 Step Dependency Resolution and Critical Path Analysis
+
+The engine generates recovery steps per component grouped by eight recovery phases (detection, triage, failover, data validation, service restoration, health check, failback, post-recovery). Steps are assigned explicit dependencies: data stores (databases, storage, caches) receive failover steps before application services, reflecting the invariant that stateful components must be recovered before stateless consumers. The engine performs topological sort on the step dependency graph to produce a valid execution order, detects cycles (which indicate configuration errors), and identifies parallelisable groups where steps share no dependencies. Critical path analysis computes the longest sequential chain through the dependency graph, yielding `estimated_rto_seconds` and identifying the single bottleneck step whose duration most constrains recovery time. Parallel savings are computed as `total_sequential_time - critical_path_time`.
+
+#### 4.84.2 DR Drill Simulation and Failover Coordination
+
+The engine executes virtual DR drills by simulating each recovery step in sequence, applying automation time factors (manual: 1.0x, semi-automated: 0.5x, fully automated: 0.1x) to step durations, and recording a timestamped event log. Drill outcomes are classified as success, partial success, or failure based on step completion rates. The engine also generates failover/failback coordination plans that enforce the ordering constraint: data stores fail over first, then application services, with failback occurring in reverse order. For each component, recovery priority scoring uses a composite formula: `priority_score = revenue_impact_per_minute * 10 + dependent_count * 5 + data_store_bonus * 20 + failover_penalty * 15`, producing a ranked recovery order.
+
+#### 4.84.3 Data Consistency Validation and Post-Recovery Health Verification
+
+The engine validates data consistency during recovery by examining replication lag, checksum matching, and records-behind counts for each data store component. Components with replication lag exceeding configurable thresholds or failed checksum verification are flagged. Post-recovery health verification planning generates structured health checks per component (connectivity, replication status, query execution, index integrity, cache warm-up, queue drain status), each classified as critical or non-critical. The engine also performs automation gap detection, comparing each step's current automation level against a recommended level and computing potential time savings.
+
+#### 4.84.4 Differentiation from DR Readiness Assessment
+
+While DR readiness assessment evaluates whether an infrastructure is prepared for disaster recovery at a policy and configuration level, the Disaster Recovery Orchestration Engine generates and simulates the actual step-by-step procedures, including communication plans (notification entries with audience, channel, timing, and responsible party across all recovery phases), DR test coverage analysis (which disaster scenarios have been tested, test frequency, and untested critical scenarios), and recovery checkpoint validation with blocking/non-blocking gate classification.
+
+### 4.85 Database Failover Analysis Engine
+
+The system provides a database failover analysis engine that evaluates failover configurations across six database types (PostgreSQL, MySQL, MongoDB, Redis, DynamoDB, Cassandra) with four failover strategies (automatic, manual, DNS-based, proxy-based). The engine produces a comprehensive reliability assessment by decomposing failover into discrete timing phases, quantifying data loss risk, analysing replica promotion candidates, and assessing split-brain prevention effectiveness.
+
+#### 4.85.1 Failover Timing Decomposition
+
+The engine decomposes total failover time into four phases: detection time, promotion time, DNS update time, and connection reset time. Each phase has a base duration determined by database type (e.g., PostgreSQL: 10s detection, 15s promotion, 5s DNS, 3s reset; Redis: 5s, 5s, 0s, 1s; DynamoDB: all zeros as a managed service). These base values are adjusted by strategy multipliers: automatic failover halves detection time, manual failover quintuples detection and doubles promotion, proxy-based failover eliminates DNS update and reduces connection reset by 0.3x (for PgBouncer/ProxySQL). Multi-AZ deployments halve promotion time, and synchronous replication reduces promotion by 0.7x. The total failover time is `detection + promotion + dns_update + connection_reset`.
+
+#### 4.85.2 Data Loss Risk and Split-Brain Assessment
+
+Data loss risk is computed as a composite score (0-1) based on replication mode (asynchronous: +0.5, semi-synchronous: +0.2, synchronous: +0.0), replica availability (no replicas: +0.3), and failover strategy (manual: +0.2). Estimated data loss is derived from WAL generation rate and replication lag: `data_loss_bytes = uncommitted_wal_bytes * risk_score`, where WAL bytes are estimated from replication lag (approximately 1 MB/s). Split-brain risk is scored from 0 to 1 based on prevention strategy (no strategy: +0.6, fencing: +0.1, quorum: +0.05, STONITH: +0.03), replication mode, multi-AZ status, replica count, and cross-region enablement. Application-level retry effectiveness is modelled by computing total retry budget from backoff strategy (exponential: `initial_delay * 2^attempt`, capped at `max_delay`) and checking whether the retry window covers the failover duration.
+
+#### 4.85.3 Differentiation from Multi-Region DR Engine (Section 4.86)
+
+While the Multi-Region DR Engine (Section 4.86) evaluates region-level failover strategies, the Database Failover Analysis Engine operates at the database instance level with database-engine-specific timing profiles, proxy-layer analysis (PgBouncer, ProxySQL, HAProxy), failover chain analysis (primary to standby to DR with per-link health and lag tracking, chain reliability computed as `health_ratio * (1 - lag_penalty * 0.5)`), post-failover health verification across six checks (replication integrity, data integrity, connection re-establishment, latency regression, failover strategy health, split-brain prevention), and overall reliability scoring (0-100) with penalties for slow failover, data loss risk, split-brain risk, and poor post-failover health, and bonuses for automatic failover, multi-AZ, cross-region, and application retry enablement.
+
+### 4.86 Multi-Region Disaster Recovery Engine
+
+The system provides a multi-region disaster recovery engine that evaluates cross-region failover strategies and simulates complete failover events with detailed timelines. The engine models four DR strategies (active-active, active-passive, pilot light, backup-restore) and computes RTO, RPO, availability nines, and cost multipliers for each.
+
+#### 4.86.1 RTO/RPO Computation and Strategy Comparison
+
+RTO is computed as the sum of three components: strategy-specific base recovery time (active-active: 0s, active-passive: 60s, pilot light: 600s, backup-restore: 3600s), DNS propagation time (equal to DNS TTL except for active-active where it is zero), and detection time (2x health check interval for automated failover, 300s for manual). RPO is determined by replication mode: synchronous yields RPO = 0, semi-synchronous yields RPO equal to replication lag, and asynchronous yields RPO equal to 2x replication lag. The engine compares all four strategies for a given configuration by instantiating a separate engine per strategy with shared region and replication parameters, producing an array of `DRAssessment` results ranked by RTO/RPO compliance.
+
+#### 4.86.2 Failover Event Simulation
+
+The engine simulates individual failover events with five trigger types (region outage, AZ outage, service degradation, manual, DNS health check), producing a timestamped step log: detection confirmation at `T+detection`, failover decision at `T+detection+decision` (5s automated, 120s manual), secondary region ready at `T+detection+decision+base_exec`, and DNS propagation complete at `T+total`. A degraded period of 300 seconds is modelled when secondary region capacity is below 100%. Availability nines are derived from estimated annual downtime: `nines = -log10(1 - availability)`, where `availability = 1 - (rto_hours * 12_incidents / 8760_hours_per_year)`.
+
+#### 4.86.3 Differentiation from Database Failover Analysis Engine (Section 4.85)
+
+While the Database Failover Analysis Engine (Section 4.85) operates at the database instance level with engine-specific timing profiles, the Multi-Region DR Engine operates at the region level, modelling entire region failover including infrastructure provisioning (pilot light scale-up, backup-restore full provisioning), DNS-level traffic redirection, and cross-region capacity constraints. The engine additionally computes cost multipliers per strategy (active-active: 2.0x, active-passive: 1.6x, pilot light: 1.2x, backup-restore: 1.05x), enabling cost-benefit trade-off analysis.
+
+### 4.87 Graceful Degradation Planning Engine
+
+The system provides a graceful degradation planning engine that models how services should progressively reduce functionality under partial failures, maintaining the highest possible quality of service for the most critical features. The engine operates on a structured `DegradationPlan` containing feature definitions with criticality classifications, degradation rules triggered by component failures, and bulkhead partition boundaries.
+
+#### 4.87.1 Feature Criticality Classification and Degradation Level Assessment
+
+Features are classified into three criticality tiers (critical, important, nice-to-have) with associated weights (3.0, 2.0, 1.0) and mapped to five ordered degradation levels (full service, reduced functionality, read-only, maintenance mode, offline). The engine evaluates each degradation level by determining which features remain available (critical features are preserved longest) and computing two impact metrics: user experience impact score (`sum of disabled_feature_weights * user_impact_weight / total_weight * 100`) and revenue impact percentage (sum of disabled features' `revenue_impact_percent`). SLA impact assessment at each level estimates availability impact, latency increase, error rate increase, SLA breach risk classification, and estimated credit percentage.
+
+#### 4.87.2 Fallback Strategy Evaluation and Bulkhead Pattern Analysis
+
+For each feature, the engine evaluates fallback strategies (cache, static content, default values, queue for later, redirect, none) based on effectiveness, staleness risk, and data consistency risk. The engine analyses bulkhead partitions -- isolation boundaries between feature groups defined by maximum concurrent requests, queue size, and timeout -- assessing isolation effectiveness, blast radius containment, and overflow risk. Cascade degradation analysis traces how a single component failure propagates through feature dependencies, identifying the cascade chain, time to full cascade, and mitigation points where circuit breakers or bulkheads could arrest propagation.
+
+#### 4.87.3 Differentiation from Load Shedding Engine (Section 4.89)
+
+While the Load Shedding Engine (Section 4.89) determines which requests to drop under overload, the Graceful Degradation Planning Engine determines which features to disable and in what order, operating at the feature/business-logic level rather than the request level. The engine produces recovery sequence plans that specify the order in which features should be re-enabled after failure resolution (critical features first), with dependency verification at each step and estimated recovery times, enabling operators to plan both degradation and recovery as coordinated processes.
+
+### 4.88 Graceful Shutdown Simulation Engine
+
+The system provides a graceful shutdown simulation engine that models the complete shutdown sequence of infrastructure components through seven discrete phases: signal received, new connections refused, in-flight request draining, health check failing, load balancer deregistration, final cleanup, and terminated. The engine quantifies the risk of data loss and request dropping for a given shutdown configuration.
+
+#### 4.88.1 Phase-by-Phase Shutdown Simulation
+
+The engine simulates each shutdown phase with durations derived from the shutdown configuration: signal received (0.1s), new connections refused (0.5s if SIGTERM handler present), in-flight draining (configurable `drain_timeout_seconds`), health check failing (2.0s), load balancer deregistration (3.0s if enabled), final cleanup (`preStop_hook_seconds`), and terminated (0s). In-flight request count is estimated from component capacity: `in_flight = max_rps * replicas * timeout_seconds * 0.01`. Drain rate is modelled as 80% of maximum capacity: `drain_rate = max_rps * replicas * 0.8`. During the draining phase, `drained = drain_rate * duration` requests are completed; remaining requests are tracked through subsequent phases. Data loss risk is classified as none/low/medium/high based on dropped request count, in-flight requests at termination, and whether SIGTERM handler and connection draining are configured.
+
+#### 4.88.2 Configuration Validation and Rolling Restart Analysis
+
+The engine validates shutdown configurations against component-specific constraints: databases require drain timeouts of at least 30 seconds, grace periods must exceed `drain_timeout + preStop_hook` to prevent forced kills before draining completes, and single-replica components without load balancer deregistration are flagged as causing downtime. Forced kill (SIGKILL) simulation models immediate termination with component-type-specific recovery times (database: 120s, queue: 60s, cache: 45s, default: 30s), reduced by 0.5x for multi-replica and 0.3x for failover-enabled components. Rolling restart analysis simulates sequential shutdown of multiple components, computing total duration, maximum simultaneous unavailability, minimum available capacity percentage, and safety assessment (safe if zero dropped requests and available capacity >= 50%).
+
+#### 4.88.3 Differentiation from Graceful Degradation Planning Engine (Section 4.87)
+
+While the Graceful Degradation Planning Engine (Section 4.87) models which features to disable during partial failures, the Graceful Shutdown Simulation Engine models the mechanical process of terminating individual component instances -- the precise sequence of signal handling, connection draining, load balancer deregistration, and cleanup -- producing per-phase timing and request-loss metrics that are relevant to deployment pipelines, autoscaling events, and maintenance operations.
+
+### 4.89 Load Shedding Simulation Engine
+
+The system provides a load shedding simulation engine that evaluates how different shedding strategies protect services from overload. The engine models eight shedding strategies (random drop, priority-based, LIFO, FIFO, token bucket, adaptive, circuit-based, client throttle) and six backpressure signalling mechanisms (HTTP 429, TCP backoff, queue full, response degradation, connection refuse, rate limit header).
+
+#### 4.89.1 Shedding Fraction and Priority Impact Computation
+
+The shed fraction is computed from the relationship between effective load and capacity: `overload_fraction = (effective_rps - threshold_rps) / effective_rps`, where `effective_rps = requests_per_second * burst_multiplier` and `threshold_rps = max_rps * replicas * (threshold_percent / 100)`. For priority-based shedding, requests are shed from lowest priority first: the engine iterates priorities in reverse rank order (low, medium, high, critical), deducting each priority's traffic fraction from the remaining shed budget, producing per-priority acceptance rates. Latency is modelled with a queueing-theory-inspired formula: `avg_latency = base_latency * queueing_factor + strategy_overhead`, where `queueing_factor = 1 / max(1 - load_ratio * (1 - shed_fraction), 0.05)` and `p99 = avg * 3.5`.
+
+#### 4.89.2 Strategy Comparison and Cascade Backpressure
+
+The engine compares all shedding strategies using per-strategy fairness multipliers (FIFO: 0.95, random: 0.90, token bucket: 0.85, priority-based: 0.60) and efficiency multipliers (adaptive: 0.95, priority-based: 0.90, token bucket: 0.85, random: 0.70). Cascade backpressure simulation walks the dependency graph upstream from the load source using BFS, computing per-hop saturation (`effective_rps / max_rps * 100`) and dampening effective RPS by 0.7x per hop. Recovery time is estimated as `depth * 10 + max_saturation * 0.5` seconds. Goodput analysis separates useful throughput from wasted work: `goodput = accepted_rps * efficiency`, `goodput_ratio = goodput / effective_rps`. Optimal threshold search sweeps from 50% to 95% in 5% steps, maximising a combined score of `stability + goodput_ratio * 100`.
+
+#### 4.89.3 Differentiation from Rate Limiter Simulation Engine (Section 4.97)
+
+While the Rate Limiter Simulation Engine (Section 4.97) models rate-limiting algorithms at the API boundary, the Load Shedding Engine operates at the service level, modelling what happens after requests have passed rate limits but the service is still overloaded. The engine additionally simulates progressive graceful degradation under load (disabling features in stages: analytics, recommendations, search suggestions, image processing, batch jobs) and computes system stability scores incorporating component health status, replica count, and shedding fraction.
+
+### 4.90 Circuit Breaker Tuning Engine
+
+The system provides a circuit breaker tuning engine that analyses and optimises circuit breaker configurations across the service dependency graph. The engine operates on the closed/open/half-open state machine model and evaluates failure threshold settings, recovery timeouts, half-open request budgets, cascading breaker coordination, false-positive and false-negative trip risks, retry-policy interactions, and thundering-herd risks after recovery.
+
+#### 4.90.1 Failure Threshold Optimisation and Recovery Timeout Tuning
+
+The engine computes optimal failure thresholds from historical error rates using the formula: `optimal_threshold = max(min_threshold, base_error_rate * safety_multiplier * evaluation_window)`. Recovery timeouts are tuned based on service recovery patterns and the formula: `optimal_recovery = mean_recovery_time * multiplier + jitter`, where mean recovery time is derived from component MTTR and failover configuration. Half-open request budgets are calculated to balance probing speed against blast radius: the engine recommends allowing `max(1, min(10, total_rps * 0.01))` probe requests during the half-open state. False-positive risk is assessed as the probability that normal error variance exceeds the trip threshold, while false-negative risk measures the probability that a genuine failure is not detected within the evaluation window.
+
+#### 4.90.2 Cascading Breaker Coordination and Placement Analysis
+
+The engine analyses how circuit breakers on different edges interact during cascading failures. When a downstream breaker opens, upstream breakers may observe increased failure rates and trip redundantly, creating a "breaker cascade." The engine detects such coordination gaps by walking dependency chains and checking whether breaker thresholds account for downstream breaker-induced errors. Optimal placement detection identifies dependency edges that lack circuit breakers but connect to components with high failure rates or high fan-out, scoring placement priority based on `error_rate * dependent_count * (1 if no_breaker else 0.1)`. The engine also evaluates thundering-herd risk after breaker recovery: when an open breaker transitions to half-open, pent-up demand may overwhelm the recovering service, estimated as `queued_requests_during_open = rps * open_duration`.
+
+#### 4.90.3 Differentiation from Cascade Engine (Section 4.4)
+
+While the Cascade Engine (Section 4.4) models failure propagation through the dependency graph using BFS with health state transitions, the Circuit Breaker Tuning Engine focuses specifically on the configuration and coordination of circuit breakers as a failure containment mechanism. The engine produces actionable tuning recommendations: specific threshold values, recovery timeout durations, half-open budgets, and placement recommendations, rather than evaluating the cascading impact of failures that circuit breakers are designed to prevent.
+
+### 4.91 API Gateway Resilience Analysis Engine
+
+The system provides an API gateway resilience analysis engine that evaluates gateway configurations across six gateway implementations (Kong, AWS API Gateway, Envoy, Nginx, Traefik, HAProxy) and produces a comprehensive resilience report covering routing, authentication, rate limiting, TLS management, high availability, request buffering, circuit breaker integration, canary routing, and caching strategy.
+
+#### 4.91.1 Multi-Dimension Gateway Assessment
+
+The engine analyses twelve resilience dimensions: (1) Request routing resilience evaluating path-based, header-based, and weight-based routing rules for missing retry configurations and excessive timeouts. (2) Authentication failure handling across methods (JWT, OAuth2, API key, mTLS, basic), assessing fallback configuration and token refresh strategy. (3) Rate limiting and throttling configuration analysis computing headroom against upstream service capacity and saturation risk. (4) Request/response transformation error handling. (5) Gateway high availability evaluating active-passive (failover time modelled by gateway type: Envoy 2s, Kong 5s, AWS API Gateway 0s) and active-active (cluster size and SPOF detection). (6) TLS termination mode (edge, passthrough, re-encrypt) with certificate expiry risk classification. (7) WebSocket and SSE long-connection handling during failover. (8) Request buffering and timeout configuration validation. (9) Gateway-level circuit breaker integration with monitored error codes. (10) Canary routing configuration validation including success/error thresholds and auto-rollback. (11) Gateway caching strategy (TTL-based, stale-while-revalidate, stale-if-error) and invalidation method analysis. (12) Overall gateway resilience scoring as the weighted average of all dimension scores.
+
+#### 4.91.2 Differentiation from Load Balancer Analysis
+
+While the Cascade Engine (Section 4.4) models load balancers as components with health status and replica counts, the API Gateway Resilience Analysis Engine evaluates the gateway's application-layer functionality: routing rule resilience, auth failure handling, request transformation, canary deployment validation, caching configuration, and WebSocket/SSE connection management during failover. The engine is gateway-implementation-aware, applying different failover time estimates and capability assessments based on the specific gateway product.
+
+### 4.92 API Versioning Impact Analysis Engine
+
+The system provides an API versioning impact analysis engine that evaluates the resilience implications of API versioning strategies across the infrastructure dependency graph. The engine tracks API versions per component, detects breaking changes, analyses version compatibility matrices, and generates version migration risk assessments.
+
+#### 4.92.1 Version Compatibility and Breaking Change Detection
+
+The engine supports four versioning strategies (URL path, header, query parameter, content negotiation) and models API versions with structured metadata (version string, status: active/deprecated/sunset/retired, deprecation and sunset dates, supported endpoints). Breaking changes are classified by type (field removal, type change, endpoint removal, behaviour change, authentication change, response format change) with per-change severity scoring. The version compatibility matrix is computed across dependent service pairs by comparing their declared API versions: compatible pairs receive score 1.0, minor-version mismatches receive 0.8, major-version mismatches receive 0.3, and unknown compatibility receives 0.0. A version skew risk score is computed from the standard deviation of version numbers across the dependency graph.
+
+#### 4.92.2 Migration Risk and Deprecation Planning
+
+Migration cost/risk assessment evaluates the effort required to upgrade between API versions by aggregating breaking change severities, counting affected endpoints, and estimating downstream consumer impact. The engine generates version deprecation timelines with sunset plans, identifying components still consuming deprecated versions and computing the time remaining before sunset enforcement. A backward compatibility score (0-100) is computed per component based on the fraction of endpoints that maintain backward compatibility across version transitions.
+
+#### 4.92.3 Differentiation from Webhook Resilience Analysis Engine (Section 4.96)
+
+While the Webhook Resilience Analysis Engine (Section 4.96) evaluates webhook delivery mechanisms, the API Versioning Impact Analysis Engine focuses on the contract-level compatibility between service interfaces over time. The engine detects version skew risks that are invisible to runtime resilience analysis: services running incompatible API versions may function correctly under normal conditions but fail during failover when traffic is redirected to secondary instances running different versions.
+
+### 4.93 Idempotency Analysis Engine
+
+The system provides an idempotency analysis engine that evaluates idempotency guarantees across service interactions in the infrastructure dependency graph. The engine assesses retry safety, delivery semantics, duplicate detection capabilities, and side-effect isolation to identify operations that may cause data corruption or financial loss when retried during failure recovery.
+
+#### 4.93.1 Idempotency Key Coverage and Delivery Semantics Classification
+
+The engine evaluates idempotency key coverage across all service endpoints, classifying HTTP methods by inherent safety (GET, HEAD, OPTIONS, TRACE are safe; PUT, DELETE are idempotent; POST requires explicit idempotency keys). Delivery semantics are classified as at-most-once, at-least-once, or exactly-once based on the combination of retry configuration and idempotency guarantees. Idempotency key collision risk is estimated from key generation method: UUID v4 baseline collision rate of `1e-18` is adjusted upward for shorter keys, sequential keys, or timestamp-based keys. The idempotency window/TTL analysis checks whether the configured deduplication window (default: 86,400 seconds) covers the maximum retry budget including exponential backoff delays.
+
+#### 4.93.2 Financial Operation Auditing and Cross-Service Chain Analysis
+
+The engine applies heightened scrutiny to components tagged as financial operations (payment, billing, finance, checkout, transaction, ledger, invoice), requiring exactly-once delivery semantics, idempotency keys on all mutating operations, and compensating transaction capabilities. Cross-service idempotency chain analysis traces idempotency key propagation across dependency edges: if service A passes an idempotency key to service B, but service B does not propagate it to service C, the chain is broken and retries at service A may cause duplicate processing at service C. The engine also evaluates event sourcing idempotency for components tagged with event sourcing patterns, checking for event deduplication and idempotent event handlers.
+
+#### 4.93.3 Differentiation from Throttle Cascade Analysis Engine (Section 4.94)
+
+While the Throttle Cascade Analysis Engine (Section 4.94) models how rate limiting propagates through service chains, the Idempotency Analysis Engine evaluates whether the operations themselves are safe to retry -- a precondition for any retry-based resilience mechanism. Without idempotency guarantees, the retry mechanisms modelled by other engines (circuit breakers, rate limiters, timeout budgets) may cause correctness failures rather than resilience improvements.
+
+### 4.94 Throttle Cascade Analysis Engine
+
+The system provides a throttle cascade analysis engine that models how rate-limiting and throttling propagate across service dependency chains. The engine evaluates upstream propagation, downstream backpressure cascades, throttle budget distribution, priority-based throttling fairness, adaptive threshold optimisation, and retry storm detection.
+
+#### 4.94.1 Upstream Throttle Propagation and Budget Distribution
+
+The engine models throttle propagation in three directions (upstream, downstream, bidirectional) by walking the dependency graph and computing per-hop effective throughput. At each hop, the effective rate is reduced by the local throttle limit: `effective_out = min(effective_in, local_limit)`. Throttle budget distribution across service chains allocates the total available throughput proportionally, accounting for priority levels (critical, high, medium, low) with configurable weight distributions. The engine detects throttle-induced retry storms by computing the amplification factor: when a service returns HTTP 429, clients retry, increasing load by `retry_rate = rejection_fraction * retry_multiplier`, which can exceed the original throttle limit and create a positive feedback loop.
+
+#### 4.94.2 Response Code Analysis and Window Alignment
+
+The engine analyses throttle response code handling (429 Too Many Requests vs. 503 Service Unavailable vs. 502 Bad Gateway), evaluating whether upstream services correctly distinguish between throttling (temporary, retry-safe) and failures (potentially not retry-safe). Throttle window alignment analysis checks whether services in a dependency chain use compatible rate-limit windows: misaligned windows (e.g., upstream uses 1-second windows, downstream uses 1-minute windows) can cause burst propagation where traffic that passes the upstream window overwhelms the downstream. Global vs. local rate limit coordination assessment evaluates whether distributed service instances use centralised rate counting (preventing split-brain counting) or per-instance limits (risking aggregate over-admission).
+
+#### 4.94.3 Differentiation from Rate Limiter Simulation Engine (Section 4.97)
+
+While the Rate Limiter Simulation Engine (Section 4.97) simulates individual rate-limiting algorithms and their per-component behaviour, the Throttle Cascade Analysis Engine models the system-wide propagation of throttling decisions across dependency chains, detecting emergent behaviours such as throttle-induced retry storms, window alignment conflicts, priority inversion, and throttle bypass vulnerabilities that arise only when multiple rate-limited services interact.
+
+### 4.95 Timeout Budget Analysis Engine
+
+The system provides a timeout budget analysis engine that performs end-to-end timeout budget analysis across service dependency chains. The engine detects timeout inconsistencies, models timeout cascade behaviour, evaluates retry-timeout interactions, propagates gRPC-style deadlines, recommends jitter strategies, and computes optimal timeout values from latency percentile data.
+
+#### 4.95.1 Timeout Inconsistency Detection and Cascade Modelling
+
+The engine detects timeout inconsistencies by comparing caller and callee timeout configurations across all dependency edges: when `caller_timeout < callee_timeout`, the caller may time out before receiving a response, wasting the callee's processing. Inconsistencies where the ratio exceeds 2.0 are classified as CRITICAL. Timeout cascade modelling traces what happens when timeouts fire in sequence along a request path: cumulative timeout is computed as the sum of per-hop read timeouts, and paths where cumulative timeout exceeds an end-to-end budget are flagged. The per-hop timeout configuration distinguishes three timeout kinds (connection, read, write) with default derivation from component capacity: `connection_timeout = min(timeout_seconds * 1000, 5000)`, `read_timeout = timeout_seconds * 1000`, `write_timeout = timeout_seconds * 600`.
+
+#### 4.95.2 Deadline Propagation and Optimal Timeout Computation
+
+The engine implements gRPC-style deadline propagation along request paths: starting with an initial deadline, the remaining budget is decremented by each hop's processing time (`remaining -= processing_time`), flagging the first hop where the deadline is exceeded. Retry-timeout interaction analysis verifies that the total retry budget (`single_timeout * (max_retries + 1) + sum(backoff_delays)`) fits within the caller's timeout window. Optimal timeout values are computed from observed latency percentiles: `recommended_timeout = p99 * headroom_factor` (default headroom: 1.5x). Jitter strategy recommendations are component-type-aware: databases and caches receive decorrelated jitter recommendations to prevent thundering herd on reconnect, while high-fan-in components (>3 dependents) also receive decorrelated jitter. The engine additionally analyses circuit breaker timeout impact by estimating the timeout-induced failure rate from latency data and determining whether it will trip the breaker.
+
+#### 4.95.3 Differentiation from Circuit Breaker Tuning Engine (Section 4.90)
+
+While the Circuit Breaker Tuning Engine (Section 4.90) optimises circuit breaker configurations, the Timeout Budget Analysis Engine focuses on the timeout configurations that precede circuit breaker decisions. Timeout misconfigurations are a root cause of false circuit breaker trips: overly aggressive timeouts cause artificial failure rates that trip breakers unnecessarily. The engine additionally detects slow-consumer mismatches in asynchronous dependency edges, computing queue buildup rates when producer throughput exceeds consumer processing capacity.
+
+### 4.96 Webhook Resilience Analysis Engine
+
+The system provides a webhook resilience analysis engine that evaluates webhook delivery mechanisms and their resilience characteristics across the infrastructure graph. The engine assesses retry policies, dead letter queue configurations, payload size impact, timeout configurations, ordering guarantees, deduplication mechanisms, signature verification coverage, endpoint availability, rate limiting impact, circuit breaker integration, replay capabilities, and delivery SLA compliance.
+
+#### 4.96.1 Retry Policy Evaluation and Dead Letter Queue Analysis
+
+The engine evaluates webhook retry strategies (none, fixed delay, linear backoff, exponential backoff, exponential with jitter) by computing total retry duration, maximum delivery attempts, and the probability of successful delivery under various endpoint failure rates. Dead letter queue (DLQ) analysis verifies that failed webhook deliveries are captured for later inspection and replay, assessing DLQ capacity, retention period, and alerting configuration. Delivery SLA compliance scoring checks whether the configured retry policy and timeout values can meet a target delivery SLA (e.g., 99.9% delivery within 1 hour), computing the expected delivery success rate as `1 - (1 - endpoint_availability)^(max_retries + 1)`.
+
+#### 4.96.2 Deduplication and Ordering Guarantee Analysis
+
+The engine evaluates deduplication mechanisms to ensure that webhook consumers can handle duplicate deliveries safely, assessing whether delivery IDs are unique, whether consumers maintain deduplication state, and whether the deduplication window covers the maximum retry period. Ordering guarantee analysis evaluates whether webhooks are delivered in the order they were generated, identifying scenarios where retry-induced reordering violates application invariants. Signature verification coverage assessment checks whether webhook payloads are cryptographically signed (HMAC-SHA256) and whether consumers validate signatures, identifying components that accept unsigned webhooks as a security and integrity risk. Fan-out delivery bottleneck detection identifies webhook producers that deliver to many endpoints, computing the fan-out amplification factor and detecting potential bottlenecks.
+
+#### 4.96.3 Differentiation from Idempotency Analysis Engine (Section 4.93)
+
+While the Idempotency Analysis Engine (Section 4.93) evaluates whether individual operations are safe to retry, the Webhook Resilience Analysis Engine evaluates the end-to-end delivery pipeline for event-driven architectures, including the webhook producer's retry mechanism, the network delivery path, the consumer's processing guarantees, and the dead letter queue safety net. The engine is specific to push-based asynchronous communication patterns, whereas the Idempotency Analysis Engine applies to both synchronous and asynchronous interactions.
+
+### 4.97 Rate Limiter Simulation Engine
+
+The system provides a rate limiter simulation engine that models five rate-limiting algorithms (token bucket, leaky bucket, fixed window, sliding window log, sliding window counter) with configurable per-component rules, multi-tier enforcement, cascade backpressure analysis, and quota optimisation across distributed services.
+
+#### 4.97.1 Algorithm Simulation and Comparison
+
+Each algorithm is characterised by three properties: burst tolerance (token bucket: 0.9, fixed window: 0.7, sliding window counter: 0.6, sliding window log: 0.5, leaky bucket: 0.3), fairness (leaky bucket: 0.95, sliding window log: 0.9, sliding window counter: 0.85, token bucket: 0.7, fixed window: 0.5), and overhead (fixed window: 0.05ms, token bucket: 0.1ms, leaky bucket: 0.2ms, sliding window counter: 0.8ms, sliding window log: 1.5ms). The rejection fraction is computed as: `effective_capacity = rps + burst_size * burst_tolerance / window_seconds`; if `effective_rps > effective_capacity`, then `rejection_fraction = (effective_rps - effective_capacity) / effective_rps`. Three throttle actions are modelled: hard reject (immediate 429), queue (rejected requests are buffered up to `queue_capacity`), and degrade (rejected requests receive degraded responses with configurable latency factor). The engine compares all five algorithms for a given traffic profile, producing per-algorithm metrics: requests allowed/rejected/queued/degraded, rejection rate, average and p99 latency, burst handling score, and fairness score.
+
+#### 4.97.2 Multi-Tier Rate Limiting and Cascade Analysis
+
+Multi-tier analysis models rate limits at four scopes (global, per-API-key, per-IP, per-user), evaluating each tier in priority order. For per-user and per-IP tiers, the effective limit is scaled by the number of unique clients. The cascade analysis walks downstream dependencies from a rate-limited source component, computing per-hop effective throughput, backpressure percentage, queue saturation, and retry amplification factor (`1 + rejection_fraction * 0.5`). Retry storm risk is computed from cumulative retry amplification: `storm_risk = (total_retry_amp - num_components) / num_components * 100`. The engine also simulates Retry-After header behaviour and client backoff, computing retry amplification factor, wasted requests, and effective goodput ratio across multiple retry waves with decreasing congestion.
+
+#### 4.97.3 Quota Optimisation and End-to-End Impact Analysis
+
+The engine optimises rate-limit quota allocation across services by distributing total capacity proportional to configurable traffic weights, computing per-component utilisation ratios, and identifying over-utilised (>90%) and under-utilised (<30%) allocations. End-to-end impact analysis traces a request path through multiple rate-limited components, computing cumulative pass rate (`product of per-hop (1 - rejection_fraction)`), base latency (sum of per-hop network RTT), added latency from rate-limiter overhead and queue delay, and total error rate (base rejection rate plus timeout-induced errors for paths exceeding 1000ms). Distributed coordination evaluation assesses rate-limit consistency across replicated services, computing a consistency score (100 if all components use the same algorithm, minus 25 per additional algorithm) and split-brain risk from multi-replica per-instance counting.
+
+#### 4.97.4 Differentiation from Load Shedding Engine (Section 4.89)
+
+While the Load Shedding Engine (Section 4.89) models service-level overload protection with strategies like priority-based shedding and adaptive load management, the Rate Limiter Simulation Engine models the specific algorithmic mechanisms of rate limiting at API boundaries. The engine is algorithm-aware (token bucket vs. sliding window vs. leaky bucket), models multi-tier enforcement scopes (global vs. per-user vs. per-IP), and provides quota optimisation across distributed services -- concerns that are specific to rate-limiting infrastructure rather than general overload protection.
+
+### 4.98 Continuous Compliance Monitoring Engine
+
+The Continuous Compliance Monitoring Engine provides persistent compliance posture surveillance across six regulatory frameworks (DORA, SOC 2, ISO 27001, PCI DSS, NIST CSF, HIPAA), unlike point-in-time compliance assessments that produce stale results immediately after execution.
+
+**4.98.1 Control Assessment**
+
+For each framework, the engine decomposes regulatory requirements into discrete controls (e.g., DORA-5.1 "ICT risk management framework documented", SOC2-CC6.1 "Logical access controls"). Each control is evaluated against the in-memory topology graph by applying control-specific check functions that inspect component attributes:
+
+- **Asset inventory checks**: Verify that the graph contains a sufficient number of typed components (load balancers, databases, application servers) to constitute a documented ICT asset inventory.
+- **Business continuity checks**: Verify that failover is enabled and replicas exceed one for components with dependents, ensuring recovery capability exists.
+- **Monitoring checks**: Verify that IDS monitoring, audit logging, or monitoring-related components (Prometheus, Grafana, Datadog) are present in the topology.
+- **Security control checks**: Verify encryption at rest, encryption in transit, WAF protection, and network segmentation coverage across components.
+- **Concentration risk checks**: Identify single points of failure (components with replicas = 1 that have dependents) and external API concentration.
+- **Third-party risk checks**: Evaluate external API dependencies for failover coverage and SLA configuration.
+
+Each control produces a `ControlStatus` classification: COMPLIANT, PARTIAL, NON_COMPLIANT, NOT_APPLICABLE, or UNKNOWN, with associated evidence items, identified gaps, remediation recommendations, and risk descriptions.
+
+**4.98.2 Snapshot and Trend Analysis**
+
+The engine captures compliance snapshots at each assessment point, recording the timestamp, framework, total controls assessed, counts by status category, and overall compliance percentage. Snapshots are persisted to an SQLite database for longitudinal tracking.
+
+From accumulated snapshots, the engine computes compliance trends per framework:
+- **Trend direction**: classified as "improving", "stable", or "degrading" based on the delta between the first-half and second-half average compliance percentages.
+- **30-day delta**: the change in compliance percentage over the most recent 30-day window.
+- **Risk areas**: specific control categories where compliance has declined.
+
+**4.98.3 Alerting**
+
+The engine generates compliance alerts for four event types:
+- `new_violation`: a previously compliant control becomes non-compliant.
+- `degradation`: compliance percentage drops by a configurable threshold.
+- `upcoming_audit`: proximity alerts for scheduled regulatory audits.
+- `regulation_change`: alerts when regulatory framework requirements are updated.
+
+Alert severity (critical, high, medium, low) is determined by the framework-specific risk profile associated with the violated control.
+
+### 4.99 Compliance Drift Detection Engine
+
+The Compliance Drift Detection Engine detects deviations from compliance baselines over time by comparing current infrastructure state against previously recorded compliance snapshots.
+
+**4.99.1 Drift Detection**
+
+For each component in the in-memory topology graph, the engine compares the current security profile against the baseline state across nine compliance-relevant properties:
+
+- Encryption at rest enablement
+- Encryption in transit enablement
+- Audit logging enablement
+- Authentication requirement
+- Backup policy enablement
+- Network segmentation enablement
+- WAF protection enablement
+- Rate limiting enablement
+- IDS monitoring enablement
+
+When a property transitions from enabled (baseline) to disabled (current), a `ComplianceDriftItem` is generated with a drift type classification: ENCRYPTION_REMOVED, LOGGING_DISABLED, PERMISSION_ESCALATION, BACKUP_POLICY_CHANGED, CONFIGURATION_CHANGE, NETWORK_EXPOSURE, NEW_VIOLATION, or REGRESSION.
+
+**4.99.2 Framework-Specific Severity Mapping**
+
+Each drift type is assigned a severity (CRITICAL, HIGH, MEDIUM, LOW, INFO) based on the applicable compliance framework. The engine maintains severity mapping tables for eight frameworks (SOC 2, HIPAA, PCI DSS, GDPR, ISO 27001, NIST CSF, FedRAMP, CIS Benchmark). For example, ENCRYPTION_REMOVED is classified as CRITICAL under HIPAA, PCI DSS, GDPR, and FedRAMP, but as HIGH under ISO 27001 and NIST CSF, reflecting the differing regulatory weight of encryption requirements across frameworks.
+
+Each drift item is mapped to a specific regulatory control identifier using framework-specific control ID tables (e.g., HIPAA "164.312(a)(2)(iv)" for encryption, PCI DSS "Req-3.4", GDPR "Art.32(1)(a)").
+
+**4.99.3 Compliance Trajectory and Projection**
+
+The engine computes compliance score trajectories grouped by framework from historical baseline snapshots. For each framework:
+- Baselines are sorted chronologically.
+- The trend is classified as "improving", "declining", or "stable" by comparing the average score of the first half of baselines against the second half, with a tolerance threshold of 2.0 points.
+- The projected next score is computed via linear extrapolation from the last two data points, clamped to the [0, 100] range.
+
+**4.99.4 Prioritized Remediation**
+
+For each detected drift item, the engine generates a `RemediationPlan` containing:
+- A priority classification (IMMEDIATE, URGENT, STANDARD, DEFERRED) mapped from drift severity.
+- Estimated effort in hours, scaled by severity (CRITICAL: 8h, HIGH: 4h, MEDIUM: 2h, LOW: 1h).
+- Regulatory risk description including framework-specific penalty information (e.g., "HIPAA violation — up to $1.5M per category per year", "GDPR breach — up to 4% of annual global turnover").
+- Ordered remediation steps specific to the drift type (e.g., for ENCRYPTION_REMOVED: re-enable encryption at rest, verify key rotation, validate TLS in transit, run compliance scan).
+
+Plans are sorted by priority (IMMEDIATE first) with a secondary sort by estimated effort descending.
+
+**4.99.5 Overall Drift Score**
+
+An overall drift score (0-100, where 100 indicates maximum drift) is computed as the sum of severity-weighted drift items: CRITICAL = 10.0, HIGH = 5.0, MEDIUM = 2.0, LOW = 1.0, capped at 100.
+
+### 4.100 Compliance Scorecard Engine
+
+The Compliance Scorecard Engine performs automated multi-framework compliance scoring by analyzing infrastructure component configurations, security profiles, and resilience posture against predefined control definitions.
+
+**4.100.1 Framework Control Libraries**
+
+The engine maintains built-in control libraries for six regulatory frameworks, each decomposed into 10 auditable controls:
+- **SOC 2**: CC6.1 (Logical Access), CC6.6 (Encryption in Transit), CC6.7 (Encryption at Rest), CC7.2 (Monitoring), CC7.3 (Change Management), CC8.1 (Incident Response), A1.1 (Availability), A1.2 (Redundancy), A1.3 (Recovery), CC9.1 (Risk Mitigation).
+- **ISO 27001**: A.8.1 (Asset Management), A.8.24 (Cryptography), A.8.9 (Configuration Management), A.8.15 (Logging), A.8.25 (Secure Development), A.5.23 (Cloud Security), A.8.6 (Capacity Management), A.5.29 (Business Continuity), A.5.30 (ICT Readiness), A.8.14 (Redundancy).
+- **PCI DSS**: Requirements 1.1 (Network Segmentation) through 11.1 (Security Testing).
+- **HIPAA**: 164.312(a) (Access Control) through 164.312(b) (Audit Controls).
+- **NIST CSF**: ID.AM (Asset Management) through RC.CO (Recovery Communication).
+- **DORA**: Art.5 (ICT Governance) through Art.30 (Subcontracting).
+
+**4.100.2 Control Scoring Method**
+
+Each control is scored on a 0-100 scale by analyzing infrastructure components through category-specific scoring functions:
+
+- **Encryption controls**: The fraction of components with encryption enabled (at rest or in transit, depending on the control), multiplied by 100.
+- **Access controls**: The fraction of components with `auth_required` enabled.
+- **Monitoring/audit controls**: The fraction of components with logging enabled or IDS monitored.
+- **Redundancy/availability controls**: The fraction of components with replicas > 1 or failover enabled.
+- **Recovery/continuity controls**: A composite score per component: backup enabled (40 points) + failover enabled (30 points) + replicas > 1 (30 points), averaged across all components.
+- **Network segmentation controls**: The fraction of components with `network_segmented` enabled.
+- **Incident response controls**: A composite per component: logging (30 points) + IDS (30 points) + runbook coverage > 50% (20 points) + on-call coverage >= 24h (20 points).
+- **Third-party risk controls**: For external API components: failover (30 points) + replicas > 1 (20 points) + rate limiting (25 points) + encryption in transit (25 points).
+- **Risk governance controls**: Per component: tags present (25 points) + data classified beyond "internal" (25 points) + logging enabled (25 points) + audit logging enabled (25 points).
+
+Each control score is classified as COMPLIANT (>= 80), PARTIAL (>= 40), or NON_COMPLIANT (< 40).
+
+**4.100.3 Framework Scorecard and Grading**
+
+Per-framework scorecards are generated containing: overall score (average of applicable control scores), counts by status category, letter grade (A >= 90, B >= 80, C >= 70, D >= 60, F < 60), and a narrative summary. A cross-framework comparison report produces the overall compliance score (average across all framework scores) with deduplicated top gaps and priority actions.
+
+### 4.101 DORA Compliance Evidence Generation Engine
+
+The DORA Compliance Evidence Generation Engine produces audit-ready evidence for the EU Digital Operational Resilience Act (Regulation 2022/2554) by mapping chaos test results to specific DORA articles and generating structured audit trails.
+
+**4.101.1 DORA Control Library**
+
+The engine implements 24 controls across five DORA articles:
+- **Article 11** (ICT Risk Management Testing): 6 controls covering periodic resilience testing (DORA-11.01), vulnerability assessments (DORA-11.02), network security tests (DORA-11.03), stress testing (DORA-11.04), failover/switchover scenario tests (DORA-11.05), and source code reviews (DORA-11.06).
+- **Article 24** (General Testing Requirements): 5 controls covering risk-based test planning (DORA-24.01), critical system coverage (DORA-24.02), test documentation (DORA-24.03), timely remediation (DORA-24.04), and adequate testing frequency (DORA-24.05).
+- **Article 25** (TLPT — Threat-Led Penetration Testing): 5 controls covering critical function coverage (DORA-25.01), real-world attack technique simulation (DORA-25.02), production system inclusion (DORA-25.03), three-year TLPT cycle (DORA-25.04), and management review of results (DORA-25.05).
+- **Article 26** (Tester Requirements): 4 controls covering tester qualifications (DORA-26.01), independence (DORA-26.02), professional standards (DORA-26.03), and professional indemnity insurance (DORA-26.04).
+- **Article 28** (Third-Party ICT Risk): 4 controls covering third-party risk assessment (DORA-28.01), concentration risk management (DORA-28.02), contractual resilience requirements (DORA-28.03), and exit strategies (DORA-28.04).
+
+**4.101.2 Test Classification**
+
+The engine classifies chaos test scenarios into three DORA test categories using keyword matching:
+- **TLPT**: Scenarios containing keywords "penetration", "red team", "attack", or "threat-led".
+- **Advanced Testing**: Scenarios containing "failover", "switchover", "disaster", "cascade", "chaos", "stress", "performance", "load", or "recovery", or involving third-party components.
+- **Basic Testing**: All other scenarios.
+
+This classification determines which DORA control receives the generated evidence record.
+
+**4.101.3 Gap Analysis**
+
+For each of the 24 controls, the engine evaluates the in-memory topology graph and produces a `DORAGapAnalysis` with identified gaps, recommendations, and a risk score (0.0-1.0). Evaluation logic is article-specific:
+- Article 11 controls: Check for redundancy (replicas >= 2), failover configuration, monitoring presence, and component health status. Missing capabilities accumulate risk (e.g., no redundancy: +0.3, no failover: +0.3, no monitoring: +0.2).
+- Article 24 controls: Evaluate whether both redundancy and failover mechanisms are configured (partial coverage: +0.25 risk, no coverage: +0.5 risk).
+- Article 25 controls: Verify prerequisites for safe TLPT execution (redundancy and failover required before production testing).
+- Article 28 controls: Compute third-party concentration ratio (third-party component count / total component count). Concentration exceeding 50%: +0.5 risk.
+
+Controls with no gaps are classified as COMPLIANT; those with risk >= 0.5 as NON_COMPLIANT; and intermediate cases as PARTIALLY_COMPLIANT.
+
+**4.101.4 Evidence Record Generation**
+
+For each executed test scenario, the engine generates an `EvidenceRecord` containing: the mapped control ID, timestamp, test classification, test description, pass/fail/partial result, severity, remediation-required flag, and artifact file paths. This produces a machine-readable audit trail that directly maps chaos engineering activity to DORA regulatory requirements.
+
+**4.101.5 Audit Package Export**
+
+The engine exports a structured audit package containing: the DORA regulation version (2022/2554), all 24 control definitions, gap analyses, and aggregate counts (compliant, non-compliant, partially compliant, not applicable). This package is designed for submission to regulatory auditors.
+
+### 4.102 Data Sovereignty Analysis Engine
+
+The Data Sovereignty Analysis Engine evaluates data residency compliance across infrastructure components by mapping data flows against jurisdictional requirements.
+
+**4.102.1 Jurisdiction Mapping**
+
+The engine maintains a comprehensive region-to-jurisdiction mapping covering seven data protection regimes:
+- **GDPR**: EU/EEA cloud regions (eu-west-1 through eu-south-2, europe-west1 through europe-north1, westeurope, northeurope).
+- **CCPA**: US cloud regions (us-west-1, us-east-1, etc.).
+- **LGPD**: Brazil cloud regions (sa-east-1, brazilsouth).
+- **PIPEDA**: Canada cloud regions (ca-central-1, canadacentral).
+- **PDPA**: Singapore/Southeast Asia regions (ap-southeast-1).
+- **APPI**: Japan cloud regions (ap-northeast-1, japaneast).
+- **POPIA**: South Africa cloud regions (af-south-1).
+
+**4.102.2 Cross-Border Transfer Detection**
+
+The engine detects restricted cross-border data transfers by analyzing dependency edges in the topology graph. For each dependency between two components deployed in different regions, the engine resolves the source and target jurisdictions and checks against a restricted transfer set (e.g., GDPR-to-CCPA, GDPR-to-LGPD, GDPR-to-NONE). When a restricted transfer is detected, a sovereignty violation of type CROSS_BORDER_TRANSFER is generated with CRITICAL severity.
+
+**4.102.3 Data Classification Analysis**
+
+The engine classifies data types across components using the compliance tags on each component (data classification levels: PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, PII, PHI, FINANCIAL, PCI). Components handling sensitive data classifications (PII, PHI, FINANCIAL, PCI) are subject to stricter residency requirements and produce DATA_CLASSIFICATION_GAP violations when deployed in regions without matching regulatory coverage.
+
+**4.102.4 Multi-Dimensional Violation Detection**
+
+The engine detects ten categories of sovereignty violations:
+- **Cross-border transfer**: Data flows between jurisdictions where transfer is restricted.
+- **Residency requirement**: Components handling regulated data deployed outside required jurisdictions.
+- **Replication target**: Database or storage replication configured to a non-compliant region.
+- **CDN edge location**: Content delivery network components serving data from non-compliant edge locations.
+- **Backup location**: Backup storage in regions that violate residency requirements.
+- **Processing location**: Data processing occurring in a different jurisdiction than data storage.
+- **Third-party processor**: External API dependencies operating in non-compliant jurisdictions.
+- **Failover target**: Failover configurations that would redirect traffic to non-compliant regions.
+- **Missing DPA**: Dependencies on external providers without data processing agreements.
+- **Data classification gap**: Components lacking proper data classification metadata.
+
+Each violation type carries a predefined severity: CRITICAL (cross-border transfer, residency requirement), HIGH (replication target, backup location, processing location, failover target), MEDIUM (CDN edge, third-party processor, missing DPA), or LOW (data classification gap).
+
+**4.102.5 Risk Score Computation**
+
+An overall sovereignty risk score (0-100) is computed as the severity-weighted sum of violations (CRITICAL: 10.0, HIGH: 7.0, MEDIUM: 4.0, LOW: 2.0, INFO: 0.5), normalized to a 100-point scale.
+
+### 4.103 Certificate Lifecycle Analysis Engine
+
+The Certificate Lifecycle Analysis Engine performs comprehensive TLS/SSL certificate risk analysis across infrastructure components, covering twelve analysis dimensions.
+
+**4.103.1 Certificate Modeling**
+
+Each certificate is modeled with typed attributes: certificate type (SINGLE_DOMAIN, WILDCARD, SAN, SELF_SIGNED, MTLS_CLIENT, MTLS_SERVER, CODE_SIGNING, EXTENDED_VALIDATION), chain role (ROOT, INTERMEDIATE, LEAF), renewal method (MANUAL, ACME, CLOUD_MANAGED, INTERNAL_CA, VENDOR_API), pinning strategy (NONE, PUBLIC_KEY, CERTIFICATE, CA), OCSP mode (DISABLED, STAPLING, RESPONDER, MUST_STAPLE), CRL mode (DISABLED, PERIODIC, REAL_TIME), certificate transparency status (NOT_LOGGED, LOGGED, MONITORED), key size, signature algorithm, SAN domain list, datacenter assignment, and rotation downtime estimate.
+
+**4.103.2 Expiry Timeline and Risk Scoring**
+
+For each certificate, the engine computes days until expiry and assigns a risk severity: CRITICAL (expired or <= 7 days), HIGH (<= 30 days), MEDIUM (<= 90 days), LOW (> 90 days). Risk scores are computed on a 0-10 scale incorporating expiry proximity, certificate type (wildcard and SAN certificates carry higher risk multipliers due to broader blast radius), and whether auto-renewal is configured.
+
+**4.103.3 Certificate Chain Validation**
+
+The engine validates certificate chains (root -> intermediate -> leaf) by verifying:
+- Chain completeness: all chain certificate references resolve to known certificates.
+- Chain ordering: certificates progress from leaf to intermediate to root role.
+- Per-link expiry: each link in the chain is checked for expiry, with the weakest link determining chain validity.
+- Self-signed certificate detection: leaf certificates with no issuer or chain length < 2 are flagged.
+
+**4.103.4 Auto-Renewal Capability Assessment**
+
+Each certificate is evaluated for renewal automation maturity. Certificates with `auto_renew` enabled and renewal method ACME or CLOUD_MANAGED receive the lowest risk classification. Manual renewal certificates with fewer than 30 days until expiry receive CRITICAL risk flags with recommendations to implement automated renewal.
+
+**4.103.5 Certificate Pinning Risk Analysis**
+
+Certificates with pinning strategies (PUBLIC_KEY or CERTIFICATE pinning) are flagged for rotation risk: pinning ties clients to a specific certificate, meaning rotation requires coordinated client updates. The engine estimates the blast radius of a pinning-related rotation failure based on the number of components using the pinned certificate.
+
+**4.103.6 Wildcard vs. SAN Coverage Gap Analysis**
+
+The engine identifies coverage gaps between wildcard certificates (*.example.com) and SAN certificates (explicit domain lists) by comparing SAN domain entries against component hostnames, detecting domains served by infrastructure components but not covered by any certificate.
+
+**4.103.7 mTLS Rotation Impact Analysis**
+
+For mutual TLS (mTLS) certificates, the engine analyzes rotation impact by computing the set of components that require coordinated certificate updates. Both MTLS_CLIENT and MTLS_SERVER certificates are analyzed, with the engine identifying all peer components that must simultaneously accept both old and new certificates during rotation.
+
+**4.103.8 Certificate Authority Dependency Risk**
+
+The engine computes CA concentration risk by grouping certificates by issuer CA and calculating the fraction of infrastructure dependent on each CA. High concentration on a single CA (exceeding a configurable threshold) generates a dependency risk warning, as a CA compromise or revocation would affect a disproportionate fraction of the infrastructure.
+
+**4.103.9 Expiry Cascade Analysis**
+
+The engine identifies shared CA and intermediate certificate expiry risks. When a root or intermediate certificate approaches expiry, all leaf certificates in the chain are identified as at risk, producing a cascade expiry report showing the total blast radius of a single intermediate certificate failure.
+
+**4.103.10 Certificate Rotation Downtime Estimation**
+
+For each certificate, the engine estimates rotation downtime based on: base rotation time (per certificate type), number of components using the certificate, auto-renewal availability, and dual-certificate support. The total fleet rotation downtime is the sum across all certificates requiring rotation within a given time window.
+
+### 4.104 Secret Rotation Analysis Engine
+
+The Secret Rotation Analysis Engine provides comprehensive credential lifecycle management analysis across eleven analysis dimensions.
+
+**4.104.1 Secret Modeling**
+
+Each secret is modeled with typed attributes: secret kind (API_KEY, DATABASE_PASSWORD, TLS_CERTIFICATE, OAUTH_TOKEN, ENCRYPTION_KEY, SSH_KEY), associated component IDs, rotation interval, last rotation timestamp, expiry timestamp, auto-rotation enablement, dual-secret enablement, grace period, and for TLS certificates, chain length and issuer.
+
+**4.104.2 Rotation Frequency Compliance**
+
+The engine checks each secret against recommended maximum rotation intervals per secret kind (API_KEY: 90 days, DATABASE_PASSWORD: 90 days, TLS_CERTIFICATE: 365 days, OAUTH_TOKEN: 30 days, ENCRYPTION_KEY: 365 days, SSH_KEY: 180 days). Overdue secrets are classified by severity: LOW (on time), MEDIUM (overdue <= 30 days), HIGH (overdue <= 90 days), CRITICAL (overdue > 90 days). Secrets with no rotation history are classified as HIGH risk.
+
+**4.104.3 Rotation Window Analysis**
+
+For each secret, the engine estimates the rotation downtime window:
+- With dual-secret enabled: zero downtime (old and new secrets coexist).
+- With grace period but no dual-secret: downtime = base rotation time x 0.5 x affected component count.
+- Without either: downtime = base rotation time x affected component count.
+- Auto-rotation reduces estimated downtime by 50%.
+
+Base rotation times are per secret kind: API_KEY (5s), DATABASE_PASSWORD (15s), TLS_CERTIFICATE (10s), OAUTH_TOKEN (3s), ENCRYPTION_KEY (20s), SSH_KEY (8s).
+
+**4.104.4 Dual-Secret Strategy Evaluation**
+
+The engine evaluates the dual-secret (old+new coexist) strategy for zero-downtime rotation:
+- Dual-secret enabled with grace period: LOW risk, zero downtime confirmed.
+- Grace period only (no dual-secret): MEDIUM risk, partial overlap.
+- Neither: HIGH risk, rotation will cause downtime.
+
+**4.104.5 Credential Blast Radius Mapping**
+
+For each secret, the engine computes the blast radius if the secret expires or is rotated:
+- **Directly affected**: Components explicitly listed in the secret's component IDs.
+- **Transitively affected**: Components that depend on directly affected components (via dependency graph traversal).
+- **Affected percentage**: Total affected component count / total infrastructure component count.
+
+Risk escalates with blast radius: > 50% affected triggers CRITICAL, > 25% triggers HIGH, > 10% triggers MEDIUM.
+
+**4.104.6 Rotation Automation Maturity Assessment**
+
+The engine computes a rotation automation maturity score (0-100) from three weighted factors:
+- Auto-rotation ratio (weight: 50): fraction of secrets with auto-rotation enabled.
+- Dual-secret ratio (weight: 30): fraction of secrets using dual-secret strategy.
+- Grace period ratio (weight: 20): fraction of secrets with a configured grace period.
+
+Maturity levels: MANUAL (< 25), SEMI_AUTOMATED (25-49), FULLY_AUTOMATED (50-79), ADAPTIVE (>= 80).
+
+**4.104.7 Secret Sprawl Detection**
+
+The engine detects secrets used across multiple services (sprawl) by identifying secrets whose `component_ids` list exceeds a configurable threshold (default: 2). Risk escalates with service count: >= 10 services triggers HIGH, >= 5 triggers MEDIUM.
+
+**4.104.8 Emergency Rotation Playbook Generation**
+
+For each secret, the engine generates a structured emergency rotation playbook containing seven ordered steps: (1) revoke compromised secret, (2) notify security team, (3) generate new credential, (4) deploy to affected services, (5) verify service operations, (6) audit access logs, (7) post-incident review. Each step includes a priority classification, estimated duration (derived from per-kind base times and affected component count), and responsible team assignment.
+
+**4.104.9 Rotation Dependency Ordering**
+
+The engine computes a safe rotation order for multiple secrets by:
+1. Assigning priority by secret kind: encryption keys first (priority 0), then TLS certificates (1), SSH keys (2), database passwords (3), OAuth tokens (4), API keys (5).
+2. Discovering dependency constraints via shared component IDs: when two secrets share components, the higher-priority secret must be rotated first.
+3. Performing topological sort with cycle detection. Circular dependencies are flagged.
+
+**4.104.10 Compliance Framework Mapping**
+
+The engine maps secrets against three compliance frameworks (PCI DSS, SOC 2, HIPAA), each with per-kind maximum rotation interval requirements (e.g., PCI DSS requires database passwords every 90 days, HIPAA requires database passwords every 60 days). For each framework, the engine produces a compliance report with compliant/non-compliant counts, compliance percentage, and per-secret gap analysis.
+
+### 4.105 Software Supply Chain Resilience Engine
+
+The Software Supply Chain Resilience Engine maps software vulnerabilities from third-party dependency scanners to infrastructure failure modes via the in-memory topology graph.
+
+**4.105.1 Vulnerability Ingestion**
+
+The engine accepts vulnerability reports in three industry-standard formats:
+- **Snyk format**: JSON with a `vulnerabilities` array.
+- **Trivy format**: JSON with `Results` containing per-target `Vulnerabilities` arrays.
+- **Dependabot/generic format**: JSON with a `results` array.
+
+Each vulnerability entry is normalized to extract: CVE identifier, package name, severity (critical/high/medium/low), and optionally a list of affected infrastructure component IDs.
+
+**4.105.2 Vulnerability-to-Infrastructure Mapping**
+
+When no explicit component mapping is provided, the engine performs heuristic auto-mapping by matching vulnerability package names and descriptions against infrastructure component types using keyword dictionaries:
+- Database keywords (sql, postgres, mysql, mongo, redis) → DATABASE components.
+- Cache keywords (cache, redis, memcache, varnish) → CACHE components.
+- Application server keywords (express, flask, django, spring, fastapi, node) → APP_SERVER components.
+- Queue keywords (kafka, rabbitmq, sqs, amqp) → QUEUE components.
+- And similarly for web servers, load balancers, and storage components.
+
+**4.105.3 Infrastructure Impact Determination**
+
+For each vulnerability, the engine determines the infrastructure impact based on the component type and vulnerability severity using a type-severity impact matrix:
+- Database + critical → "data breach"; Database + high → "data corruption".
+- Cache + critical → "cache poisoning"; Cache + high → "OOM".
+- App server + critical → "remote code execution"; App server + high → "OOM".
+- Load balancer + critical → "traffic hijack"; Load balancer + high → "denial of service".
+- Storage + critical → "data breach"; Storage + high → "data loss".
+- External API + critical → "supply chain compromise".
+
+**4.105.4 Blast Radius Computation**
+
+For each affected component, the engine traverses the dependency graph to compute the transitive blast radius (total number of downstream components that would be affected if the vulnerability were exploited). The per-vulnerability risk score is computed as:
+```
+risk_score = min(10.0, severity_weight × 2.0 + min(blast_radius, 3) × 0.5)
+```
+Where severity_weight maps critical=4, high=3, medium=2, low=1.
+
+**4.105.5 Aggregate Risk Score**
+
+The infrastructure-level supply chain risk score (0-100) is computed as the average per-vulnerability risk score multiplied by 10, capped at 100. The engine generates prioritized remediation recommendations: URGENT patching for critical vulnerabilities, 7-day patching schedule for high-severity, network segmentation recommendations for high-blast-radius vulnerabilities, and encryption recommendations for data-breach-risk vulnerabilities.
+
+### 4.106 Attack Surface Analysis Engine
+
+The Attack Surface Analysis Engine maps the complete attack surface of infrastructure by adopting an attacker's perspective to identify entry points, lateral movement paths, high-value targets, and multi-step attack chains.
+
+**4.106.1 Entry Point Detection**
+
+The engine identifies externally reachable components using a multi-factor classification:
+- **Type-based**: Load balancers and DNS components are classified as "internet" exposure; external APIs as "api" exposure.
+- **Name-based**: Components whose names or IDs contain tokens matching `{public, external, api, gateway, cdn, edge, ingress}` (using word-boundary regex matching to avoid false positives) are classified as internet-facing.
+
+For each entry point, the engine computes: protocol inference (HTTPS for port 443, HTTP for ports 80/8080, TCP otherwise), applicable attack vectors (per component type, e.g., load balancers: DDoS, SSL stripping, request smuggling; databases: SQL injection, credential theft, data exfiltration), and a defense score (0-1) computed as the fraction of nine security controls enabled (encryption at rest, encryption in transit, WAF, rate limiting, authentication, network segmentation, backup, logging, IDS).
+
+**4.106.2 Lateral Movement Simulation**
+
+From each entry point, the engine performs bidirectional breadth-first search through the dependency graph (following both forward dependencies and reverse dependents) to discover all reachable components. For each discovered path:
+- **Hop count**: Number of graph edges traversed from entry point to target.
+- **Defense barriers**: Count of security controls encountered along the path (authentication requirements, network segmentation boundaries, WAF at entry, circuit breakers on edges).
+- **Difficulty classification**: trivial (0 barriers), easy (1), moderate (2), hard (3-4), very_hard (5+).
+
+**4.106.3 High-Value Target Identification**
+
+Components are classified as high-value targets using type and name-based heuristics:
+- **data_store**: Database-type components.
+- **auth_service**: Components matching tokens {auth, identity, login, iam, oauth, sso}.
+- **payment**: Components matching tokens {payment, stripe, billing, checkout, pay}.
+- **pii**: Components matching tokens {user, customer, profile, personal, account}.
+- **secrets**: Components matching tokens {secret, vault, kms, key, cert, credential}.
+
+For each high-value target, the engine computes a risk score (0-10):
+```
+risk = 5.0 (base) + min(3.0, reachable_entry_points × 0.75) + hop_proximity_bonus + defense_gap_penalty - own_defense_score × 3.0
+```
+Where hop proximity adds 2.0 for min_hops <= 1 or 1.0 for min_hops <= 2, and defense gap adds 2.0 for zero defense depth or 1.0 for depth = 1.
+
+**4.106.4 Attack Chain Generation**
+
+The engine generates four categories of named attack chains:
+- **External to Database**: Entry point exploitation → lateral movement → database access/exfiltration. Likelihood escalates when the database is reachable within 2 hops.
+- **Supply Chain Attack**: External API compromise → payload propagation to dependents → high-value target access.
+- **Privilege Escalation**: Low-privilege entry → auth service exploitation → administrative access.
+- **Data Exfiltration**: Entry compromise → data store access → side-channel exfiltration.
+
+Each chain includes specific mitigation recommendations (e.g., network segmentation, parameterized queries, dependency pinning, data loss prevention).
+
+**4.106.5 Attack Surface Score**
+
+A total attack surface score (0-100, lower is better) is computed from four weighted components:
+- Entry point exposure (0-30): Internet-facing component count / total components × 100, capped at 30.
+- Easy lateral paths (0-30): Fraction of paths with trivial/easy difficulty × 30.
+- Reachable high-value targets (0-25): Fraction of HVTs reachable from entry points × 25.
+- Defense depth penalty (0-15): 15 for average defense depth < 1, 10 for < 2, 5 for < 3.
+
+### 4.107 Compound Security-Failure Simulation Engine
+
+The Compound Security-Failure Simulation Engine simulates scenarios where infrastructure failures and security attacks occur simultaneously, answering the question: "What happens when the system is under attack AND experiencing failures at the same time?"
+
+**4.107.1 Security Posture Assessment**
+
+Each component is assigned a security posture (HARDENED, STANDARD, WEAK, COMPROMISED) based on a weighted security profile score. Nine security fields contribute with differentiated weights: `auth_required` and `network_segmented` carry weight 1.5 each; `encryption_at_rest`, `encryption_in_transit`, `waf_protected`, `rate_limiting`, and `ids_monitored` carry weight 1.0 each; `backup_enabled` and `log_enabled` carry weight 0.5 each. The normalized score (0-1) maps to posture levels: >= 0.75 → HARDENED, >= 0.45 → STANDARD, >= 0.20 → WEAK, < 0.20 → COMPROMISED.
+
+**4.107.2 Attack-Defense Mapping**
+
+The engine maintains an attack-defense matrix mapping ten attack types to relevant defense fields with per-defense effectiveness values (0-1):
+- DDoS → waf_protected (0.7), rate_limiting (0.9).
+- Auth bypass → auth_required (0.8), ids_monitored (0.5).
+- Data exfiltration → encryption_at_rest (0.8), encryption_in_transit (0.6), network_segmented (0.5).
+- Supply chain attack → network_segmented (0.5), ids_monitored (0.4), log_enabled (0.3).
+- And similarly for certificate expiry, DNS poisoning, privilege escalation, API abuse, credential stuffing, and man-in-the-middle attacks.
+
+Attack resistance (0-100) is computed as the ratio of active defense effectiveness to total defense effectiveness for the applicable attack type.
+
+**4.107.3 Failure-Security Exposure Mapping**
+
+The engine models how infrastructure failures weaken security controls. Nine failure types map to specific security fields that become effectively disabled during the failure:
+- Node failure → disables network segmentation, IDS monitoring, logging.
+- Network partition → disables encryption in transit, network segmentation, WAF.
+- Memory exhaustion → disables rate limiting, WAF, IDS monitoring.
+- Cascade failure → disables network segmentation, IDS monitoring, logging, WAF (broadest exposure).
+
+**4.107.4 Compound Risk Computation**
+
+For each compound scenario (attack type + failure type + target component), the engine computes:
+- **Attack resistance**: Derived from the attack-defense matrix, scaled by attack severity (0-1).
+- **Failure containment**: Base score (50) + replica bonus (up to 20) + failover bonus (15) + backup bonus for data failures (10) + segmentation bonus (5), scaled by failure severity.
+- **Compound risk**: When simultaneous: `(1 - attack_resistance/100) × (1 - failure_containment/100) × 100`. When sequential: `max(1 - attack_resistance/100, 1 - failure_containment/100) × 50`.
+- **Overall score**: `attack_resistance × 0.35 + failure_containment × 0.35 + (100 - compound_risk) × 0.30`.
+- **Exposure window**: `(30 × failure_severity + 20 × attack_severity) × posture_factor`, where posture_factor ranges from 0.5 (HARDENED) to 3.0 (COMPROMISED).
+
+**4.107.5 Attack Surface Change Analysis**
+
+The engine computes how each failure type changes a component's attack surface by constructing a "degraded" security profile where fields exposed by the failure are set to disabled. The attack surface increase percentage is computed as the ratio of the difference between degraded and normal attack surfaces to the normal attack surface.
+
+**4.107.6 Critical Combination Discovery**
+
+The engine automatically identifies the most dangerous attack + failure combinations. For WEAK/COMPROMISED components, all 10 attack types × 9 failure types are tested at high severity (0.8). For HARDENED/STANDARD components, only the three highest-impact attack types (DDoS, data exfiltration, supply chain) are tested against cascade failures.
+
+### 4.108 Cost-Resilience Optimization Engine
+
+The Cost-Resilience Optimization Engine finds the optimal balance between infrastructure cost and resilience by computing Pareto-optimal improvement frontiers and ROI-ranked recommendations.
+
+**4.108.1 Component Cost Modeling**
+
+Each component's monthly cost is estimated from per-type base costs (e.g., database: $150, app server: $80, load balancer: $25, DNS: $10) multiplied by replica count. Component resilience scores (0-100) are computed from: replica count (up to 30 points for 3+ replicas), failover enablement (20 points + 5 bonus for promotion time <= 30s), autoscaling enablement (10 points), backup enablement (10 points), encryption at rest (5 points), MTBF >= 90 days (10 points), with health status penalties (DEGRADED: -10, OVERLOADED: -20, DOWN: -40).
+
+**4.108.2 Improvement Option Generation**
+
+For each component, the engine identifies applicable improvements with per-improvement cost and resilience gain estimates:
+- Add replica: cost = base component cost; resilience gain = 15 points (10 for third replica).
+- Enable failover: cost = $20/mo; resilience gain = 20 points.
+- Enable autoscaling: cost = $15/mo; resilience gain = 10 points.
+- Enable backup (data stores only): cost = $25/mo; resilience gain = 12 points.
+- Enable encryption (databases/storage only): cost = $10/mo; resilience gain = 5 points.
+- Add monitoring: cost = $30/mo; resilience gain = 6 points.
+- Multi-region: cost = $200/mo; resilience gain = 25 points.
+
+For each improvement, the ROI score is computed as resilience gain divided by monthly cost increase. The estimated annual loss prevented is computed from per-type revenue impact assumptions, estimated incident frequency, and improvement-specific reduction factors (e.g., failover reduces incidents by 50%, multi-region by 60%).
+
+**4.108.3 Strategy-Based Selection**
+
+Improvements are selected based on four optimization strategies:
+- **MIN_COST**: Select the cheapest improvements that reach a target resilience (default: 70), sorted by cost ascending.
+- **MAX_RESILIENCE**: Select improvements that maximize resilience within a budget, sorted by resilience gain descending.
+- **COST_EFFICIENT**: Select improvements with the highest ROI (resilience per dollar) within a budget.
+- **BALANCED**: Select the top 5 improvements by ROI within a budget.
+
+**4.108.4 Pareto Frontier Construction**
+
+The engine constructs a Pareto frontier by incrementally applying improvements sorted by ROI descending, recording each (cost, resilience) point where resilience strictly increases. The resulting frontier shows the achievable resilience at each incremental cost level, enabling data-driven infrastructure investment decisions.
+
+### 4.109 Infrastructure Cost Optimization Engine
+
+The Infrastructure Cost Optimization Engine provides comprehensive cost analysis with resilience awareness, including detailed cost modeling, right-sizing recommendations, pricing model optimization, idle resource detection, and total cost of ownership calculations.
+
+**4.109.1 Cost Category Decomposition**
+
+For each component, the engine computes monthly costs across five categories:
+- **Compute**: Per-type base costs multiplied by replica count (e.g., database: $500/replica, app server: $200/replica, cache: $150/replica).
+- **Storage**: Per-type storage costs (e.g., database: $50/replica, storage: $20/replica).
+- **Network**: Per-type network transfer costs (e.g., load balancer: $30/replica, app server: $15/replica).
+- **Licensing**: Per-type software license costs (e.g., database: $100/replica).
+- **Operational**: Fixed per-component overhead ($50/component) covering monitoring, on-call, and management.
+
+The total monthly cost per component is the sum across all five categories.
+
+**4.109.2 Right-Sizing Analysis**
+
+The engine identifies over-provisioned components by analyzing utilization metrics:
+- **Idle resources**: Components with utilization below 5% are flagged for termination or consolidation.
+- **Right-sizing candidates**: Components with utilization below 30% are flagged for downsizing, with estimated savings computed as 30-50% of current compute cost.
+- **Savings per request**: For components with known request rates, the engine computes cost-per-request to identify cost-inefficient components.
+
+**4.109.3 Reserved vs. On-Demand vs. Spot Analysis**
+
+The engine evaluates pricing model alternatives for each component:
+- **Spot instances**: 70% discount, recommended for non-critical components (no dependents, failover available), with resilience impact warnings.
+- **Reserved 1-year**: 30% discount, recommended for stable workloads with break-even analysis.
+- **Reserved 3-year**: 50% discount, recommended for core infrastructure components.
+- **Savings plans**: Break-even analysis at 6-month horizon.
+
+Each recommendation includes the resilience risk level (LOW for reserved, MEDIUM for savings plans, HIGH for spot) and estimated monthly savings.
+
+**4.109.4 Multi-AZ Cost-Benefit Analysis**
+
+The engine evaluates the cost premium of multi-availability-zone deployment (default: 25% cost increase) against the resilience benefit, producing a cost-effectiveness ratio for AZ redundancy.
+
+**4.109.5 Cost Anomaly Detection**
+
+The engine detects cost anomalies by comparing component costs against type-based expected ranges and flagging components whose costs deviate by more than two standard deviations from the category mean.
+
+**4.109.6 Total Cost of Ownership**
+
+The engine computes a 1-year and 3-year TCO projection incorporating compute, storage, network, licensing, operational costs, estimated growth rates, and pricing model discounts.
+
+### 4.110 FinOps Resilience Engine
+
+The FinOps Resilience Engine quantifies the tradeoff between infrastructure cost and resilience by generating Pareto-optimal configurations that minimize cost while meeting resilience targets.
+
+**4.110.1 Cost Tier Modeling**
+
+The engine models four pricing tiers with distinct cost, availability, and failover characteristics:
+- **On-demand**: Cost multiplier 1.0×, availability 99.95%, failover time 30s.
+- **Reserved**: Cost multiplier 0.6×, availability 99.99%, failover time 15s.
+- **Spot**: Cost multiplier 0.3×, availability 95.0%, failover time 120s.
+- **Serverless**: Cost multiplier 0.8×, availability 99.9%, failover time 5s.
+
+Component monthly costs are derived from the CostProfile hourly rate (× 730 hours) if configured, or from per-type default costs.
+
+**4.110.2 Infrastructure Option Evaluation**
+
+Each infrastructure option (component + cost tier + replicas) is scored on a 0-100 resilience scale:
+- Availability contribution (up to 50 points): 50 for >= 99.99%, 40 for >= 99.9%, 30 for >= 99.0%, 15 for >= 95.0%.
+- Replica contribution (up to 30 points): 30 for 3+ replicas, 20 for 2 replicas, 5 for 1 replica.
+- Failover time contribution (up to 20 points): 20 for <= 5s, 15 for <= 15s, 10 for <= 30s, 5 for <= 60s.
+
+**4.110.3 Pareto Frontier Generation**
+
+The engine enumerates all combinations of infrastructure options (one per component) and computes total cost and average resilience for each combination. Dominated solutions (where another solution has both higher resilience and lower cost) are filtered, producing the Pareto-optimal frontier. This enables visualization of the efficient cost-resilience tradeoff curve.
+
+**4.110.4 SLA Breach Cost Assessment**
+
+For each component, the engine computes the financial risk of SLA breach:
+- Current availability is estimated from replicas, failover, autoscaling, and health status.
+- Breach probability is proportional to the gap between the SLA target and current availability.
+- Annual expected penalty = penalty per incident × breach probability × 12 billing periods.
+
+**4.110.5 Automated FinOps Recommendations**
+
+The engine generates four categories of cost-saving recommendations:
+- **Reduce over-provisioned replicas**: When a component has >= 3 replicas with failover enabled, suggest reducing by one replica (estimated savings: 20% of component cost, resilience impact: -5 points).
+- **Switch to spot/reserved**: For non-critical leaf components (no dependents), suggest spot instances (savings: 40%, resilience impact: -10 points).
+- **Enable autoscaling**: For components with >= 2 replicas but no autoscaling, suggest enabling autoscaling (savings: 15%, resilience impact: +5 points).
+- **Right-size under-utilized**: For components with utilization < 30%, suggest downsizing (savings: 30%, resilience impact: -2 points).
+
+Recommendations are sorted by monthly savings descending and include explicit resilience impact and risk descriptions.
+
+### 4.111 Incident Cost Modeling Engine
+
+The Incident Cost Modeling Engine calculates the total business cost of infrastructure incidents across ten cost categories, providing ROI analysis, scenario comparison, error budget valuation, annual projections, and executive reporting.
+
+**4.111.1 Cost Category Taxonomy**
+
+The engine computes costs across ten categories:
+- **Direct revenue loss**: `revenue_per_minute × duration × severity_multiplier`, where severity multipliers are: SEV1=5.0, SEV2=3.0, SEV3=1.5, SEV4=1.0, SEV5=0.5.
+- **SLA credits**: Monthly revenue value × SLA credit percentage × severity multiplier (only when SLA breach occurs).
+- **Engineering time**: `$150/hour × (duration × 1.5 for diagnostics) × engineer_count`, where engineer count scales with severity (SEV1: 10, SEV2: 5, SEV3: 3, SEV4: 2, SEV5: 1).
+- **Customer churn**: `affected_users × churn_rate_per_hour × duration_hours × customer_LTV × severity_multiplier`, with base churn rate 0.001/hour and base LTV $5,000.
+- **Brand damage**: `affected_users × $0.50/user × severity_multiplier` (only for public-facing incidents).
+- **Regulatory fines**: Base fine $50,000 × severity multiplier (only when regulatory impact is flagged).
+- **Data recovery**: `$25,000/component × affected_component_count × severity_multiplier` (only when data loss occurs).
+- **Communication costs**: `$10/minute × duration × severity_multiplier`.
+- **Legal costs**: `$500/hour × (duration_hours × severity_multiplier)` (only when regulatory impact or data loss occurs).
+- **Opportunity cost**: `$50/minute × duration × severity_multiplier`.
+
+Each cost item includes a confidence score (0.0-1.0) reflecting estimation certainty: revenue loss (0.9), engineering time (0.9), SLA credits (0.85), communication (0.8), data recovery (0.7), customer churn (0.6), regulatory fines (0.5), legal (0.5), opportunity cost (0.5), brand damage (0.4).
+
+**4.111.2 Prevention ROI Analysis**
+
+The engine estimates the ROI of prevention investment by:
+1. Computing total annualized loss across all provided incident profiles.
+2. Assuming prevention reduces incidents by 70%.
+3. Computing annual savings = (total_loss × 0.70) - investment.
+4. ROI percentage = (savings / investment) × 100.
+5. Payback period in months = investment / (monthly savings).
+
+ROI is classified as: "Strongly recommended" (ROI > 200%), "Recommended" (> 50%), "Marginal" (> 0%), or "Not recommended" (< 0%).
+
+**4.111.3 Scenario Comparison**
+
+The engine enables side-by-side comparison of multiple incident profiles, computing: worst-case cost, best-case cost, average cost, and cost variance. High-variance results trigger recommendations to standardize incident response.
+
+**4.111.4 Error Budget Valuation**
+
+Given an SLO target (e.g., 99.9%), the engine computes the monetary value of the error budget:
+- Error budget percentage = 100% - SLO target.
+- Error budget minutes per month = 43,200 × (error_budget_percentage / 100).
+- Cost per budget minute = sum of all component revenue per minute.
+- Total budget value = cost per minute × budget minutes.
+
+This enables organizations to assign a dollar value to each minute of their error budget.
+
+**4.111.5 Cascading Cost Model**
+
+The engine computes the financial cost of cascading failures by traversing the dependency graph from an initial component failure. Each affected component contributes cost proportional to its revenue per minute, with a cascade depth multiplier (1.0 + depth × 0.2) reflecting increased detection and recovery time for deeper cascade levels.
+
+**4.111.6 Executive Reporting**
+
+The engine generates executive-level incident reports containing: a narrative summary, total cost, cost breakdown by category, business impact flags (data loss, SLA breach, regulatory exposure, customer visibility), risk rating (CRITICAL > $500K, HIGH > $100K, MEDIUM > $10K, LOW), top recommendations, and prevention investment guidance.
+
+### 4.112 Failure Cost Attribution Engine
+
+The Failure Cost Attribution Engine attributes the financial cost of potential infrastructure failures to specific teams, services, and components, enabling risk-proportional budget allocation and targeted resilience investment.
+
+**4.112.1 Failure Probability Estimation**
+
+For each component, the engine estimates annual failure probability using a Poisson model:
+- Base failure rate: `HOURS_PER_YEAR / MTBF` if MTBF is available, otherwise 10 incidents/year for single instances.
+- Replica reduction: 3+ replicas → 99% reduction; 2 replicas → 90% reduction.
+- Failover reduction: 80% reduction when enabled.
+- Autoscaling reduction: 50% reduction when enabled.
+- Probability: `1 - e^(-base_failures)`, capped at 1.0.
+
+**4.112.2 Downtime Estimation**
+
+Per-incident downtime is estimated from MTTR and resilience features:
+- Both replicas and failover: 10% of base MTTR.
+- Failover only: 30% of base MTTR.
+- Replicas only (no failover): 50% of base MTTR.
+- Single instance, no failover: full MTTR.
+
+**4.112.3 Traffic Fraction Estimation**
+
+The engine estimates each component's traffic fraction using the dependency graph:
+- Entry-point components (have dependencies but no dependents): 100% of traffic.
+- Other components: `(transitively_affected_count + 1) / total_components`.
+- Isolated components: `1 / total_components`.
+
+**4.112.4 Direct and Cascade Cost Computation**
+
+- **Direct cost**: `downtime_hours × (revenue_per_hour × traffic_fraction + SLA_penalty_per_hour)`.
+- **Cascade cost**: Direct cost × cascade multiplier, where the cascade multiplier accumulates 50% of each transitively affected component's traffic fraction.
+- **Total annual risk**: `failure_probability × cascade_cost + cost_per_incident × failure_probability`.
+
+**4.112.5 Team-Level Risk Aggregation**
+
+Components are assigned to teams either via explicit mapping or auto-assignment by component name patterns (e.g., "api-", "web-", "backend-" → backend team; "db-", "postgres", "redis" → data team; "lb-", "nginx", "cdn" → infra team; "kafka", "rabbit", "sqs" → messaging team). Team risk profiles aggregate: owned component list, total annual risk, highest-risk component, percentage of total risk, and recommended budget (20% of team risk).
+
+**4.112.6 Improvement ROI Ranking**
+
+For each component, the engine computes the ROI of adding one replica by comparing the current total annual risk against the improved risk (with one additional replica). The ROI is expressed as risk reduction per $10,000 invested. Components are ranked by ROI descending, enabling prioritized investment in the components where each dollar of resilience spending produces the greatest risk reduction.
+
+**4.112.7 Cost Reduction Opportunity Discovery**
+
+The engine identifies the top 10 cost reduction opportunities by analyzing the highest-risk components for: replica addition (for single-instance components), failover enablement (for multi-replica components without failover), and autoscaling enablement. Each opportunity includes the component ID, estimated annual savings, and recommended action.
+
+### 4.113 Consensus Protocol Analysis Engine
+
+The Consensus Protocol Analysis Engine simulates distributed consensus protocol behavior and evaluates resilience characteristics across infrastructure topologies. The engine operates entirely on the in-memory graph model, analyzing Raft, Paxos, ZAB, PBFT, and Viewstamped Replication protocols without requiring access to actual consensus clusters.
+
+**4.113.1 Quorum Analysis**
+
+For each consensus cluster with $n$ voting nodes, the engine computes:
+- Quorum size: $q = \lfloor n/2 \rfloor + 1$
+- Maximum tolerable failures: $f = n - q$
+- Quorum margin: $m = h - q$, where $h$ is the count of currently healthy voters
+
+Risk level is classified as: CRITICAL if $m < 0$ (quorum lost), HIGH if $m = 0$ (no failure tolerance), MEDIUM if $m = 1$ (single failure tolerance), LOW otherwise. For PBFT protocol, the Byzantine fault tolerance bound is computed as $f = \lfloor (n - 1) / 3 \rfloor$.
+
+**4.113.2 Split-Brain Detection and Prevention**
+
+The engine evaluates split-brain susceptibility by analyzing cluster topology for partition scenarios:
+- Dual-leader probability is computed based on cluster size, election timeout, and whether pre-vote is enabled: $P_{\text{dual}} = \max(0, 1 - q/n) \times (1 - P_{\text{prevote}})$, where $P_{\text{prevote}} = 0.5$ if pre-vote is enabled, 0 otherwise
+- Detection time is estimated as $2 \times \text{election\_timeout}$
+- Resolution time is estimated as $3 \times \text{election\_timeout}$
+- Prevention mechanisms include pre-vote (Raft), fencing tokens (Paxos), and epoch-based leader identification (ZAB)
+
+**4.113.3 Leader Election Failure Impact**
+
+For each cluster, the engine models leader election failure impact:
+- Write unavailability duration: computed as election timeout plus the time for a new leader to be elected
+- Read availability during election: protocol-dependent (Raft followers can serve stale reads; PBFT maintains reads)
+- Split vote risk: $P_{\text{split}} = \max(0, 1 - 1/c)$, where $c$ is the candidate count
+- Pre-vote disruption reduction is modeled as a 50% reduction in estimated downtime
+
+**4.113.4 Network Partition Tolerance**
+
+The engine simulates symmetric, asymmetric, partial, and total network partition scenarios:
+- Surviving partition size and isolated partition size are computed from node distribution across regions
+- Quorum maintenance is evaluated: the partition containing $\geq q$ voters maintains write availability
+- Safety (no conflicting commits) and liveness (ability to make progress) are assessed per partition type
+- Byzantine fault tolerance is computed as $f_{\text{byz}} = \lfloor (n - 1) / 3 \rfloor$
+
+**4.113.5 Consensus Latency Modeling**
+
+Commit latency is modeled under multiple failure scenarios:
+- Normal: median of all node latencies, representing the quorum acknowledgment latency
+- One-node failure: latency increases to the $(q)$-th percentile of remaining node latencies
+- Two-node failure: latency increases to the $(q)$-th percentile of remaining nodes, or infinite if quorum is lost
+- Cross-region: maximum latency among nodes in different regions, multiplied by 2 for round-trip consensus
+- Leader in minority partition: latency set to infinity (writes unavailable) with read latency at the minority partition's node latencies
+
+**4.113.6 CAP Theorem Trade-off Scoring**
+
+The engine produces a quantitative CAP trade-off score for each cluster:
+- Consistency score: derived from protocol guarantees (Raft/Paxos: high, PBFT: highest)
+- Availability score: derived from quorum margin and failover configuration
+- Partition tolerance score: derived from geographic distribution of nodes and Byzantine fault tolerance
+- A composite trade-off vector $(C, A, P)$ is normalized to $[0, 1]$ for cross-protocol comparison
+
+**4.113.7 Voter Membership Change Impact**
+
+The engine assesses the impact of membership changes (add voter, remove voter, promote observer, demote voter):
+- Quorum size before and after the change
+- Window of vulnerability during the joint consensus period
+- Log replication lag assessment for newly added voters
+- Witness/observer node effectiveness: quantified as the improvement in fault tolerance without increasing write latency
+
+### 4.114 Data Replication Analysis Engine
+
+The Data Replication Analysis Engine evaluates data replication strategies, consistency models, and their resilience characteristics across distributed infrastructure. The engine models synchronous, asynchronous, semi-synchronous, and quorum-based replication strategies, operating entirely on the in-memory topology model.
+
+**4.114.1 Replication Lag Risk Assessment**
+
+For each replication group, the engine computes:
+- Maximum, average, and 99th-percentile replication lag across all replica nodes
+- Lagging nodes: replicas whose lag exceeds a configurable threshold
+- Estimated data loss window: $W_{\text{loss}} = \text{max\_lag\_ms} / 1000$ seconds, representing the RPO under sudden primary failure
+- Risk level is classified based on lag magnitude: CRITICAL if max lag > 10,000ms, HIGH if > 5,000ms, MEDIUM if > 1,000ms, LOW otherwise
+
+**4.114.2 Split-Brain Assessment**
+
+The engine evaluates split-brain susceptibility per replication group using strategy-specific susceptibility factors:
+- Synchronous: base susceptibility 0.1 (lowest risk due to synchronous acknowledgment)
+- Asynchronous: base susceptibility 0.7 (highest risk due to independent divergence)
+- Semi-synchronous: base susceptibility 0.4
+- Quorum: base susceptibility 0.2
+
+Data divergence risk is computed by combining the strategy susceptibility with the consistency model's data loss factor and the conflict resolution effectiveness score. Resolution time is estimated based on the configured split-brain resolution strategy (fencing, quorum leader election, manual intervention, or automatic rollback).
+
+**4.114.3 Failover Sequence Analysis**
+
+For each replication group, the engine generates a complete failover plan comprising ordered steps:
+1. Detect primary failure (estimated duration based on health check interval)
+2. Select promotion candidate (the replica with the lowest replication lag)
+3. Promote replica to primary (estimated duration based on replication strategy)
+4. Redirect traffic to new primary
+5. Verify replication state
+
+Each step is annotated with estimated duration, risk description, and whether data loss is possible. The total RPO and RTO are computed from the aggregate step durations and the replication lag at the time of failure.
+
+**4.114.4 Replication Factor Optimization**
+
+The engine produces cost-versus-durability profiles for replication factors 1 through 5:
+- Storage cost multiplier: linear with replication factor
+- Network cost multiplier: $(r - 1) \times \text{strategy\_factor}$, where the strategy factor accounts for synchronous (3.0x), asynchronous (1.0x), semi-synchronous (2.0x), or quorum (2.5x) overhead
+- Write latency multiplier: derived from the replication strategy
+- Durability (nines): $-\log_{10}(P_{\text{loss}})$, where $P_{\text{loss}}$ decreases exponentially with replication factor
+- Cost efficiency score: $\text{durability\_nines} / \text{total\_cost\_multiplier}$
+
+**4.114.5 Cross-Region Replication Profiling**
+
+For replication groups with nodes in multiple regions, the engine computes:
+- Estimated cross-region latency based on geographic distance heuristics
+- Bandwidth cost factor derived from egress pricing
+- Consistency risk: the probability that cross-region lag causes stale reads
+- Regulatory risk: whether cross-region replication violates data residency requirements
+
+### 4.115 Connection Pool Analysis Engine
+
+The Connection Pool Analysis Engine evaluates connection pool configurations and their impact on infrastructure reliability. The engine supports database, HTTP, gRPC, message queue, and Redis pool types, analyzing pool sizing, leak detection, exhaustion scenarios, timeout adequacy, health checking strategies, warmup strategies, cross-service coordination, and connection storm prevention.
+
+**4.115.1 Pool Sizing Analysis**
+
+For each connection pool, the engine evaluates current sizing against recommended values:
+- Recommended minimum: derived from the pool type's ideal idle ratio multiplied by the maximum pool size
+- Recommended maximum: computed from component capacity (max RPS), connection overhead, and pool type characteristics
+- Recommended idle: the pool type's ideal idle ratio applied to the recommended maximum
+- Sizing score (0-100): penalized for oversizing (wasted resources), undersizing (exhaustion risk), and idle-to-max ratio deviation from the pool-type-specific ideal
+
+**4.115.2 Connection Leak Detection**
+
+The engine detects connection leaks by analyzing the gap between active connections and expected usage:
+- Leaked connections estimate: $L = \text{active} - (\text{max\_size} \times \text{utilization})$
+- Leak rate per hour: $R = L / \max(\text{max\_lifetime\_seconds} / 3600, 1)$
+- Time to exhaustion: $T = (\text{max\_size} - L) / R$ hours
+- Detection confidence: based on pool utilization and health check strategy reliability score
+
+Risk classification: CRITICAL if time to exhaustion < 1 hour, HIGH if < 4 hours, MEDIUM if < 24 hours, LOW otherwise.
+
+**4.115.3 Pool Exhaustion Simulation**
+
+The engine simulates connection pool exhaustion under load:
+- Time to exhaustion: computed from current active connections, request rate, and average connection hold time
+- Requests queued: estimated from the wait queue capacity and arrival rate
+- Requests rejected: computed when the queue overflows
+- Cascade affected: components transitively dependent on the exhausted pool, identified via dependency graph traversal
+- Recovery time: estimated from pool type creation overhead and the number of connections to re-establish
+
+**4.115.4 Timeout Analysis**
+
+The engine evaluates three timeout dimensions:
+- Acquire timeout adequacy: whether the acquire timeout exceeds the pool creation overhead multiplied by the queue depth
+- Idle timeout adequacy: whether idle connections are evicted before becoming stale (compared against health check interval)
+- Max lifetime adequacy: whether the maximum connection lifetime prevents stale connection accumulation
+- Estimated timeout errors per hour: computed from the probability of queue overflow under current load
+
+**4.115.5 Health Check Strategy Evaluation**
+
+Each health check strategy is evaluated for overhead and reliability:
+- TEST_ON_BORROW: 2.0ms overhead, 0.95 reliability (highest stale detection, highest latency impact)
+- BACKGROUND_VALIDATION: 0.5ms overhead, 0.90 reliability (good balance)
+- TEST_WHILE_IDLE: 0.3ms overhead, 0.80 reliability (low overhead, moderate detection)
+- TEST_ON_RETURN: 1.5ms overhead, 0.70 reliability
+- NONE: 0.0ms overhead, 0.0 reliability (no stale detection)
+
+The engine recommends upgrading to a higher-reliability strategy when stale connection risk is high.
+
+**4.115.6 Connection Storm Prevention**
+
+The engine evaluates thundering herd risk when many connections are established simultaneously (e.g., after a deployment or failover):
+- Estimated peak connections: $P = \text{replicas} \times \text{max\_pool\_size}$
+- Maximum safe connections: derived from the target component's capacity
+- Reconnect backoff adequacy: whether exponential backoff with jitter is configured
+- Storm risk: CRITICAL if peak exceeds 3x safe connections, HIGH if 2x, MEDIUM if 1.5x
+
+### 4.116 Memory Leak Detection Engine
+
+The Memory Leak Detection Engine analyzes memory leak patterns and their infrastructure impact through in-memory simulation. The engine models memory growth rates, time-to-OOM estimation, cascade effects of out-of-memory failures, garbage collection pressure, memory fragmentation risk, container memory limit analysis, and statistical anomaly detection for leak identification.
+
+**4.116.1 Memory Growth Rate Modeling**
+
+The engine computes memory growth rate from a series of `MemorySnapshot` observations using linear regression:
+- Growth rate: $\Delta = (m_{\text{current}} - m_{\text{baseline}}) / (t_{\text{current}} - t_{\text{baseline}})$ MB/hour
+- Utilization: $U = m_{\text{current}} / m_{\text{total}} \times 100$
+- Leak detection confidence: based on the coefficient of determination ($R^2$) of the linear fit and the number of data points
+- A component is classified as leaking when the growth rate exceeds a configurable threshold and the confidence exceeds 0.5
+
+**4.116.2 Time-to-OOM Estimation**
+
+For each component with a positive memory growth rate, the engine estimates:
+```
+time_to_oom = (memory_limit - current_usage) / growth_rate
+```
+Where `memory_limit` is derived from the container memory limit (at the 95% OOM kill threshold). The 24-hour OOM probability is computed as:
+```
+P_oom_24h = min(1.0, 24.0 / time_to_oom) if time_to_oom > 0 else 0.0
+```
+Severity classification: CRITICAL if time to OOM < 4 hours, HIGH if < 12 hours, MEDIUM if < 48 hours, LOW otherwise.
+
+**4.116.3 OOM Cascade Analysis**
+
+When a component reaches OOM, the engine simulates the cascade impact through the dependency graph:
+- Affected components: all components transitively dependent on the OOM component via `requires` dependencies
+- Cascade depth: the maximum graph distance from the OOM component to any affected component
+- Total impact score: $S = \sum_{i} w_i / \text{replicas}_i$, where $w_i$ is the dependency weight and $\text{replicas}_i$ is the replica count of affected component $i$
+- Critical path: the dependency path with the highest aggregate impact score
+
+**4.116.4 GC Pressure Scoring**
+
+The engine models garbage collection pressure based on the GC algorithm and memory utilization:
+- GC characteristics are parameterized per algorithm: G1 (10ms avg pause, 1.0x frequency), ZGC (1ms, 0.5x), Shenandoah (1.5ms, 0.6x), CMS (20ms, 1.2x), Serial (100ms, 0.3x), Parallel (50ms, 0.8x)
+- Pressure score: $P = (\text{avg\_pause} \times \text{frequency} \times U) / 100$, where $U$ is the memory utilization percentage
+- Throughput impact: estimated as the fraction of time spent in GC pauses per minute
+
+**4.116.5 Memory Fragmentation Risk Assessment**
+
+The engine assesses fragmentation risk per memory region:
+- Fragmentation ratio: $F = 1 - (\text{largest\_free\_block} / \text{total\_free})$
+- Region-specific risk multipliers: heap (0.6), off-heap (0.8), stack (0.1), mmap (0.4), shared (0.5)
+- Fragmentation level: SEVERE if $F > 0.8$, HIGH if $F > 0.6$, MODERATE if $F > 0.4$, LOW if $F > 0.2$, MINIMAL otherwise
+
+**4.116.6 Remediation Priority Scoring**
+
+Each recommended remediation action is scored on two dimensions:
+- Effectiveness (0-1): restart_service (0.9), fix_code_leak (1.0), tune_gc (0.6), optimize_allocation (0.7), enable_autoscaling (0.55), increase_memory_limit (0.5), reduce_cache_size (0.45), add_replicas (0.4)
+- Effort (0-1): restart_service (0.1), increase_memory_limit (0.2), add_replicas (0.3), reduce_cache_size (0.3), enable_autoscaling (0.4), tune_gc (0.5), optimize_allocation (0.7), fix_code_leak (0.9)
+
+Priority score: $\text{priority} = \text{effectiveness} \times (1 - \text{effort}) \times \text{severity\_weight}$, enabling operators to identify high-impact, low-effort remediations first.
+
+### 4.117 Kubernetes Pod Disruption Analysis Engine
+
+The Kubernetes Pod Disruption Analysis Engine evaluates Pod Disruption Budget (PDB) configurations and their impact on infrastructure resilience. The engine models PDB policy evaluation (minAvailable/maxUnavailable), rolling update interaction, node drain simulation, multi-PDB conflict detection, eviction budget calculation, maintenance window optimization, StatefulSet versus Deployment behavioral differences, PDB violation risk scoring, and cross-namespace interaction analysis.
+
+**4.117.1 PDB Policy Evaluation and Eviction Budget**
+
+For each PDB specification with total replicas $n$, ready replicas $r$, and policy parameters, the engine resolves:
+- Effective minAvailable: for percentage-based policies, $\lceil n \times v / 100 \rceil$; for absolute values, $\min(v, n)$
+- Effective maxUnavailable: for percentage-based policies, $\lfloor n \times v / 100 \rfloor$; derived from minAvailable for MIN_AVAILABLE policies
+- Current unavailable: $u = n - r$
+- Allowed disruptions: $a = \max(0, \text{maxUnavailable} - u)$
+- Headroom: $h = \max(0, r - \text{minAvailable})$
+- Blocked state: $a = 0$ indicates that no further evictions are permitted
+
+**4.117.2 Rolling Update Impact Analysis**
+
+The engine determines how PDB constraints affect rolling update progress:
+- Effective parallelism: $\min(\text{maxUnavailable}, \text{maxSurge} + \text{maxUnavailable})$
+- Estimated duration: $\lceil n / \text{parallelism} \rceil \times 30\text{s} \times \text{workload\_multiplier}$
+- Workload multiplier: StatefulSet (1.5x, due to ordered pod management), DaemonSet (1.2x), Deployment (1.0x)
+- Blocking condition: when maxUnavailable resolves to 0, the rolling update cannot proceed
+
+**4.117.3 Node Drain Simulation**
+
+The engine simulates node drain operations against PDB constraints:
+- For each node, the set of hosted components is identified from node assignments
+- Each component's PDB is evaluated to determine whether eviction is permitted
+- Drain results include: which pods can be evicted, which are blocked, estimated drain duration, and whether the drain would violate any PDB
+- When PDB constraints prevent complete drain, the engine recommends increasing maxUnavailable or rescheduling the drain to a maintenance window with fewer traffic-sensitive workloads
+
+**4.117.4 Multi-PDB Conflict Detection**
+
+The engine detects conflicts between overlapping PDB specifications:
+- Label selector overlap: when two PDBs select the same pods via overlapping label selectors
+- Resource contention: when PDBs on the same node compete for eviction budget
+- Severity classification based on the nature of the conflict and whether it could cause deadlock during cluster operations
+
+**4.117.5 PDB Violation Risk Scoring**
+
+For each PDB, the engine computes a violation risk score (0-100):
+- Headroom penalty: lower headroom increases violation risk
+- Replica count penalty: fewer replicas increase the probability that a single failure violates the PDB
+- Workload type penalty: StatefulSet PDBs carry higher risk due to ordered termination
+- Violation probability: estimated from the combination of failure rate and headroom margin
+
+**4.117.6 Cross-Namespace Interaction Analysis**
+
+The engine analyzes interactions between PDBs in different namespaces that share the same node pool:
+- Shared node pool detection: components in different namespaces assigned to the same nodes
+- Resource contention: whether simultaneous evictions in different namespaces could exhaust node capacity
+- Eviction priority conflicts: when PDBs in different namespaces impose contradictory constraints on the same nodes
+
+**4.117.7 Maintenance Window Optimization**
+
+The engine recommends optimal maintenance windows based on PDB constraints and traffic patterns:
+- Maximum concurrent disruptions per window
+- Affected namespaces
+- Recommended window duration based on the aggregate drain time across all nodes
+
+### 4.118 Cold Start Analysis Engine
+
+The Cold Start Analysis Engine analyzes cold start behavior across infrastructure components, providing comprehensive assessment of cold start latency, warm-up time modeling, cascade effects of simultaneous cold starts, container and serverless overhead, initialization order dependency resolution, SLA impact during scale-out events, and pre-warming strategy evaluation.
+
+**4.118.1 Cold Start Latency Estimation**
+
+For each component, the engine estimates total cold start latency as:
+```
+total_cold_start = image_pull_time + (base_latency × runtime_multiplier) + dependency_wait_time
+```
+Where:
+- Base latency is parameterized per component type: load balancer (500ms), web server (2,000ms), app server (3,000ms), database (5,000ms), cache (1,000ms), queue (1,500ms), storage (800ms), DNS (200ms)
+- Runtime multiplier accounts for the deployment model: container (1.0x), serverless (1.5x), VM (3.0x), bare metal (5.0x), managed service (0.5x)
+- Image pull time: container (2,000ms), serverless (500ms), VM/bare metal/managed (0ms)
+- Dependency wait time: the sum of cold start latencies of components in the initialization dependency chain
+
+**4.118.2 Warm-Up Time Modeling**
+
+The engine models sequential warm-up phases after cold start:
+- Cache warming: 5,000ms (provides 30% capacity)
+- Connection pool filling: 2,000ms (provides 20% capacity)
+- JIT compilation: 3,000ms (provides 25% capacity)
+- DNS resolution: 100ms (provides 5% capacity, blocking)
+- TLS handshake: 200ms (provides 5% capacity, blocking)
+- Health check: 500ms (provides 15% capacity, blocking)
+
+Total warm-up time is computed as the sum of blocking phase durations plus the maximum of non-blocking phase durations, reflecting that non-blocking phases execute concurrently.
+
+**4.118.3 Cold Start Cascade Analysis**
+
+When a component cold starts, its dependent services may also need to cold start simultaneously. The engine models this cascade:
+- Cascade depth: the maximum depth of the dependency tree from the root cold-starting component
+- Simultaneous cold starts: the count of components cold starting concurrently
+- Total cascade cold start time: the maximum cold start latency along any path in the dependency tree
+- SLA violation risk: whether the cascade cold start time exceeds the component's SLA latency target
+
+**4.118.4 Cold Start Frequency Estimation**
+
+The engine estimates cold start frequency based on autoscaling patterns:
+- Scale events per day: derived from autoscaling configuration (min/max replicas, scale-up threshold)
+- Idle timeout cold starts: inversely proportional to the idle timeout duration
+- Deployment cold starts: based on deployment frequency from the operational profile
+- Total daily cold starts: the sum of all cold start sources
+
+**4.118.5 Startup Probe Timeout Adequacy**
+
+The engine evaluates whether Kubernetes startup probe timeouts are sufficient:
+- Margin: $M = \text{probe\_timeout} - \text{estimated\_start\_time}$
+- Margin percent: $M_{\%} = M / \text{estimated\_start\_time} \times 100$
+- Status: ADEQUATE if margin > 50%, TIGHT if margin 10-50%, INSUFFICIENT if margin < 10%, MISSING if no probe configured
+
+**4.118.6 Resource Consumption Spike Analysis**
+
+The engine models resource consumption spikes during cold start:
+- CPU spike: estimated as 2-5x steady-state CPU utilization during JIT compilation and initialization
+- Memory spike: estimated as 1.5-3x steady-state memory during class loading and cache warming
+- Network spike: estimated from image pull size and dependency initialization traffic
+- Spike duration: equal to the total cold start time plus warm-up time
+
+### 4.119 Multi-Tenant Isolation Verification Engine
+
+The Multi-Tenant Isolation Verification Engine simulates and verifies tenant isolation in multi-tenant architectures. The engine detects noisy-neighbor effects, shared-resource bottlenecks, data-leak risks, and recommends isolation upgrades, operating entirely on the in-memory topology model augmented with tenant configuration data.
+
+**4.119.1 Isolation Level Hierarchy**
+
+The engine defines seven isolation levels with monotonically increasing protection:
+- NONE (rank 0): no isolation
+- LOGICAL (rank 1): application-level data partitioning
+- NAMESPACE (rank 2): Kubernetes namespace separation
+- PROCESS (rank 3): OS process-level isolation
+- CONTAINER (rank 4): container-level isolation
+- VM (rank 5): virtual machine isolation
+- PHYSICAL (rank 6): dedicated physical hardware
+
+Each commercial tier maps to a minimum required isolation level: Free/Basic (LOGICAL), Professional (NAMESPACE), Enterprise (CONTAINER), Dedicated (VM).
+
+**4.119.2 Noisy-Neighbor Simulation**
+
+The engine simulates noisy-neighbor scenarios where one tenant's resource consumption impacts others:
+
+For each noise type (CPU hog, memory hog, disk I/O flood, network flood, connection pool exhaustion, query storm, cache thrash, lock contention), the engine computes:
+```
+latency_increase = base_impact × isolation_attenuation
+error_rate_increase = base_error_rate × isolation_attenuation
+```
+Where `isolation_attenuation` decreases with stronger isolation: NONE (1.0), LOGICAL (0.8), NAMESPACE (0.5), PROCESS (0.3), CONTAINER (0.15), VM (0.05), PHYSICAL (0.0). An isolation breach is detected when latency increase exceeds 20% or error rate increase exceeds 5%.
+
+**4.119.3 Data Isolation Verification**
+
+The engine verifies data-level isolation by identifying shared data-bearing components (databases, caches, storage) across tenants:
+- For each component shared by multiple tenants, the weaker isolation level of the two tenants is evaluated
+- Risk classification for data-bearing components: CRITICAL if isolation < NAMESPACE, HIGH if < CONTAINER, MEDIUM otherwise
+- Risk classification for non-data-bearing components: HIGH if isolation < LOGICAL, MEDIUM if < NAMESPACE, LOW otherwise
+- Verification fails if any risk is classified as HIGH or CRITICAL
+
+**4.119.4 Shared Bottleneck Detection**
+
+The engine identifies shared infrastructure components that may become bottlenecks:
+- Contention score: $C = \text{tenant\_count} \times (1 + U / 100)$, where $U$ is the component utilization percentage
+- Severity: CRITICAL if contention > 5 or tenant count >= 5, HIGH if contention > 3 or tenant count >= 3, MEDIUM otherwise
+
+**4.119.5 Isolation Score Computation**
+
+The overall isolation score (0-100) is computed as:
+```
+score = 100 - Σ(tier_gap_penalty) - Σ(shared_resource_penalty) - Σ(weak_isolation_penalty)
+```
+Where tier gap penalty is $5 \times (\text{required\_rank} - \text{current\_rank})$ per tenant, shared resource penalties are 10 (critical), 5 (high), or 2 (medium) per risk, and weak isolation penalty is 3 per tenant with attenuation >= 0.8.
+
+**4.119.6 Tenant Traffic Spike Simulation**
+
+The engine simulates the impact of one tenant experiencing a traffic spike:
+- Per-tenant resource share: $s = U_{\text{current}} / \text{tenant\_count}$
+- Spiked utilization: $U_{\text{spiked}} = U_{\text{current}} + s \times (\text{multiplier} - 1)$
+- Resource exhaustion: flagged when spiked utilization exceeds 100%
+- Cross-tenant impact: determined by whether spiked utilization exceeds 80% on shared components
+- Latency and error rate increase are attenuated by the tenant's isolation level
+
+**4.119.7 Fair Share Resource Allocation**
+
+The engine computes fair resource allocation per tenant using tier-weighted capacity splitting:
+- Tier weights: Free (0.5), Basic (0.75), Professional (1.0), Enterprise (1.5), Dedicated (2.0)
+- Fair share: $F_t = (\text{capacity} / \text{sharing\_count}) \times \text{tier\_weight}$
+
+### 4.120 Multi-Cloud Resilience Analysis Engine
+
+The Multi-Cloud Resilience Analysis Engine evaluates resilience of multi-cloud and hybrid cloud deployments by analyzing cross-cloud dependencies, provider-level failure impact, data sovereignty compliance, vendor lock-in risk, egress costs, workload portability, and disaster recovery posture.
+
+**4.120.1 Cross-Cloud Dependency Identification**
+
+The engine identifies dependencies that cross cloud provider or region boundaries by comparing `CloudComponentMapping` annotations for each edge in the dependency graph:
+- Cross-provider dependencies: source and target on different cloud providers
+- Cross-region dependencies: source and target in different regions (same or different provider)
+- Estimated latency: parameterized by relationship type: same-provider same-region (1.5ms), same-provider cross-region (80ms), cross-provider same-geography (15ms), cross-provider cross-geography (200ms)
+- Monthly data transfer volume is estimated from component data volume annotations
+
+**4.120.2 Vendor Lock-In Assessment**
+
+For each component, the engine computes a vendor lock-in score (0-100) based on:
+- Proprietary service usage (+40): pre-defined proprietary service sets per provider (AWS: DynamoDB, Aurora, Kinesis, etc.; GCP: BigQuery, Spanner, Bigtable, etc.; Azure: Cosmos, Synapse, Event Hub, etc.)
+- Service portability (+20 for low portability, +35 for locked)
+- Stateful workload penalty (+15): data migration complexity
+- Data volume penalty (+10 if > 1TB): migration time and cost
+- Service equivalence mapping: 12 cross-cloud service equivalence categories with portability ratings
+
+**4.120.3 Failure Mode Impact Analysis**
+
+The engine simulates seven cloud-specific failure modes: AZ outage, region outage, provider outage, network partition, service degradation, DNS failure, and control plane failure:
+- Affected components: all components mapped to the failed scope (AZ, region, or provider)
+- Impact percentage: fraction of total components affected
+- Estimated recovery time: parameterized per failure mode (AZ: 30min, region: 120min, provider: 480min, network partition: 15min, service degradation: 45min, DNS: 20min, control plane: 60min)
+- Residual capacity: the fraction of capacity remaining in unaffected locations
+
+**4.120.4 Data Sovereignty Compliance**
+
+The engine verifies data sovereignty compliance by mapping component regions to regulatory geographic boundaries (EU, US, APAC, China, Brazil, India):
+- Each component's region is checked against the sovereignty requirement's permitted regions
+- Cross-region replication paths are evaluated for data residency violations
+- Compliance status: true only if all components with sovereignty requirements are located in permitted regions
+
+**4.120.5 Egress Cost Estimation**
+
+For each cross-cloud dependency, the engine computes:
+```
+monthly_cost = data_transfer_gb × egress_rate_per_gb
+```
+Where egress rates are parameterized per provider: AWS ($0.09/GB), GCP ($0.08/GB), Azure ($0.087/GB), on-premise ($0.00/GB), edge ($0.12/GB).
+
+**4.120.6 Overall Resilience Score**
+
+The multi-cloud resilience score (0-100) aggregates four sub-scores:
+- Provider diversity score (weight: 0.25): based on Shannon entropy of provider distribution
+- Geographic distribution score (weight: 0.25): based on unique region count and geographic spread
+- Vendor lock-in score (weight: 0.25): inverted average lock-in across components
+- DR readiness score (weight: 0.25): based on DR mode (active-active: 100, active-passive: 70, pilot-light: 40, backup-restore: 20), replication factor, and RTO/RPO targets
+
+### 4.121 Deployment Strategy Analysis Engine
+
+The Deployment Strategy Analysis Engine evaluates deployment strategies for resilience and risk across infrastructure topologies. The engine supports six deployment strategies (rolling update, blue-green, canary, A/B testing, recreate, shadow/dark launch) and produces detailed assessments across eleven dimensions.
+
+**4.121.1 Rollback Safety Analysis**
+
+For each strategy, the engine computes rollback time, safety classification, and data compatibility:
+- Blue-green: 10s rollback, INSTANT safety (traffic switch), data-compatible
+- Canary: 30s rollback, FAST safety, data-compatible
+- Rolling update: $\max(60, n \times 15)$s rollback where $n$ is component count, MODERATE safety
+- A/B testing: 20s rollback, FAST safety, data-compatible
+- Recreate: 300s rollback, DANGEROUS safety, data-incompatible (potential data loss risk of 15%)
+- Shadow: 5s rollback, INSTANT safety (stop mirroring)
+
+Stateful component presence increases rollback time by 1.5x for non-blue-green, non-shadow strategies.
+
+**4.121.2 Canary Progression Modeling**
+
+For canary deployments, the engine models traffic progression through seven default stages: 1%, 5%, 10%, 25%, 50%, 75%, 100%. At each stage:
+- Risk assessment based on the fraction of traffic exposed and the number of components in the blast radius
+- Health gate criteria: error rate, latency p99, and saturation thresholds
+- Automatic rollback triggers at any stage where health gates are violated
+
+**4.121.3 Resource Cost Modeling**
+
+Each strategy's resource cost is computed using strategy-specific multipliers:
+- Blue-green: 2.0x (full duplicate environment)
+- Shadow: 1.8x (duplicate compute for traffic mirroring)
+- A/B testing: 1.3x
+- Canary: 1.15x
+- Rolling update: 1.1x (surge instances)
+- Recreate: 1.0x (no additional resources)
+
+**4.121.4 Velocity-Risk Tradeoff Scoring**
+
+The engine produces a composite risk score (0-100) from weighted factors:
+- Rollback risk weight: 0.25
+- Downtime risk weight: 0.25
+- Data risk weight: 0.20
+- Dependency risk weight: 0.15
+- Resource risk weight: 0.15
+
+**4.121.5 Health Check Adequacy Evaluation**
+
+For each component, the engine evaluates whether health check configuration is sufficient for the chosen strategy:
+- Health check interval relative to failover detection time
+- Readiness probe coverage for rolling updates
+- Liveness probe coverage for crash detection
+
+**4.121.6 Database Migration Compatibility**
+
+For database and storage components, the engine assesses deployment strategy compatibility:
+- Schema migration compatibility with zero-downtime requirements
+- Backward compatibility requirements for rolling/canary strategies
+- Data migration risk for recreate strategies
+
+**4.121.7 Multi-Region Deployment Coordination**
+
+The engine plans multi-region deployment sequences:
+- Coordination overhead per region: 120 seconds
+- Propagation delay between regions: 30 seconds
+- Canary region selection: the region with the lowest traffic weight
+- Rollback order: reverse of deployment sequence
+
+**4.121.8 Deployment Window Optimization**
+
+The engine recommends optimal deployment windows:
+- Peak hours (8-17 UTC): high risk, avoid deployment
+- Safe hours (2-5 UTC): low risk, recommended for deployment
+- Risk factor is multiplied by traffic pattern weight during the proposed deployment hour
+
+**4.121.9 Zero-Downtime Verification**
+
+The engine verifies whether the chosen strategy can achieve zero-downtime deployment:
+- Blue-green, canary, rolling, A/B, shadow: zero-downtime capable (with conditions)
+- Recreate: not zero-downtime capable
+- Blockers: SPOF components, missing health checks, insufficient replica count
+
+### 4.122 Canary Rollback Simulation Engine
+
+The Canary Rollback Simulation Engine simulates canary deployments with progressive traffic shifting and automated rollback decisions. The engine analyzes blast radius at each canary stage, models rollback impact, and compares deployment strategies to identify the safest promotion path.
+
+**4.122.1 Canary Simulation**
+
+The engine executes a step-by-step canary simulation for a target component:
+- Initial traffic split at a configurable percentage (default: 5%)
+- Progressive traffic increase in configurable step increments (default: 10%)
+- At each step, synthetic error rate and latency are computed from component health, utilization, and traffic percentage
+- Decision logic at each step: ROLLBACK if error rate exceeds threshold or latency exceeds p99 target (with auto-rollback enabled); HOLD if error rate approaches threshold (within 80%); PROCEED otherwise
+- Simulation terminates when traffic reaches 100% (COMPLETED) or rollback is triggered
+
+**4.122.2 Rollback Impact Analysis**
+
+When a rollback is triggered, the engine computes:
+- Detection time: parameterized by trigger type (health check failure: 5s, crash loop: 8s, error rate spike: 10s, CPU spike: 12s, latency degradation: 15s, saturation breach: 20s, custom metric: 25s, SLO violation: 30s, memory leak: 60s, manual: 120s)
+- Rollback time: based on component's deploy downtime, reduced by 30% if replicas > 1, capped at failover promotion time if failover is enabled
+- Total impact: detection time + rollback time
+- Affected requests: total impact seconds multiplied by component RPS
+- Data consistency risk: HIGH for database components, MEDIUM for components with single-replica database dependencies, LOW for replicated database dependencies, NONE otherwise
+
+**4.122.3 Failed Canary Simulation**
+
+The engine simulates the complete scenario of a canary failing at a specified traffic percentage:
+- Normal canary steps are executed up to the failure percentage
+- At the failure point, error rate spikes to 5% and latency to 1,200ms
+- Rollback trigger is automatically detected based on component state (crash loop, memory leak, CPU spike, latency degradation, or error rate spike)
+- Total duration includes all observation steps plus rollback time
+
+**4.122.4 Blast Radius Estimation**
+
+At each traffic split percentage, the engine estimates the blast radius:
+- Affected components: all components transitively dependent on the canary component, identified via dependency graph traversal
+- Affected request ratio: equal to the traffic split percentage / 100
+- Estimated error impact: $\text{ratio} \times \text{affected\_count} \times 0.1$
+- Risk level: computed from a weighted score of traffic percentage (60% weight) and affected component count (40% weight), classified as CRITICAL ($\geq 0.75$), HIGH ($\geq 0.5$), MEDIUM ($\geq 0.25$), LOW otherwise
+
+**4.122.5 Strategy Comparison**
+
+The engine compares all six deployment strategies for a given component:
+- Base risk scores: canary (20), blue-green (15), rolling (30), recreate (60), shadow (10), A/B test (25)
+- Risk adjusted by blast radius: $+2$ per affected component
+- Single replica penalty: $+10$
+- Rollback times per strategy: blue-green (10s), A/B test (15s), canary (30s), rolling (120s), recreate (300s), shadow (5s)
+- Failover-enabled components receive 50% reduction in rollback time
+
+**4.122.6 Rollback Readiness Validation**
+
+Pre-deployment readiness checks include:
+- Component health (blocker if unhealthy)
+- Multiple replicas (warning if single)
+- Failover enabled (warning if disabled)
+- Circuit breaker coverage on upstream dependencies (warning if absent)
+- Autoscaling enabled (warning if disabled)
+- SLO targets defined (warning if missing)
+- Database dependencies replicated (blocker if unreplicated)
+- Readiness score: percentage of passed checks; deployment blocked if score < 50% or any blocker exists
+
+### 4.123 Feature Flag Risk Analysis Engine
+
+The Feature Flag Risk Analysis Engine analyzes feature flag configurations and their operational risks. The engine detects stale flags, dependency chains, technical debt, flag conflicts, rollback safety issues, evaluation performance impact, and missing kill-switch coverage, producing prioritized cleanup recommendations and ownership accountability mappings.
+
+**4.123.1 Stale Flag Detection**
+
+The engine identifies flags that have not been toggled within a configurable threshold (default: 30 days):
+- Reference time: the later of last_toggled_at or created_at
+- Days since toggle: $(now - \text{reference\_time}).\text{days}$
+- Recommendations are type-specific: release flags should be made permanent, experiments should be concluded, kill switches should be verified
+
+**4.123.2 Flag Dependency Analysis**
+
+The engine constructs a dependency graph among flags and detects:
+- Direct dependencies: flags that explicitly depend on other flags
+- Reverse dependencies: flags that are depended upon by other flags
+- Circular dependencies: detected via depth-first search with cycle detection
+- Chain depth: the maximum dependency chain length, computed recursively with cycle protection
+
+**4.123.3 Technical Debt Scoring**
+
+Each flag accumulates a technical debt score based on:
+- Age penalty: $\min(40, (\text{age\_days} - 90) \times 0.3)$ for flags older than 90 days
+- Fully rolled out release flag: +20 (should be removed)
+- Long-running experiment: +15 (over 30 days)
+- Missing unit tests with code references: +10
+- High code reference count: $\min(15, \text{references} \times 0.5)$ for > 10 references
+
+Cleanup priority: CRITICAL ($\geq 60$), HIGH ($\geq 30$), MEDIUM ($\geq 10$), LOW ($> 0$), NONE ($= 0$).
+
+**4.123.4 Flag Conflict Detection**
+
+The engine detects three categories of conflicts:
+- Mutual exclusion: flags marked as conflicting that are both enabled (severity: CRITICAL)
+- Experiment overlap: two experiment flags affecting the same components simultaneously (severity: HIGH)
+- Circular dependency: flags that mutually depend on each other (severity: CRITICAL)
+
+**4.123.5 Rollback Safety Assessment**
+
+Each flag receives a rollback safety score (0-100):
+- Dependent flag penalty: $\min(40, \text{count} \times 15)$
+- High affected component penalty: $\min(30, (\text{count} - 5) \times 3)$ for > 5 components
+- Kill switch bonus: +10 (inherently safer to toggle)
+- Partial rollout experiment bonus: +5
+- Missing unit tests penalty: -10
+
+Classification: SAFE ($\geq 80$), RISKY ($\geq 50$), DANGEROUS ($< 50$).
+
+**4.123.6 Evaluation Performance Impact**
+
+The engine estimates flag evaluation latency overhead:
+- Per-flag overhead: 0.5ms per active flag
+- Total latency: $\text{active\_flag\_count} \times 0.5$ms
+- Status: CRITICAL if active flags $\geq 50$, WARNING if $\geq 20$, HEALTHY otherwise
+
+**4.123.7 Kill Switch Coverage Audit**
+
+The engine audits whether critical infrastructure paths have kill switch coverage:
+- Coverage percentage: fraction of components covered by at least one kill switch flag
+- Uncovered components are identified for remediation
+- Assessment thresholds: good ($\geq 80\%$), acceptable ($\geq 50\%$), poor ($< 50\%$)
+
+**4.123.8 Overall Risk Score**
+
+The composite risk score (0-100) aggregates:
+- Stale flag ratio: $\times 25$
+- High-debt flag ratio: $\times 25$
+- Conflict count: $\min(25, \text{count} \times 10)$
+- Kill switch coverage gap: $(100 - \text{coverage}) / 100 \times 15$
+- Performance status: +10 (critical) or +5 (warning)
+
+Risk classification: CRITICAL ($\geq 70$), HIGH ($\geq 40$), MEDIUM ($\geq 20$), LOW ($< 20$).
+
+### 4.124 Change Risk Prediction Engine
+
+The Change Risk Prediction Engine predicts how proposed infrastructure changes affect the overall resilience score before changes are applied, enabling pre-deployment risk assessment in CI/CD pipelines. The engine operates by cloning the in-memory graph, applying proposed changes to the clone, and computing the resilience delta.
+
+**4.124.1 Impact Prediction**
+
+For each proposed change, the engine:
+1. Computes the resilience score of the current graph ($S_{\text{before}}$)
+2. Deep-copies the graph to create an isolated simulation environment
+3. Applies the proposed change to the cloned graph
+4. Computes the resilience score of the modified graph ($S_{\text{after}}$)
+5. Computes the delta: $\Delta = S_{\text{after}} - S_{\text{before}}$
+
+Supported change types: ADD_COMPONENT, REMOVE_COMPONENT, MODIFY_REPLICAS, MODIFY_FAILOVER, ADD_DEPENDENCY, REMOVE_DEPENDENCY, CHANGE_REGION, UPGRADE_VERSION.
+
+**4.124.2 Risk Classification**
+
+Risk is classified from both the resilience delta and the blast radius:
+- CRITICAL: $|\Delta| \geq 20$ or blast radius $\geq 80\%$
+- HIGH: $|\Delta| \geq 10$ or blast radius $\geq 50\%$
+- MEDIUM: $|\Delta| \geq 5$ or blast radius $\geq 30\%$
+- LOW: $|\Delta| \geq 1$ or blast radius $\geq 10\%$
+- NEGLIGIBLE: otherwise
+
+Blast radius is computed as: $B = |\text{affected\_components}| / |\text{total\_components}|$, where affected components are identified via transitive dependency graph traversal from the changed component.
+
+**4.124.3 Change Set Analysis**
+
+When multiple changes are proposed together, the engine detects interaction effects:
+- Combined impact: all changes applied sequentially to a single cloned graph
+- Individual sum: the sum of deltas from applying each change independently
+- Interaction detected when $|\text{combined} - \text{individual\_sum}| > 0.5$, indicating non-linear interaction between changes
+- Conflicting targets: multiple changes targeting the same component are flagged for order review
+
+**4.124.4 Rollback Complexity Assessment**
+
+Each change type is assigned a rollback complexity:
+- Simple: MODIFY_REPLICAS, MODIFY_FAILOVER (parameter revert)
+- Moderate: ADD_DEPENDENCY, REMOVE_DEPENDENCY, CHANGE_REGION, UPGRADE_VERSION (configuration revert)
+- Complex: ADD_COMPONENT, REMOVE_COMPONENT (topology change requiring re-deployment or restoration)
+
+**4.124.5 CI/CD Gate Integration**
+
+The engine provides a binary gate check function for CI/CD pipelines:
+- Input: list of proposed changes and a risk threshold (e.g., MEDIUM)
+- Output: true if all changes are within the threshold, false if any change exceeds it
+- This enables automated deployment blocking when resilience regression exceeds acceptable limits
+
+**4.124.6 Recommended Deployment Sequence**
+
+When multiple changes are proposed, the engine recommends an optimal execution sequence:
+- Changes with positive delta (resilience improvements) are ordered first
+- Changes with negative delta (resilience regressions) are ordered last
+- This minimizes the window of reduced resilience during the deployment process
+
+### 4.125 Service Mesh Resilience Engine
+
+The Service Mesh Resilience Engine analyzes resilience patterns within service mesh architectures, supporting Istio, Linkerd, Consul Connect, App Mesh, and Kuma. The engine evaluates mesh health, simulates sidecar failures, analyzes retry storm potential, detects policy conflicts, simulates control plane outages, recommends policies, and computes mesh overhead.
+
+**4.125.1 Mesh Health Assessment**
+
+The engine produces a comprehensive health report with two resilience sub-scores:
+
+Control plane resilience (0-100):
+```
+CP = 100 - (100 - sidecar_coverage) × 0.3 - min(30, SPOF_count × 10) - Σ(essential_policy_penalties)
+```
+Where essential policies are circuit breaker, retry, and timeout; each missing essential policy (coverage < 50%) incurs a 10-point penalty.
+
+Data plane resilience (0-100):
+```
+DP = 100 - (100 - sidecar_coverage) × 0.4 - min(40, SPOF_count × 8) - CB_coverage_penalty
+```
+Where CB (circuit breaker) coverage below 50% incurs a 15-point penalty.
+
+**4.125.2 Sidecar Failure Simulation**
+
+The engine simulates sidecar proxy failure for each service, producing:
+- Failure mode: determined by component type (ingress_proxy_down for load balancers, egress_proxy_down for external APIs, data_plane_proxy_failure for databases, sidecar_crash for other services)
+- Traffic impact: dependent on failure mode and replica count (multiple replicas mitigate via traffic redistribution)
+- Fallback behavior: direct_connection_if_available, application_level_retry, traffic_redistributed_to_healthy_replicas, or automatic_failover
+- Blast radius: all transitively affected components plus direct dependencies that lose connectivity
+
+**4.125.3 Retry Storm Analysis**
+
+The engine identifies retry amplification risks along dependency paths:
+- Amplification factor per path: $A = \prod_{i \in \text{path}} (1 + r_i)$, where $r_i$ is the max retry count for node $i$
+- At-risk services: services on paths where $A > 2.0$
+- Storm probability: $P = \min(1, (A - 1) / 20)$, reduced by 70% if retry budgets are configured
+- Retry budgets (retry_budget_percent or retry_budget_per_second) are the primary mitigation mechanism
+
+**4.125.4 Policy Conflict Detection**
+
+The engine detects five categories of policy conflicts:
+- Timeout-retry mismatch: total retry time exceeds timeout duration (severity: HIGH)
+- Circuit breaker-retry conflict: retry count exceeds circuit breaker failure threshold (severity: HIGH)
+- Rate limit-fault injection overlap: fault injection may trigger rate limits unexpectedly (severity: MEDIUM)
+- Mirror-rate limit amplification: traffic mirroring doubles request volume, not accounted for in rate limits (severity: MEDIUM)
+- Outlier detection-circuit breaker timing conflict: outlier detection interval exceeds circuit breaker recovery timeout (severity: LOW)
+
+**4.125.5 Control Plane Outage Simulation**
+
+The engine simulates complete control plane outage per mesh type:
+- Data plane continues with last-known configuration (all supported mesh types)
+- Affected features: mesh-type-specific (e.g., Istio: certificate rotation, policy updates, telemetry configuration, traffic management changes, service discovery updates)
+- Impact percentage: base 20% + (features at risk × 3%) + service count penalty + SPOF amplification
+- MTTR: parameterized per mesh type (Linkerd: 5min, Kuma: 7min, Consul Connect: 8min, Istio: 10min, App Mesh: 12min)
+
+**4.125.6 Mesh Overhead Calculation**
+
+The engine computes performance overhead introduced by the service mesh:
+- Per-hop latency: mesh-type-specific base (Linkerd: 1.5ms, Kuma: 1.8ms, Consul Connect: 2.0ms, App Mesh: 2.2ms, Istio: 2.5ms) × 2 (inbound + outbound) + policy evaluation latency
+- Total latency: per-hop latency × maximum dependency chain depth
+- Memory overhead: sidecar memory × total sidecar instances (Linkerd: 20MB, Kuma: 25MB, Consul Connect: 35MB, App Mesh: 40MB, Istio: 50MB per sidecar)
+- CPU overhead: sidecar CPU × total sidecar instances
+- Policy evaluation latency: sum of per-policy evaluation times (retry: 0.1ms, timeout: 0.05ms, circuit breaker: 0.2ms, rate limit: 0.15ms, outlier detection: 0.3ms, fault injection: 0.1ms, mirror: 0.5ms)
+
+### 4.126 DNS Resilience Analysis Engine
+
+The DNS Resilience Analysis Engine evaluates DNS infrastructure resilience and failure scenarios across distributed systems. The engine provides comprehensive assessment of provider redundancy, TTL analysis, propagation delay modeling, DNSSEC validation chain integrity, DNS-based load balancing strategies, failover timing, amplification attack resistance, split-horizon DNS risk, dependency chain mapping, resolver resilience, and zone transfer security.
+
+**4.126.1 Provider Redundancy Assessment**
+
+The engine evaluates DNS provider redundancy by analyzing the DNS configuration of all components in the topology:
+- Single-provider risk: detected when all DNS records are served by a single provider (CRITICAL risk)
+- Multi-provider configuration: evaluated for failover readiness and synchronization consistency
+- Provider diversity score: based on the number of distinct DNS providers and their geographic distribution
+- Recommended configuration: at least two independent DNS providers with automated failover
+
+**4.126.2 TTL Analysis**
+
+The engine evaluates TTL (Time-to-Live) settings for their impact on failure behavior:
+- TTL too low (< 30s): excessive DNS query volume, increased latency, higher DNS infrastructure load
+- TTL too high (> 3600s): slow failover during outages, stale records served during incidents
+- Optimal TTL range: computed based on the component's failover detection time and acceptable staleness window
+- Cache behavior during failures: estimated stale traffic duration as a function of TTL and resolver cache behavior
+
+**4.126.3 Propagation Delay Modeling**
+
+The engine estimates DNS change propagation timing:
+- Authoritative server update latency
+- Recursive resolver cache expiry: bounded by TTL values
+- Global propagation estimate: based on TTL plus recursive resolver implementation variability
+- Total failover delay: detection time + DNS update time + propagation delay
+
+**4.126.4 DNSSEC Validation Chain Assessment**
+
+The engine evaluates DNSSEC signing chain integrity:
+- Chain completeness: whether all zones from root to the target domain have valid signatures
+- Key rotation schedule adequacy: whether DNSKEY records are rotated before expiry
+- Signature expiry risk: time until RRSIG records expire, triggering validation failures
+- DS record consistency: whether DS records at parent zones match current DNSKEY records
+
+**4.126.5 DNS-Based Load Balancing Evaluation**
+
+The engine evaluates DNS-based load balancing strategies:
+- GeoDNS: effectiveness based on geographic distribution of endpoints and client population
+- Weighted routing: risk assessment for unbalanced weight distributions
+- Latency-based routing: evaluation against actual network latency measurements
+- Health-check-integrated routing: assessment of health check intervals versus TTL settings for failover responsiveness
+
+**4.126.6 Amplification Attack Resistance**
+
+The engine assesses vulnerability to DNS amplification attacks:
+- Open resolver exposure: detection of recursion-enabled resolvers accessible from the public Internet
+- Response size risk: evaluation of records that could serve as amplification vectors (ANY queries, large TXT records)
+- Rate limiting configuration: assessment of query rate limiting on authoritative servers
+- Response Rate Limiting (RRL) coverage
+
+**4.126.7 Dependency Chain Analysis**
+
+The engine maps DNS dependency chains:
+- NS delegation depth: the number of delegation hops from root to the target zone
+- CNAME chain length: detection of long CNAME chains that increase resolution latency and fragility
+- External delegation risk: dependencies on third-party DNS providers in the delegation chain
+- Single point of failure in the delegation chain
+
+**4.126.8 Resolver Resilience Assessment**
+
+The engine evaluates resolver infrastructure resilience:
+- Local cache adequacy: whether local DNS caching is configured to survive upstream resolver failures
+- Stub versus recursive resolver configuration
+- DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT) readiness for encrypted DNS resolution
+- Fallback resolver configuration for primary resolver failure scenarios
+
+### 4.127 Log Pipeline Resilience Engine
+
+The Log Pipeline Resilience Engine analyzes logging and telemetry pipeline resilience across six pipeline stages: collection, aggregation, transport, storage, indexing, and querying. The engine evaluates log loss risk, buffer overflow behavior, ingestion capacity planning, pipeline redundancy, cardinality explosion detection, sampling strategy impact, pipeline latency, cost modeling, compliance-driven retention requirements, and backpressure strategy effectiveness.
+
+**4.127.1 Pipeline Stage Modeling**
+
+Each log pipeline is modeled as a sequence of six stages, each with independent failure characteristics:
+- Collection: log agents and shippers that gather data from sources (failure mode: agent buffer overflow)
+- Aggregation: intermediate aggregation layers that batch and compress logs (failure mode: queue backlog)
+- Transport: network transport between pipeline stages (failure mode: network partition, TLS failure)
+- Storage: persistent log storage backends (failure mode: disk full, write rejection)
+- Indexing: search index construction (failure mode: index corruption, capacity exhaustion)
+- Querying: log search and retrieval (failure mode: query timeout, resource exhaustion)
+
+**4.127.2 Log Loss Risk Assessment**
+
+The engine identifies scenarios that cause log data loss:
+- Agent buffer overflow: when log generation rate exceeds agent buffer capacity, computed as: $T_{\text{overflow}} = \text{buffer\_size} / (\text{generation\_rate} - \text{drain\_rate})$
+- Queue backlog: when aggregation queues saturate during downstream outages
+- Network partition: logs generated during partition that exceed local buffer capacity
+- Disk full: storage capacity exhaustion under sustained ingestion
+- Sampling drops: intentional data loss from sampling strategies, quantified as: $\text{loss\_rate} = 1 - \text{sample\_rate}$
+
+Each scenario is scored for severity and probability, producing an aggregate log loss risk score.
+
+**4.127.3 Ingestion Rate vs. Processing Capacity Analysis**
+
+The engine compares ingestion rate against processing capacity at each pipeline stage:
+- Per-stage throughput capacity (events per second)
+- Bottleneck identification: the stage with the lowest throughput capacity
+- Headroom: $H = (\text{capacity} - \text{current\_rate}) / \text{capacity} \times 100\%$
+- Saturation forecast: estimated time until capacity exhaustion under current growth trends
+
+**4.127.4 Buffer Overflow Simulation**
+
+The engine simulates buffer overflow behavior under sustained load:
+- Buffer fill rate: $\text{ingestion\_rate} - \text{processing\_rate}$ events per second
+- Time to overflow: $T = \text{buffer\_capacity} / \text{fill\_rate}$
+- Overflow behavior: determined by backpressure strategy (drop oldest, drop newest, block producers, spill to disk)
+- Data loss estimate: events lost during the overflow period
+
+**4.127.5 Pipeline Redundancy Evaluation**
+
+The engine evaluates redundancy at each pipeline stage:
+- Single-stage SPOF detection: stages with only one instance and no failover
+- Hot/warm/cold standby assessment: failover readiness and switchover time
+- Cross-datacenter replication: whether log data is replicated across failure domains
+- Redundancy score (0-100): penalized per stage for missing redundancy, weighted by stage criticality
+
+**4.127.6 Cardinality Explosion Detection**
+
+The engine detects high-cardinality fields that cause storage and indexing cost explosion:
+- Field cardinality estimation: based on configured label dimensions and expected value ranges
+- Cost impact: storage and indexing cost scale linearly with cardinality
+- Threshold-based alerting: CRITICAL when cardinality exceeds configured limits
+- Recommended mitigations: field value aggregation, sampling, or label dropping
+
+**4.127.7 Cost Modeling**
+
+The engine computes log pipeline cost across three dimensions:
+- Ingestion cost: based on volume (GB/day) and per-GB ingestion pricing
+- Storage cost: based on retention period, compression ratio, and per-GB storage pricing
+- Query cost: based on query volume and per-query pricing
+- Cost optimization recommendations: retention policy adjustments, compression improvements, sampling strategy changes, and tier-based storage (hot/warm/cold)
+
+**4.127.8 Compliance-Driven Retention Analysis**
+
+The engine evaluates log retention policies against regulatory requirements:
+- Framework-specific retention periods: SOC 2 (1 year), PCI DSS (1 year), HIPAA (6 years), GDPR (varies)
+- Current retention versus required retention gap analysis
+- Immutability requirements: whether logs are stored in append-only/immutable storage
+- Audit trail completeness: whether all required events are captured and retained
+
+**4.127.9 Backpressure Strategy Evaluation**
+
+The engine evaluates backpressure strategies for their data preservation characteristics:
+- Drop oldest: loses historical data, preserves most recent (suitable for real-time monitoring)
+- Drop newest: preserves historical data, loses current events (suitable for compliance)
+- Block producers: no data loss but risks upstream service degradation
+- Spill to disk: no immediate data loss but risks disk exhaustion
+- Each strategy is scored for data safety, upstream impact, and recovery complexity
+
+**4.127.10 Alert Pipeline Dependency Analysis**
+
+The engine identifies dependencies between the alerting system and the log pipeline:
+- Circular dependency detection: when the alerting system depends on the same log pipeline it monitors
+- Alert delivery risk during pipeline failure: whether alerts about pipeline failures can themselves be delivered
+- Independent monitoring channel recommendation: dedicated out-of-band alerting for pipeline health
+
+### 4.128 Health Check Strategy Optimization Engine
+
+The Health Check Strategy Optimization Engine analyzes and optimizes health check configurations across all components in the in-memory infrastructure topology. Unlike static linting tools that check configuration syntax, this engine evaluates the dynamic interplay between probe types, intervals, dependency chains, and cascade behavior to produce an actionable optimization strategy.
+
+**4.128.1 Probe Type Differentiation**
+
+The engine differentiates between three Kubernetes-style probe types and recommends appropriate configurations for each:
+- **Liveness probes**: Configured as shallow checks (process-alive verification only) with conservative failure thresholds (default: 3) to avoid cascading container restarts
+- **Readiness probes**: Configured as dependency-aware checks that verify downstream connectivity, with lower failure thresholds (default: 2) to enable rapid traffic rerouting
+- **Startup probes**: Configured as deep checks with generous grace periods (30-60 seconds depending on component type) and high failure thresholds (default: 30) to accommodate slow-starting services
+
+For each component, the engine generates differentiated probe configurations based on component type (database, cache, load balancer, external API), dependency count, dependent count, and estimated p99 response time.
+
+**4.128.2 Interval Optimization**
+
+For each configured probe, the engine analyzes the check interval against two competing concerns:
+- **Detection delay**: `detection_delay = interval × failure_threshold`. Intervals exceeding 60 seconds are classified as too infrequent
+- **Noise risk**: `noise_risk = min(1.0, checks_per_minute / 12.0)`. Intervals below 5 seconds are classified as too frequent
+
+The recommended interval is computed from component type (load balancers and DNS: 5s; databases: 15s; external APIs: 30s) and adjusted upward for components with more than 5 dependents (15s) or more than 10 dependents (30s), then clamped to the range [5, 120] seconds.
+
+**4.128.3 Cascading Health Check Failure Analysis**
+
+The engine traces health check failure cascades through the dependency graph using upstream BFS traversal. For each component, it computes:
+- All cascade chains (paths through which a health check failure propagates)
+- Maximum cascade depth, with severity classification: depth >= 5 is critical, depth >= 3 is high
+- Total affected component count
+- Estimated total detection time along each chain, computed as the sum of per-hop detection delays
+
+**4.128.4 False-Positive Rate Estimation**
+
+For each probe configuration, the engine estimates the false-positive health check failure rate as a composite of three factors:
+- **Timeout-induced false positives**: When `timeout < p99_response_time`, the rate is `min(50%, (p99 / timeout - 1) × 20%)`
+- **Dependency-induced false positives**: `min(30%, dependency_count × 5%)`
+- **Network-induced false positives**: `min(15%, packet_loss_rate × 1000)`
+
+Single-check failure thresholds (threshold = 1) amplify timeout-induced false positives by a factor of 1.5x.
+
+**4.128.5 Timeout Alignment Analysis**
+
+The engine estimates the p99 response time for each component based on its type (database: 200ms, external API: 500ms, cache: 5ms, queue: 50ms) and current utilization (>80% utilization applies a 3x multiplier, >60% applies 1.5x). The configured timeout is compared against this estimate, with an optimal ratio range of 1.5x to 5.0x the p99 response time. The recommended timeout is computed as `p99 × 2.5`, clamped to [1, 30] seconds.
+
+**4.128.6 Monitoring Blind Spot Detection**
+
+The engine scans the entire topology for health check monitoring blind spots across 10 categories: unchecked component, missing liveness probe, missing readiness probe, missing startup probe, missing dependency check, timeout mismatch, no grace period, single protocol (TCP-only), no deep check, and no service mesh check. Each blind spot is classified by severity (high for unchecked components and timeout mismatches, medium for missing probe types, low for protocol and grace period issues). A coverage ratio is computed as `covered_components / total_components`.
+
+**4.128.7 Service Mesh Health Check Integration Analysis**
+
+For components deployed with service meshes (Istio, Linkerd, Consul Connect), the engine detects conflicts between mesh-level and application-level health checking:
+- Sidecar timeout misalignment (difference > 2 seconds)
+- Retry policy overlap between mesh and application retries (which can cause retry storms)
+- Circuit breaker configuration conflicts between mesh and application layers
+- mTLS latency overhead (estimated at 50ms for Istio and Linkerd)
+
+**4.128.8 Comprehensive Scoring Rubric**
+
+Each component receives a health check scorecard (0-100) computed across 10 weighted rubric categories:
+- Probe coverage (weight: 1.5): presence of liveness, readiness, and startup probes
+- Interval tuning (weight: 1.0): interval quality classification
+- Timeout alignment (weight: 1.2): timeout-to-p99 ratio
+- Threshold tuning (weight: 1.0): failure and success threshold appropriateness
+- Depth strategy (weight: 1.3): shallow liveness, deep readiness adherence
+- Grace period (weight: 0.8): startup grace period and initial delay configuration
+- Dependency awareness (weight: 1.1): dependency check coverage ratio
+- Cascade safety (weight: 1.5): cascade depth and affected component count
+- Endpoint design (weight: 0.7): standard endpoint naming conventions
+- Mesh integration (weight: 0.5): service mesh alignment quality
+
+The overall score is computed as `(Σ(score_i × weight_i) / Σ(max_score_i × weight_i)) × 100` and assigned a letter grade (A >= 90, B >= 80, C >= 70, D >= 60, F < 60).
+
+### 4.129 Observability Gap Analysis Engine
+
+The Observability Gap Analysis Engine identifies gaps in monitoring, logging, and tracing coverage across the in-memory infrastructure topology. The engine evaluates observability maturity against multiple frameworks without requiring access to real monitoring systems.
+
+**4.129.1 Three-Pillar Analysis**
+
+The engine evaluates coverage of the three pillars of observability for each component:
+- **Metrics**: Whether metric collection is enabled and the completeness of metric coverage (0.0-1.0)
+- **Logs**: Whether structured logging is enabled and the completeness of log coverage (0.0-1.0)
+- **Traces**: Whether distributed tracing is enabled and the completeness of trace instrumentation (0.0-1.0)
+
+A pillar score (0-100) is computed from the average coverage across all components and all three pillars.
+
+**4.129.2 Golden Signal Coverage Assessment**
+
+For each component, the engine checks whether the four Google SRE golden signals are monitored: latency, traffic, errors, and saturation. A coverage score (0-100) is computed from the fraction of components with full signal coverage.
+
+**4.129.3 Alert-to-Failure-Mode Mapping**
+
+The engine maps known failure modes for each component to configured alert rules. Unalerted failure modes are identified as coverage gaps. The alert coverage percentage is computed as `alerted_failure_modes / total_failure_modes × 100`.
+
+**4.129.4 Distributed Tracing Completeness**
+
+The engine analyzes trace context propagation across all dependency edges in the graph. For each edge, it checks whether trace propagation is configured between the source and target components. Gap edges (missing propagation) are identified, and a completeness percentage is computed as `propagated_edges / total_edges × 100`.
+
+**4.129.5 Log Level Balance Analysis**
+
+The engine evaluates log level configuration across components, identifying components that are too verbose (excessive debug logging generating high storage costs) or too quiet (error-only logging that misses diagnostic information). A balance score (0-100) reflects the proportion of components with appropriately configured log levels. Estimated daily log volume in gigabytes is projected from per-component volume estimates.
+
+**4.129.6 Dashboard Coverage Assessment**
+
+The engine checks whether each component has a dedicated monitoring dashboard and counts the number of metrics displayed per dashboard. A coverage percentage is computed from the fraction of components with dashboards.
+
+**4.129.7 SLI/SLO Monitoring Gap Detection**
+
+For each component, the engine verifies whether Service Level Indicators (SLIs) are defined, Service Level Objectives (SLOs) are set, error budget tracking is enabled, and burn rate alerting is configured. Components missing any of these capabilities are flagged as having SLI/SLO monitoring gaps.
+
+**4.129.8 Correlation Capability Assessment**
+
+The engine evaluates the ability to correlate signals across the three observability pillars (metrics, logs, traces). Full correlation capability requires all three pillars to be enabled and linked; partial capability exists when at least two pillars are present; no correlation capability is flagged when pillars operate in isolation.
+
+**4.129.9 Mean Time to Detect (MTTD) Estimation**
+
+The engine estimates the Mean Time to Detect failures for each component based on the observability configuration. Components with comprehensive monitoring (all three pillars, golden signal coverage, and alert mapping) receive lower MTTD estimates, while components with gaps receive higher estimates reflecting the additional time required for manual detection.
+
+**4.129.10 Observability Cost Optimization**
+
+The engine analyzes the cost efficiency of the observability setup by comparing the current monthly cost against the target budget and identifying optimization opportunities such as reducing verbose logging, consolidating duplicate metrics, and eliminating unused dashboards.
+
+### 4.130 Alert Fatigue Analysis Engine
+
+The Alert Fatigue Analysis Engine evaluates alert configurations for fatigue risk and optimizes alert quality by analyzing actionability, duplication, noise ratios, and threshold appropriateness.
+
+**4.130.1 Fatigue Risk Assessment**
+
+The engine performs a multi-factor fatigue risk assessment by computing a composite score from four dimensions:
+- **Volume scoring**: Estimated daily alert volume, computed from evaluation window durations using trigger multipliers (1-minute window: 60x daily, 5-minute: 20x, 15-minute: 6x, 60-minute: 1.5x), with adjustments for non-actionable alerts (+50% trigger rate), suppression windows (reduction factor), and auto-resolve configuration (50% reduction)
+- **Actionable ratio scoring**: Fraction of alerts marked as actionable; ratios below 0.3 contribute 3 points, below 0.5 contribute 2 points
+- **Duplication scoring**: Total duplicate alerts detected; more than 10 duplicates contribute 3 points
+- **Alert count scoring**: Total configured alert rules; more than 50 contribute 2 points
+
+The composite score maps to five risk levels: none (0-1), low (2-3), moderate (4-5), high (6-7), severe (8+).
+
+**4.130.2 Duplicate Alert Detection**
+
+Alerts are classified as duplicates when they target the same component with the same severity and have thresholds within 20% of each other. The detection algorithm performs pairwise comparison across the alert set and groups duplicates into consolidation candidates.
+
+**4.130.3 Alert Storm Simulation**
+
+Given a component failure scenario, the engine simulates the resulting alert storm by:
+1. Computing the set of affected components using the dependency graph's cascade propagation
+2. Identifying all alerts that would trigger based on component membership in the affected set
+3. Estimating peak alerts per minute based on evaluation window durations
+4. Computing storm duration based on suppression and auto-resolve configuration (15 minutes with both, 30 minutes with either, 60 minutes with neither)
+5. Calculating total alerts generated and classifying storm fatigue risk
+
+**4.130.4 Signal-to-Noise Ratio Computation**
+
+The engine computes a signal-to-noise ratio (0.0-1.0) as a weighted combination of four factors:
+```
+SNR = actionable_ratio × 0.4 + duplication_penalty × 0.2 + managed_ratio × 0.2 + severity_score × 0.2
+```
+Where `duplication_penalty = 1.0 - (duplicate_count / total)`, `managed_ratio` is the fraction of alerts with auto-resolve or suppression, and `severity_score` penalizes configurations where more than 30% of alerts are classified as critical.
+
+**4.130.5 Threshold Optimization**
+
+The engine recommends optimal alert thresholds by analyzing each alert against its component's current utilization and topology position:
+- Alerts with less than 10% headroom between threshold and current utilization are recommended for increase (`utilization + threshold × 0.2`)
+- Alerts with more than 50% headroom are recommended for tightening (`utilization + threshold × 0.15`)
+- Components with three or more dependents receive a 15% threshold reduction to provide earlier warning for high-impact components
+
+**4.130.6 Alert Set Optimization**
+
+The engine produces an optimized copy of the alert set by: (1) removing non-actionable alerts, (2) deduplicating alert groups by retaining the best-configured member, (3) adding suppression windows (critical: 5 min, warning: 15 min, info: 30 min, debug: 60 min), and (4) enabling auto-resolve for info and debug severity alerts.
+
+**4.130.7 Response Time Estimation**
+
+Average response time per alert is estimated using severity-weighted effort (critical: 15 min, warning: 5 min, info: 1 min, debug: 0.5 min), with reductions for auto-resolve (70% reduction) and suppression (30% reduction). A volume factor `1.0 + ln(1 + daily_alerts) × 0.3` models the logarithmic increase in per-alert response time due to context switching as alert volume grows.
+
+### 4.131 Golden Signal Analysis Engine
+
+The Golden Signal Analysis Engine evaluates the in-memory infrastructure topology against Google SRE's four golden signals framework: latency, traffic, errors, and saturation.
+
+**4.131.1 Per-Signal Analysis**
+
+For each component in the topology, the engine computes four signal readings:
+
+- **Latency**: Estimated from component health status (healthy: 50ms, degraded: 500ms, overloaded: 2000ms, down: 9999ms) multiplied by a component-type factor (database: 1.5x, external API: 2.0x, cache: 0.5x). Warning threshold: 200ms; critical threshold: 1000ms
+- **Traffic**: Computed as the ratio of current network connections to maximum connection capacity, expressed as a percentage. Default capacities vary by type (web server: 1000, app server: 500, database: 200, cache: 5000). Warning threshold: 70%; critical threshold: 90%
+- **Errors**: Derived from component health status (healthy: 0%, degraded: 5%, overloaded: 15%, down: 100%). Warning threshold: 1%; critical threshold: 5%
+- **Saturation**: The maximum of CPU, memory, and disk utilization percentages. Warning threshold: 70%; critical threshold: 85%
+
+**4.131.2 Signal Summary Aggregation**
+
+For each signal type, the engine aggregates readings across all components, computing the count of healthy, warning, and critical readings, the worst reading, and the average value. The overall system health is classified as critical if any reading is critical, warning if any reading is in warning state, and healthy otherwise. The count of signals in violation (signal types with any non-healthy reading) is reported out of 4.
+
+**4.131.3 Context-Aware Recommendations**
+
+The engine generates context-specific recommendations based on the signal type and severity. For example, critical latency triggers investigation of slow queries, connection pool exhaustion, and downstream timeouts, while critical traffic saturation triggers immediate horizontal scaling or autoscaling enablement.
+
+### 4.132 SLO Burn Rate Simulation Engine
+
+The SLO Burn Rate Simulation Engine implements Google SRE's multi-window, multi-burn-rate alerting strategy to evaluate whether alerting rules would catch SLO violations early enough to prevent error budget exhaustion.
+
+**4.132.1 Burn Rate Computation**
+
+The burn rate is defined as the ratio of actual error rate to allowed error rate:
+```
+burn_rate = (average_error_rate / allowed_error_rate)
+```
+where `allowed_error_rate = (100 - SLO_target) / 100`. A burn rate of 1.0 means the error budget will be exactly consumed at the end of the SLO window. A burn rate of 14.4 means the budget will be consumed in approximately 1 hour.
+
+**4.132.2 Multi-Window Alert Configuration**
+
+The engine implements four burn-rate windows following Google SRE's recommended configuration:
+
+| Window | Burn Rate Threshold | Long Window | Short Window | Severity |
+|--------|-------------------|-------------|--------------|----------|
+| 1h     | 14.4x             | 60 min      | 5 min        | Page     |
+| 6h     | 6.0x              | 360 min     | 30 min       | Page     |
+| 24h    | 3.0x              | 1440 min    | 120 min      | Ticket   |
+| 72h    | 1.0x              | 4320 min    | 360 min      | Log      |
+
+An alert triggers only when both the long window and short window burn rates exceed the threshold, reducing false positives while maintaining fast detection for high-severity incidents.
+
+**4.132.3 Error Budget Status Evaluation**
+
+The engine computes comprehensive error budget status including:
+- Total error budget in minutes: `allowed_error_rate × window_days × 24 × 60`
+- Budget consumed: sum of per-hour error fractions converted to minutes
+- Remaining budget percentage
+- Burn rates at 1h, 6h, 24h, and 72h windows
+- Projected time to exhaustion based on current 1h burn rate
+
+**4.132.4 Scenario Simulation**
+
+The engine accepts scenario definitions consisting of an error rate pattern (hourly error rates), SLO target, and window length, then walks through the pattern hour-by-hour, checking all alert windows at each step. The simulation records:
+- First detection time (minutes from scenario start)
+- False positive count (alerts triggered during hours without actual violations)
+- Missed violation count (real violations that were never detected)
+
+**4.132.5 Alert Effectiveness Scoring**
+
+Across multiple simulated scenarios, the engine computes an alert effectiveness score as the percentage of violation-containing scenarios where at least one alert was triggered. It also reports the fastest and slowest detection times and generates recommendations for improving detection coverage.
+
+### 4.133 SLA Cascade Modeling Engine
+
+The SLA Cascade Modeling Engine computes composite SLAs across dependency chains and predicts how SLA violations propagate through service graphs, including financial risk estimation, conflict detection, and compliance projection.
+
+**4.133.1 Composite SLA Computation**
+
+For availability-type SLAs, the composite SLA is computed as the product of individual availability fractions across all components in the dependency graph:
+```
+composite_availability = ∏(target_i / 100) × 100
+```
+For non-availability SLA types (latency, throughput, error rate, durability), the composite is the minimum (weakest) target across all services. Services without explicit SLA definitions are treated as 100% (perfect).
+
+**4.133.2 Weakest Link Identification**
+
+The engine identifies the service with the lowest SLA target. When multiple services share the lowest target, ties are broken by the number of dependents (highest upstream impact is selected), as the failure of a highly depended-upon component has the greatest cascading effect.
+
+**4.133.3 Bottleneck Detection**
+
+Services are classified as bottlenecks if their SLA target is more than 0.5% below the average of all SLA targets, or if they have dependents with higher SLA targets than their own (a structural impossibility in practice that indicates misconfiguration).
+
+**4.133.4 SLA Breach Impact Simulation**
+
+For a given breached service, the engine traces all upstream dependents using the dependency graph and estimates:
+- Cascade depth via BFS traversal from the breached component
+- Total SLA degradation: `breach_gap × (1 + affected_count)`
+- Financial penalty: the breached service's penalty plus 50% of each affected service's penalty
+
+**4.133.5 SLA Target Recommendation**
+
+The engine recommends SLA tiers based on topology position: components with more than 3 dependents receive platinum tier (99.999%), components with 1-3 dependents receive gold tier (99.99%), and leaf components receive silver tier (99.9%).
+
+**4.133.6 Financial Risk Calculation**
+
+For each service, annual financial risk is computed as:
+```
+annual_risk = penalty_per_violation × (100 - target) × 12 / measurement_window_days × 30
+```
+The engine identifies the highest-risk service, aggregates risk by tier, and estimates mitigation savings as a conservative 30% reduction from tier upgrades.
+
+**4.133.7 SLA Conflict Detection**
+
+The engine detects five categories of SLA conflicts: tier-target mismatch (e.g., platinum tier with target below 99.999%), zero penalty on non-best-effort tiers, unrealistically high targets exceeding five nines, measurement windows shorter than 7 days, and duplicate SLA type definitions on the same service. Cross-service measurement window inconsistencies are also flagged.
+
+**4.133.8 Compliance Projection**
+
+The engine projects SLA compliance over a configurable number of months using a deterministic model where each service's monthly violation probability is:
+```
+effective_prob = min(1.0, base_prob × cascade_multiplier)
+```
+where `base_prob = (100 - target) / 100` and `cascade_multiplier = 1.0 + dependency_count × 0.1`. Trend analysis compares first-half versus second-half penalty accumulation to classify the risk trajectory as improving, stable, or worsening.
+
+### 4.134 Error Budget Policy Engine
+
+The Error Budget Policy Engine implements Google SRE's error budget policy framework, automatically determining whether releases should be allowed based on error budget consumption and defining escalation policies, freeze conditions, and recovery actions.
+
+**4.134.1 Budget State Classification**
+
+The engine classifies error budget state based on remaining percentage:
+- **Healthy** (>= 50% remaining): Releases unrestricted; team-level escalation
+- **Warning** (20-50% remaining): Slow release cadence; management escalation
+- **Critical** (1-20% remaining): Freeze non-critical releases; VP escalation
+- **Exhausted** (< 1% remaining): Emergency changes only; executive escalation
+
+**4.134.2 Error Budget Snapshot Creation**
+
+For each SLO, the engine creates a point-in-time snapshot by computing:
+```
+budget_total = allowed_error_rate × window_days × 24 × 60 (minutes)
+remaining_percent = max(0, (budget_total - consumed) / budget_total × 100)
+```
+where `allowed_error_rate = (100 - slo_target) / 100`.
+
+**4.134.3 Policy Decision Evaluation**
+
+Each snapshot is evaluated against the threshold table to produce a policy decision containing: the recommended action (allow, slow, freeze, or emergency-only), the escalation level (team, management, VP, or executive), the reason for the decision, and specific conditions that must be met for any release to proceed.
+
+**4.134.4 Budget Forecast**
+
+Given a snapshot and a recent error rate per day, the engine forecasts:
+- Days until budget exhaustion: `remaining_budget / recent_error_rate_per_day`
+- Current burn rate: `recent_error_rate_per_day / (budget_total / window_days)`
+- Projected remaining budget at end of window
+- Whether the SLO is on track (burn rate <= 1.0)
+
+**4.134.5 Release Gate**
+
+The engine provides a boolean release gate that returns true only if all SLOs allow releases or slow releases. Any SLO in freeze or emergency-only state causes the gate to reject the release.
+
+**4.134.6 Recovery Action Generation**
+
+Context-specific recovery actions are generated for each budget state: exhausted budgets trigger immediate deployment halts, 24-hour incident reviews, and executive escalation; critical budgets trigger release freezes and reliability prioritization; warning budgets trigger cadence reduction and incident pattern review.
+
+### 4.135 Resilience Forecast Engine
+
+The Resilience Forecast Engine predicts future resilience scores from historical snapshots using time-series analysis, enabling proactive identification of resilience degradation trends before they result in SLO breaches.
+
+**4.135.1 Trend Analysis**
+
+The engine performs linear regression on moving-average-smoothed score data (5-point window) to determine the resilience trend:
+```
+slope, intercept, r² = linear_regression(days, smoothed_scores)
+```
+The trend is classified as:
+- **Improving**: slope > 0.05 points/day
+- **Stable**: |slope| < 0.05
+- **Degrading**: slope < -0.05
+- **Volatile**: standard deviation > 10 and r² < 0.3
+
+**4.135.2 Score Forecasting**
+
+Future scores are predicted using the linear regression model with confidence intervals that widen with prediction horizon:
+```
+predicted_score = slope × future_day + intercept
+margin = 1.96 × std_residuals × √(1 + days_ahead / n_observations)
+```
+Confidence level decays as `max(0.3, 1.0 - days_ahead / (horizon × 2))`, reflecting decreasing prediction reliability over longer horizons. Forecast horizons of 7, 30, 60, 90, and 180 days are supported.
+
+**4.135.3 SLO Breach Risk Assessment**
+
+The engine assesses the probability of the resilience score breaching the SLO threshold using the cumulative normal distribution:
+```
+z = (slo_threshold - predicted_future_score) / volatility
+breach_probability = 0.5 × (1 + erf(z / √2))
+```
+The number of days until the score crosses the SLO threshold is estimated from the regression slope. Risk levels are classified as: critical (probability >= 0.8 or days to threshold <= 7), high (probability >= 0.5 or days <= 30), medium (probability >= 0.2), and low (probability < 0.2).
+
+**4.135.4 Anomaly Detection**
+
+The engine detects anomalous snapshots using z-score analysis: any snapshot with a score more than 2.0 standard deviations from the mean is flagged as anomalous, indicating sudden changes in resilience posture that warrant investigation.
+
+### 4.136 Resilience Regression Detection Engine
+
+The Resilience Regression Detection Engine compares infrastructure graph snapshots over time to detect resilience regressions such as score drops, SPOF introductions, circuit breaker removals, replica reductions, failover disablement, capacity reductions, new dependencies, security downgrades, SLO loosening, and recovery time increases.
+
+**4.136.1 Snapshot Comparison**
+
+The engine creates internal snapshots of each graph version, capturing per-component resilience properties: replica count, failover status, circuit breaker presence on outgoing edges, dependency and dependent lists, SLO targets, recovery time, encryption settings, and capacity limits. The two snapshots are compared field-by-field to detect regressions.
+
+**4.136.2 Regression Types and Severity**
+
+Ten regression types are defined, each with a pre-assigned severity:
+
+| Regression Type | Severity | Detection Condition |
+|----------------|----------|---------------------|
+| Score drop | Critical | Overall score decreased by > 5 points |
+| SPOF introduced | Critical | Component became single-replica with dependents and no failover |
+| Failover disabled | Critical | Failover changed from enabled to disabled |
+| Circuit breaker removed | Major | Circuit breaker removed from any outgoing dependency edge |
+| Replica reduced | Major | Replica count decreased |
+| Security downgrade | Major | Encryption at rest or in transit was disabled |
+| Capacity reduced | Minor | Max RPS decreased |
+| SLO loosened | Minor | Any SLO target decreased |
+| Recovery time increased | Minor | Recovery time increased by > 20% |
+| Dependency added | Info | New dependencies introduced |
+
+**4.136.3 Score History Tracking**
+
+The engine tracks resilience scores across multiple snapshots, computing average, minimum, maximum, and volatility (standard deviation). Trend is determined by comparing the average of the first half of observations against the second half: a delta exceeding 3.0 indicates improvement, below -3.0 indicates degradation.
+
+**4.136.4 Gradual Degradation Detection**
+
+The engine detects gradual degradation patterns using linear regression over multiple snapshots. Overall score slopes below -1.0 per snapshot and per-component replica slopes below -0.3 per snapshot are flagged as gradual degradation patterns that may not be visible in pairwise comparisons.
+
+**4.136.5 CI/CD Gate Integration**
+
+The engine produces CI/CD gate pass/fail results by evaluating: (1) whether any critical regressions exist (automatic fail), (2) whether the score delta exceeds a configurable threshold (default: 5 points), and (3) counts of major and minor regressions. This enables resilience regression detection as an automated quality gate in deployment pipelines.
+
+**4.136.6 Root Cause Analysis and Remediation**
+
+For each detected regression, the engine generates a root cause analysis string explaining the likely cause and a prioritized remediation plan with effort and impact estimates (low/medium/high for each). Remediation steps are ordered by severity, ensuring critical regressions are addressed first.
+
+**4.136.7 Regression Velocity Computation**
+
+The engine computes regression velocity as the average number of regressions per consecutive snapshot pair, enabling trend tracking of whether infrastructure changes are introducing regressions at an increasing or decreasing rate.
+
+### 4.137 Topology Intelligence Engine
+
+The Topology Intelligence Engine discovers implicit and hidden dependencies in the infrastructure graph that are not explicitly declared in service configurations, detects topological anomalies, and generates test scenarios for hidden risks.
+
+**4.137.1 Implicit Dependency Discovery**
+
+The engine applies six heuristic rules to infer hidden dependencies:
+- **Rule 1 (Shared DNS)**: All non-external-API components implicitly depend on DNS nodes (confidence: high)
+- **Rule 2 (Common Load Balancer)**: All web servers implicitly sit behind load balancers (confidence: high)
+- **Rule 3 (Shared Network)**: Databases and caches in the same region share network infrastructure (confidence: medium)
+- **Rule 4 (External DNS/TLS)**: External APIs have implicit DNS resolution dependencies (confidence: high)
+- **Rule 5 (Tag-Based Inference)**: Components without declared dependencies but with shared tags likely share infrastructure (confidence: low)
+- **Rule 6 (Cache Affinity)**: Application servers typically depend on cache nodes if they exist (confidence: medium)
+
+Each inferred dependency is annotated with its source method, confidence level, and human-readable reasoning.
+
+**4.137.2 Topology Anomaly Detection**
+
+The engine detects five categories of topological anomalies:
+- **Missing load balancer** (severity: 0.8): Web servers exist without a load balancer
+- **Single path** (severity: 0.7): A component has exactly one dependency with only one replica
+- **Circular dependency** (severity: 0.9): Cycles detected using NetworkX's cycle detection
+- **Orphan component** (severity: 0.3): Components with no dependencies and no dependents
+- **Asymmetric redundancy** (severity: 0.6): A multi-replica component depends on a single-replica component
+
+**4.137.3 Hidden Risk Scenario Generation**
+
+For each inferred implicit dependency, the engine generates a test scenario that simulates the failure of the implicit link. The blast radius is estimated as `impact_components / total_components`, where impact components are determined by tracing all affected nodes from the target component through the dependency graph.
+
+**4.137.4 Topology Health Score**
+
+A composite topology health score (0-100) is computed with deductions for: orphan components (-5 each), single-replica components with dependents (-8 each), missing load balancers (-10), and circular dependencies (-10 per cycle). Bonuses are applied for failover-enabled components (+3 each).
+
+### 4.138 Architectural Anti-Pattern Detection Engine
+
+The Architectural Anti-Pattern Detection Engine identifies known architectural anti-patterns in the in-memory infrastructure graph that correlate with reduced resilience and increased failure risk.
+
+**4.138.1 Anti-Pattern Categories**
+
+The engine detects eight anti-pattern categories:
+
+- **God Component** (severity: critical): Components that more than 50% of the system depends on, representing extreme coupling that amplifies the blast radius of any failure
+- **Circular Dependency** (severity: high): Cycles in the dependency graph that can cause deadlocks, startup ordering issues, and cascade failures
+- **Missing Circuit Breaker** (severity: high): `requires`-type dependency edges without circuit breaker protection, allowing failures to cascade directly
+- **Database Direct Access** (severity: medium): Multiple application servers accessing a database directly without a connection pooling proxy, risking connection exhaustion
+- **Single Availability Zone** (severity: critical): All components deployed in a single availability zone, with no zone-level redundancy
+- **No Health Check** (severity: high): Load balancers without health checks configured, preventing automatic routing around failed backends
+- **Thundering Herd** (severity: medium): Components with high connection counts and no rate limiting, susceptible to reconnection storms
+- **N+1 Query** (severity: medium): Application servers with many database dependencies suggesting potential N+1 query patterns
+
+**4.138.2 Severity-Filtered Detection**
+
+The engine supports severity-filtered detection, enabling callers to retrieve only anti-patterns at or above a specified minimum severity level. Results are sorted by severity in descending order, ensuring the most critical findings are presented first.
+
+### 4.139 Team Topology Resilience Engine
+
+The Team Topology Resilience Engine analyzes how team structure affects infrastructure resilience using Conway's Law principles, mapping team ownership to infrastructure components and detecting organizational anti-patterns that increase operational risk.
+
+**4.139.1 Ownership Gap Detection**
+
+The engine compares the set of all component IDs in the infrastructure graph against the union of all team ownership claims to identify components that are not owned by any team. Unowned components represent operational blind spots where no team is accountable for reliability.
+
+**4.139.2 Bus Factor Computation**
+
+For each team, the bus factor (minimum number of departures that would endanger the team's maintenance capability) is computed as the team size adjusted downward when the components-per-member ratio exceeds 2:
+```
+bus_factor = max(1, team_size - int(components_per_member - 2))
+```
+
+**4.139.3 Cognitive Overload Detection**
+
+Teams with cognitive load scores exceeding a threshold of 7.0 (on a 0-10 scale) are flagged as overloaded. The Team Topologies model (Skelton & Pais) identifies cognitive overload as a primary driver of operational incidents.
+
+**4.139.4 Incident Response Coverage Analysis**
+
+The engine analyzes on-call coverage across teams, computing: total teams, teams with any on-call coverage, teams with 24/7 coverage (168 hours/week), average coverage hours, and specific gaps (no coverage, partial coverage, or insufficient hours).
+
+**4.139.5 Team Member Loss Simulation**
+
+The engine simulates the impact of losing a team member by computing: the cognitive load increase on remaining members, the new effective cognitive load, whether the team can still maintain on-call rotations, and the risk level (low/medium/high/critical) based on remaining capacity.
+
+**4.139.6 Team Structure Recommendations**
+
+Based on the Team Topologies model, the engine recommends team structure improvements across four team types (stream-aligned, platform, enabling, complicated-subsystem) and three interaction modes (collaboration, X-as-a-service, facilitating).
+
+### 4.140 Chaos Engineering Maturity Assessment Engine
+
+The Chaos Engineering Maturity Assessment Engine evaluates an organization's chaos engineering practices across multiple dimensions, providing a maturity level classification and an actionable improvement roadmap.
+
+**4.140.1 Maturity Levels**
+
+The engine defines five maturity levels:
+- **Level 0 (Initial)**: No formal chaos engineering; ad-hoc failure testing only
+- **Level 1 (Planned)**: Chaos engineering recognized; initial experiments planned
+- **Level 2 (Practiced)**: Regular chaos experiments conducted in staging environments
+- **Level 3 (Managed)**: Production chaos engineering with automated experiments and blast radius control
+- **Level 4 (Optimized)**: Continuous, automated chaos engineering integrated into CI/CD with organizational learning loops
+
+**4.140.2 Assessment Dimensions**
+
+The engine scores eight dimensions, each on a 0-100 scale:
+- **Culture**: Team buy-in, management support, blameless post-mortems
+- **Process**: Experiment design rigor, hypothesis formulation, scheduling regularity
+- **Tooling**: Chaos engineering tool adoption, integration depth, coverage
+- **Automation**: Degree of automated experiment execution, scheduling, and reporting
+- **Observability**: Ability to observe experiment effects across metrics, logs, and traces
+- **Blast Radius Control**: Safeguards limiting experiment impact (kill switches, scoping)
+- **Hypothesis Rigor**: Quality of steady-state hypotheses and experimental design
+- **Game Day Practices**: Frequency and thoroughness of structured game day exercises
+
+**4.140.3 Industry Comparison**
+
+The engine computes an estimated industry percentile from the overall maturity score, enabling organizations to benchmark their chaos engineering practices against peers. Dimension-level strengths (top 2 scoring dimensions) and weaknesses (bottom 2) are identified.
+
+**4.140.4 ROI Estimation**
+
+The engine estimates return on investment from chaos engineering practices by projecting incident reduction rates, MTTR improvements, and customer impact reductions from increased maturity levels. The investment required (in engineer-months) is estimated for reaching the next maturity level.
+
+**4.140.5 Roadmap Generation**
+
+A prioritized improvement roadmap is generated with specific action items ordered by impact-to-effort ratio. Each roadmap item includes the target dimension, specific action, expected maturity impact, effort estimate, and priority classification.
+
+**4.140.6 Progress Tracking**
+
+The engine supports tracking maturity progress over time by comparing assessment snapshots, computing per-dimension deltas, and classifying overall trajectory as improving, stable, or declining.
+
+### 4.141 Automated Game Day Simulation Engine
+
+The Automated Game Day Simulation Engine generates, executes, and evaluates structured chaos engineering game day exercises against the in-memory infrastructure topology to assess operational readiness.
+
+**4.141.1 Exercise Types**
+
+The engine generates exercises across eight failure categories: component failure, cascading failure, region outage, dependency timeout, load spike, data corruption, security breach, and network partition.
+
+**4.141.2 Automatic Exercise Generation**
+
+Exercises are automatically generated from topology analysis:
+- **Component failure exercises**: Generated for each component, with difficulty scaled by the number of dependents and SPOF status
+- **Cascading failure exercises**: Generated for components with deep dependency chains (depth > 2), testing cascade containment
+- **Region outage exercises**: Generated for each region represented in the topology, testing cross-region failover
+- **Load spike exercises**: Generated for components with autoscaling configured, testing scaling response
+- **Security breach exercises**: Generated for components lacking security controls
+- **Network partition exercises**: Generated for multi-region topologies, testing partition tolerance
+- **Dependency timeout exercises**: Generated for components with external API dependencies
+- **Data corruption exercises**: Generated for database and storage components
+
+Each exercise includes objectives (e.g., "Verify failover activates within SLA"), structured steps, expected outcomes, and difficulty rating (beginner, intermediate, advanced, expert).
+
+**4.141.3 Exercise Evaluation**
+
+Each exercise is evaluated against multiple criteria including:
+- Failover activation and effectiveness
+- Circuit breaker presence and configuration
+- Replica availability and redundancy
+- Autoscaling response capability
+- Blast radius containment
+- Detection and recovery time estimates
+- Data integrity protection (backups, replication)
+- Security control effectiveness
+
+The evaluation produces a score (0-100) and detailed findings for each exercise.
+
+**4.141.4 Readiness Assessment**
+
+The engine computes an overall readiness level from the average exercise score: excellent (>= 90), good (>= 75), fair (>= 60), poor (>= 40), and critical (< 40). A comprehensive game day report includes all exercises, scores, the overall readiness level, top recommendations, and critical findings.
+
+### 4.142 Incident Learning Engine
+
+The Incident Learning Engine converts post-mortem incident reports into reproducible chaos simulation scenarios, transforming organizational knowledge from "we learned from this incident" into "we continuously verify we won't repeat this incident."
+
+**4.142.1 Incident Record Processing**
+
+The engine accepts structured incident records containing: incident ID, title, severity (SEV1-SEV4), failure category (cascade failure, capacity exhaustion, dependency failure, configuration error, deployment failure, security breach, data corruption, network partition), root cause component, affected components, duration, detection time, mitigation steps, and lessons learned.
+
+**4.142.2 Pattern Extraction**
+
+The engine extracts failure patterns from the incident history by analyzing:
+- **Root cause frequency**: Components that appear as root causes in multiple incidents
+- **Category clustering**: Failure categories that recur, indicating systemic weaknesses
+- **Affected component patterns**: Components that are frequently affected across incidents
+
+Each pattern is assigned a risk score weighted by incident severity (SEV1: 1.0, SEV2: 0.7, SEV3: 0.4, SEV4: 0.2) and frequency of occurrence.
+
+**4.142.3 Chaos Scenario Generation**
+
+For each incident, the engine generates a chaos scenario template containing:
+- Target components derived from the incident's root cause and affected components
+- Failure sequence steps specific to the incident category (e.g., cascade failure: inject latency then observe cascade; capacity exhaustion: exhaust CPU to 95%)
+- Expected detection time based on the original incident's detection time
+- Expected recovery time based on the original incident's duration
+- Validation criteria derived from the incident's mitigation steps and lessons learned
+
+**4.142.4 Repeat Risk Assessment**
+
+The engine computes a repeat risk score (0.0-1.0) from the incident history, factoring in recency, severity, and whether the same failure categories or root cause components appear in multiple incidents.
+
+**4.142.5 Coverage Analysis**
+
+The engine produces a coverage report showing what fraction of each failure category has been converted into chaos scenarios, identifying categories with insufficient test coverage.
+
+### 4.143 Runbook Validation Engine
+
+The Runbook Validation Engine analyzes infrastructure topology to identify all critical failure scenarios and validates that operational runbooks exist, are complete, and cover the necessary recovery steps for each scenario.
+
+**4.143.1 Critical Scenario Identification**
+
+The engine automatically identifies critical failure scenarios from the topology by examining:
+- SPOF components (single replica, no failover, with dependents)
+- Components with high dependent counts (many upstream services affected)
+- Components on deep dependency chains
+- Components by type-specific failure modes (database corruption, cache invalidation, queue overflow)
+
+Each scenario is assigned a severity (critical, high, medium) based on the number of dependents and SPOF status.
+
+**4.143.2 Runbook Completeness Validation**
+
+For each identified scenario, the engine validates whether a matching runbook exists and checks its completeness by verifying the presence of required sections:
+- Detection steps (how to identify the failure)
+- Diagnosis steps (how to confirm root cause)
+- Mitigation steps (immediate impact reduction)
+- Recovery steps (full service restoration)
+- Post-incident steps (review and prevention)
+- Communication templates (stakeholder notifications)
+
+**4.143.3 Per-Step Validation**
+
+The V2 validation engine performs granular per-step validation of each runbook step, checking:
+- Step type classification (detection, triage, mitigation, recovery, communication, escalation, verification)
+- Estimated duration (steps without time estimates are flagged)
+- Responsible party assignment (steps without owners are flagged)
+- Command or action specificity (vague steps are flagged)
+- Prerequisite dependencies between steps
+
+**4.143.4 MTTR Estimation**
+
+The engine estimates Mean Time To Recovery from a runbook by summing the estimated durations of all steps. Runbooks exceeding expected MTTR thresholds are flagged for optimization.
+
+**4.143.5 Staleness Detection**
+
+The engine detects stale runbooks by computing the number of days since the last update. Runbooks older than a configurable threshold (default: 90 days) are flagged for review, as outdated runbooks may reference deprecated components or procedures.
+
+**4.143.6 Auto-Suggestion**
+
+For failure scenarios without runbooks, the engine automatically suggests recovery steps based on the component type and failure mode. Database failures receive backup verification and failover promotion steps; cache failures receive cache invalidation and warming steps; queue failures receive consumer restart and dead-letter processing steps.
+
+**4.143.7 Escalation Path Validation**
+
+The engine validates escalation paths defined in runbooks, checking for: escalation step presence, escalation target specification, escalation time limits, and circular escalation chains.
+
+**4.143.8 Runbook Comparison**
+
+The engine compares two versions of a runbook to identify added steps, removed steps, and modified steps, enabling change tracking and review of runbook updates.
+
+### 4.144 State Machine Chaos Engine
+
+The State Machine Chaos Engine models infrastructure components as finite state machines and injects chaos at state transition boundaries, enabling discovery of failure modes that arise from invalid state transitions.
+
+**4.144.1 Component State Machine Model**
+
+Each component is modeled with nine operational states: initializing, healthy, degraded, overloaded, failing, recovering, maintenance, draining, and terminated. Transitions between states are triggered by ten event types: load increase, load decrease, failure detected, health check pass, health check fail, manual intervention, timeout, resource exhaustion, dependency failure, and deployment.
+
+Each transition is annotated with: probability of occurrence (0.0-1.0), duration in seconds, and side effects (e.g., "component_ready", "cascade_alert", "data_at_risk").
+
+**4.144.2 Default Transition Table**
+
+The engine includes a comprehensive default transition table adapted to component types. For example, database components receive additional transitions for data-consistency-sensitive states, while cache components omit data-risk side effects. Transition probabilities and durations are adjusted based on component type characteristics.
+
+**4.144.3 Chaos Injection**
+
+The engine injects chaos by forcing a specific transition trigger on a component in a given state. If no matching transition exists, the engine forces the component to the most appropriate target state (e.g., `failure_detected` always forces transition to `failing`). The result includes:
+- The triggered transition
+- Cascade effects on dependent components (computed via BFS through the dependency graph)
+- Recovery path back to healthy state
+- Estimated recovery duration
+- Data risk assessment (none/low/medium/high/critical based on component type and target state)
+
+**4.144.4 Deadlock State Detection**
+
+The engine identifies deadlock states — states from which no outgoing transitions exist — by analyzing the state machine graph. Components stuck in deadlock states require manual intervention to recover.
+
+**4.144.5 Unreachable State Detection**
+
+The engine identifies unreachable states — states that cannot be reached from the initial state through any sequence of transitions — indicating configuration errors in the state machine definition.
+
+**4.144.6 Recovery Path Analysis**
+
+For each non-healthy state, the engine computes the shortest recovery path back to the healthy state using BFS through the transition graph. The analysis includes: the sequence of states traversed, transitions used, and total estimated recovery duration. States with no recovery path require manual intervention.
+
+**4.144.7 Forbidden Transition Detection**
+
+The engine identifies forbidden transitions — transitions explicitly marked as invalid — that could still be triggered by operational events. Each forbidden transition is assessed for risk level based on the potential triggers that could force the invalid transition.
+
+### 4.145 Digital Twin Synchronization Engine
+
+The Digital Twin Synchronization Engine maintains a continuous shadow simulation of the infrastructure, ingesting real-time metrics and using trend extrapolation to predict resource saturation before it occurs.
+
+**4.145.1 Metric Ingestion**
+
+The engine accepts real-time metric snapshots for each component, including CPU utilization, memory utilization, disk utilization, network connections, and request latency. When no external metrics are provided, the engine falls back to the current metric values from the in-memory graph topology.
+
+**4.145.2 Trend Computation**
+
+For each metric on each component, the engine maintains a history of observations and computes the trend as the average rate of change between consecutive observations:
+```
+trend = mean(Δmetric_i / Δtime_i) for all consecutive observation pairs
+```
+
+**4.145.3 Saturation Prediction**
+
+The engine extrapolates current metrics forward using the computed trend to predict future values at a configurable prediction horizon:
+```
+predicted_value = current_value + trend × horizon_minutes
+```
+When a predicted value exceeds its critical threshold (CPU: 90%, memory: 85%, disk: 90%, connections: 80% of max, latency: 2x baseline), a prediction warning is generated.
+
+**4.145.4 Time-to-Threshold Estimation**
+
+For each metric trending toward its threshold, the engine computes the estimated time until the threshold is crossed:
+```
+time_to_threshold = (threshold - current_value) / trend
+```
+Negative values indicate the metric is already above the threshold.
+
+**4.145.5 Predictive Availability**
+
+The engine estimates predicted system availability based on the number and severity of prediction warnings. Each critical warning reduces predicted availability, reflecting the expected impact of approaching saturation points.
+
+**4.145.6 Continuous Reporting**
+
+The engine produces periodic digital twin reports containing: a snapshot of all current metrics, all active prediction warnings sorted by time-to-threshold, predicted system availability, and a timestamp for correlation with other monitoring systems.
+
+### 4.146 Autoscaling Policy Evaluation Engine
+
+The Autoscaling Policy Evaluation Engine simulates and evaluates infrastructure autoscaling policies for resilience, analyzing scaling strategies, cooldown oscillation, scale-up/down asymmetry, cost optimization, scaling lag, policy conflicts, warm pool management, and regional coordination.
+
+**4.146.1 Scaling Strategy Simulation**
+
+The engine simulates four scaling strategy types:
+- **Reactive**: Scales based on current metric thresholds with configurable cooldown periods
+- **Predictive**: Uses linear regression to forecast future metric values and scale proactively
+- **Scheduled**: Scales at predetermined times based on expected demand patterns
+- **Step**: Applies graduated scaling increments based on the magnitude of threshold breach
+
+For each strategy, the simulation produces a sequence of scaling events with timestamps, replica counts, trigger conditions, and scaling directions (up/down).
+
+**4.146.2 Cooldown Oscillation Detection**
+
+The engine detects scaling oscillation by analyzing the sequence of scaling events within sliding time windows. Rapid alternation between scale-up and scale-down events within a cooldown window indicates misconfigured thresholds or insufficient cooldown periods. The oscillation count, affected components, and recommended cooldown adjustments are reported.
+
+**4.146.3 Asymmetry Analysis**
+
+The engine analyzes the asymmetry between scale-up and scale-down behavior:
+- Scale-up speed: time from threshold breach to new capacity online
+- Scale-down speed: time from load reduction to capacity removal
+- Asymmetry ratio: `scale_down_time / scale_up_time`
+
+An asymmetry ratio greater than 3.0 is flagged as potentially wasteful (slow scale-down wastes resources), while a ratio less than 0.5 is flagged as potentially dangerous (aggressive scale-down risks capacity shortfall during load spikes).
+
+**4.146.4 Policy Conflict Detection**
+
+The engine detects conflicts between autoscaling policies including: overlapping policies on the same component with different strategies, contradictory thresholds (scale-up threshold lower than scale-down threshold), conflicting min/max bounds, cooldown interference between policies, and metric conflicts (policies triggered by different metrics with opposing effects).
+
+**4.146.5 Cost Analysis**
+
+The engine estimates hourly scaling costs based on current replica count and per-unit cost, and projects savings from policy optimization. Over-provisioning costs (replicas above minimum during low-load periods) and under-provisioning risks (insufficient replicas during peak load) are both quantified.
+
+**4.146.6 Scaling Lag Analysis**
+
+The engine measures and analyzes the total scaling lag from threshold breach to capacity availability:
+```
+total_lag = detection_lag + decision_lag + provisioning_lag
+```
+where detection lag is the metric collection interval, decision lag is the evaluation window, and provisioning lag is the time to start and warm new instances.
+
+**4.146.7 Blast Radius During Scale-In**
+
+The engine evaluates the blast radius risk during scale-in events by determining: the minimum safe replica count, the connection draining impact, the in-flight request risk, and whether circuit breakers or graceful shutdown mechanisms are in place.
+
+**4.146.8 Regional Scaling Coordination**
+
+For multi-region deployments, the engine evaluates whether autoscaling policies are coordinated across regions, detecting: independent scaling that could cause cross-region traffic imbalances, lack of global load awareness, and region-specific scaling limits that differ from global capacity requirements.
+
+**4.146.9 Multi-Metric Evaluation**
+
+The engine evaluates policies that scale based on multiple metrics simultaneously, detecting conflicts between metrics (e.g., CPU says scale up while memory says scale down) and computing the effective scaling decision from the combined metric signals.
+
+**4.146.10 Comprehensive Scoring**
+
+The engine produces an overall autoscaling policy score (0-100) with contributions from: responsiveness (30%), stability (25%), cost efficiency (20%), and safety (25%). The score maps to severity levels: excellent (>= 90), good (>= 70), concerning (>= 50), and critical (< 50).
+
+### 4.147 Event Storm Simulation Engine
+
+The Event Storm Simulation Engine simulates event storms across distributed event bus and message streaming platforms, analyzing the resilience of event-driven architectures under extreme conditions.
+
+**4.147.1 Event Bus Platform Modeling**
+
+The engine models eight event bus platforms: Apache Kafka, RabbitMQ, Amazon SQS, Amazon SNS, Apache Pulsar, NATS, Redis Streams, and Amazon Kinesis. Each platform is modeled with its specific characteristics including throughput limits, consumer group semantics, partition/queue models, retry behavior, and backpressure mechanisms.
+
+**4.147.2 Storm Type Simulation**
+
+The engine simulates eight types of event storms:
+- **Broadcast storm**: A single event triggers fan-out to many consumers, each producing additional events
+- **Retry storm**: Failed message processing triggers exponential retry amplification
+- **Dead-letter flood**: High failure rates overwhelm dead-letter queues
+- **Consumer lag cascade**: Slow consumers cause lag buildup that cascades to downstream systems
+- **Partition rebalancing**: Consumer group rebalancing causes processing pauses and duplicate delivery
+- **Schema change storm**: Schema evolution triggers widespread deserialization failures
+- **Replay flood**: Event replay (e.g., for reprocessing) generates volumes exceeding consumer capacity
+- **Fan-out explosion**: A single source event multiplies through multiple topic subscriptions
+
+For each storm type, the simulation computes: peak event rate, total events generated, affected components, consumer lag accumulation, estimated recovery time, and overall severity (0.0-1.0).
+
+**4.147.3 Storm Risk Detection**
+
+The engine proactively detects storm risk by analyzing the topology for conditions that predispose the system to event storms:
+- Queue components without dead-letter queue configuration
+- High fan-out ratios (many consumers per topic)
+- Missing backpressure mechanisms
+- Circular event routing patterns
+
+Each risk is annotated with a severity (0.0-1.0), description, and mitigation recommendation.
+
+**4.147.4 Consumer Capacity Analysis**
+
+The engine evaluates whether consumers can keep pace with producers by analyzing: the ratio of producer throughput to consumer processing rate, the number of consumer instances, partition assignment balance, and the maximum sustainable event rate before lag begins accumulating.
+
+**4.147.5 Partition Rebalance Simulation**
+
+The engine simulates consumer group partition rebalancing events, modeling: the rebalance duration, the number of partitions affected, the processing pause window, the duplicate message delivery risk, and the consumer lag accumulated during the rebalance.
+
+**4.147.6 Storm Protection Recommendations**
+
+Based on the topology and simulation results, the engine recommends storm protection measures including: rate limiting configuration, dead-letter queue setup, backpressure mechanism enablement, consumer scaling recommendations, circuit breaker placement, and retry policy tuning (maximum retries, backoff configuration).
+
+**4.147.7 Backpressure Response Simulation**
+
+The engine simulates the system's response to backpressure signals, evaluating whether: upstream producers correctly throttle when consumers signal overload, the backpressure propagates through the full event chain, and the system recovers gracefully when pressure subsides. The simulation measures the time from overload detection to producer throttling and from load reduction to full recovery.
+
+**4.147.8 Recovery Time Estimation**
+
+For each storm scenario, the engine estimates the total recovery time by computing: the time to drain accumulated backlogs at maximum consumer throughput, the time for consumer group stabilization, and the time for downstream systems to process delayed events. The formula accounts for the event bus platform's specific characteristics (e.g., Kafka's partition-level ordering guarantees vs. SQS's visibility timeout model).
+
+
 
 ## 5. ALTERNATIVE EMBODIMENTS AND EXTENSIONS
 
