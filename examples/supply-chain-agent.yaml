@@ -1,0 +1,244 @@
+schema_version: "4.0"
+
+components:
+  # ── Infrastructure layer ──────────────────────────────────────────
+  - id: api-server
+    name: API Server
+    type: app_server
+    host: api.example.com
+    port: 443
+    replicas: 3
+    metrics:
+      cpu_percent: 30.0
+      memory_percent: 45.0
+    capacity:
+      max_connections: 5000
+      max_rps: 10000
+      timeout_seconds: 30
+    parameters:
+      packages: "express,lodash,axios,jsonwebtoken"
+      vuln_lodash: "CVE-2024-28863"
+      vuln_jsonwebtoken: "CVE-2024-33663"
+      sbom_risk: "high"
+
+  - id: postgres-db
+    name: PostgreSQL
+    type: database
+    host: db.internal
+    port: 5432
+    replicas: 2
+    metrics:
+      cpu_percent: 35.0
+      memory_percent: 55.0
+      disk_percent: 40.0
+    capacity:
+      max_connections: 200
+    failover:
+      enabled: true
+      promotion_time_seconds: 30
+    parameters:
+      packages: "pg,knex"
+
+  - id: redis-cache
+    name: Redis Cache
+    type: cache
+    host: redis.internal
+    port: 6379
+    replicas: 3
+    metrics:
+      memory_percent: 50.0
+    capacity:
+      max_connections: 1000
+    parameters:
+      packages: "ioredis"
+
+  # ── LLM API layer ────────────────────────────────────────────────
+  - id: claude-api
+    name: Claude API (Anthropic)
+    type: llm_endpoint
+    host: api.anthropic.com
+    port: 443
+    replicas: 1
+    capacity:
+      max_rps: 1000
+      timeout_seconds: 60
+
+  - id: openai-api
+    name: OpenAI API (Fallback)
+    type: llm_endpoint
+    host: api.openai.com
+    port: 443
+    replicas: 1
+    capacity:
+      max_rps: 500
+      timeout_seconds: 60
+
+  # ── Tool services ────────────────────────────────────────────────
+  - id: web-search
+    name: Web Search Tool
+    type: tool_service
+    host: search.internal
+    port: 8080
+    replicas: 2
+    capacity:
+      max_rps: 100
+      timeout_seconds: 10
+    parameters:
+      packages: "cheerio,puppeteer"
+      vuln_cheerio: "CVE-2024-42461"
+
+  - id: db-query-tool
+    name: Database Query Tool
+    type: tool_service
+    host: query.internal
+    port: 8081
+    replicas: 2
+    capacity:
+      max_rps: 500
+      timeout_seconds: 5
+    parameters:
+      packages: "pg,knex"
+
+  # ── Agent layer ──────────────────────────────────────────────────
+  - id: router-agent
+    name: Router Agent
+    type: agent_orchestrator
+    host: agents.internal
+    port: 9000
+    replicas: 2
+    capacity:
+      max_connections: 100
+      timeout_seconds: 120
+    parameters:
+      packages: "langchain,tiktoken,zod"
+
+  - id: research-agent
+    name: Research Agent
+    type: ai_agent
+    host: agents.internal
+    port: 9001
+    replicas: 2
+    capacity:
+      max_connections: 50
+      timeout_seconds: 90
+    parameters:
+      packages: "langchain,tiktoken,axios"
+      vuln_axios: "CVE-2024-39338"
+
+  - id: writer-agent
+    name: Writer Agent
+    type: ai_agent
+    host: agents.internal
+    port: 9002
+    replicas: 1
+    capacity:
+      max_connections: 30
+      timeout_seconds: 120
+    parameters:
+      packages: "langchain,tiktoken,marked"
+      vuln_marked: "CVE-2024-43803"
+
+dependencies:
+  # ── User -> Router ───────────────────────────────────────────────
+  - source_id: api-server
+    target_id: router-agent
+    dependency_type: requires
+    protocol: grpc
+    latency_ms: 5
+    weight: 1.0
+
+  # ── Router -> Agents ─────────────────────────────────────────────
+  - source_id: router-agent
+    target_id: research-agent
+    dependency_type: requires
+    protocol: grpc
+    latency_ms: 2
+    weight: 0.8
+
+  - source_id: router-agent
+    target_id: writer-agent
+    dependency_type: requires
+    protocol: grpc
+    latency_ms: 2
+    weight: 0.7
+
+  # ── Research Agent -> Tools (supply chain attack path: pkg compromise
+  #    in tool -> poisoned data -> agent hallucination) ─────────────
+  - source_id: research-agent
+    target_id: web-search
+    dependency_type: optional
+    protocol: http
+    latency_ms: 100
+    weight: 0.5
+
+  - source_id: research-agent
+    target_id: db-query-tool
+    dependency_type: requires
+    protocol: http
+    latency_ms: 10
+    weight: 0.9
+
+  # ── Agents -> LLM APIs ──────────────────────────────────────────
+  - source_id: research-agent
+    target_id: claude-api
+    dependency_type: requires
+    protocol: https
+    latency_ms: 500
+    weight: 1.0
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 3
+      recovery_timeout_seconds: 30
+
+  - source_id: writer-agent
+    target_id: claude-api
+    dependency_type: requires
+    protocol: https
+    latency_ms: 500
+    weight: 1.0
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 3
+      recovery_timeout_seconds: 30
+
+  # ── Fallback LLM ────────────────────────────────────────────────
+  - source_id: research-agent
+    target_id: openai-api
+    dependency_type: optional
+    protocol: https
+    latency_ms: 600
+    weight: 0.3
+
+  # ── Tools -> Infrastructure ─────────────────────────────────────
+  - source_id: db-query-tool
+    target_id: postgres-db
+    dependency_type: requires
+    protocol: tcp
+    port: 5432
+    latency_ms: 3
+    weight: 1.0
+
+  - source_id: db-query-tool
+    target_id: redis-cache
+    dependency_type: optional
+    protocol: tcp
+    port: 6379
+    latency_ms: 1
+    weight: 0.4
+
+  # ── API Server -> Infrastructure (direct DB/cache access) ───────
+  - source_id: api-server
+    target_id: postgres-db
+    dependency_type: requires
+    protocol: tcp
+    port: 5432
+    latency_ms: 3
+    weight: 0.9
+
+  - source_id: api-server
+    target_id: redis-cache
+    dependency_type: optional
+    protocol: tcp
+    port: 6379
+    latency_ms: 1
+    weight: 0.4

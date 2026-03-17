@@ -28,6 +28,8 @@ class FaultType(str, Enum):
     TOOL_FAILURE = "tool_failure"
     AGENT_LOOP = "agent_loop"
     PROMPT_INJECTION = "prompt_injection"
+    DEPENDENCY_COMPROMISED = "dependency_compromised"  # Supply chain attack
+    DEPENDENCY_VULNERABLE = "dependency_vulnerable"    # CVE discovered
 
 
 class Fault(BaseModel):
