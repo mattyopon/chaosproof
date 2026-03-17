@@ -102,7 +102,7 @@ The invention provides a computer-implemented system and method comprising:
    - A **Fuzzy Logic Resilience Engine** that evaluates infrastructure resilience using Mamdani fuzzy inference with linguistic variables and centroid defuzzification
    - A **Causal Inference Engine** that constructs Structural Causal Models from the dependency graph and applies do-calculus interventions and counterfactual reasoning to identify true root causes
 
-4. **Sixteen integration pipelines** that combine multiple simulation engines into automated analytical workflows:
+5. **Sixteen integration pipelines** that combine multiple simulation engines into automated analytical workflows:
    - A **Multi-Engine Consensus Pipeline** that executes multiple independent engines on the same scenario and computes agreement scores with divergence detection
    - A **Compliance Audit Pipeline** that maps simulation results to regulatory framework requirements (SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR) and generates structured audit reports
    - A **Cascade-Cost-Remediation Pipeline** that chains cascade simulation through financial risk quantification to ROI-prioritized remediation recommendations
@@ -120,7 +120,7 @@ The invention provides a computer-implemented system and method comprising:
    - A **Hierarchical Analyzer** that decomposes infrastructure into hierarchical levels and propagates resilience assessments bidirectionally
    - A **Temporal Unified View** that merges current-state snapshots, historical trend analysis, and future-state forecasts into a single temporal assessment
 
-4. **A multi-layer availability limit model** (the "N-Layer Model") that computes mathematically distinct availability ceilings:
+6. **A multi-layer availability limit model** (the "N-Layer Model") that computes mathematically distinct availability ceilings:
    - **Layer 1 (Software Limit):** Accounts for deployment downtime frequency, human error rate, and configuration drift probability. Computed as: `A_sw = 1 - (deploy_frequency × avg_deploy_downtime / period + human_error_rate + config_drift_rate)`, bounded by the hardware limit.
    - **Layer 2 (Hardware Limit):** For each component, computes single-instance availability as `A_single = MTBF / (MTBF + MTTR)`, parallel redundancy as `A_tier = 1 - (1 - A_single)^replicas`, and applies a failover penalty based on promotion time and detection latency. System availability is the product of all critical-path tier availabilities, where criticality is determined by the dependency graph edge types.
    - **Layer 3 (Theoretical Limit):** Computes the irreducible physical noise floor from network packet loss rates, garbage collection pause fractions, and kernel scheduling jitter, applied as multiplicative penalties on the hardware availability.
@@ -128,19 +128,19 @@ The invention provides a computer-implemented system and method comprising:
    - **Layer 5 (External SLA Cascading):** Computes the product of all external dependency SLA values, establishing the hard ceiling imposed by third-party service availability.
    - The model is generalizable to **N layers**, where additional layers may be defined for geographic constraints, economic constraints (budget-limited availability), regulatory constraints, or other domain-specific factors.
 
-5. **A resilience scoring system** that aggregates simulation results into a quantitative score (0-100) enabling comparison across different infrastructure designs and configurations.
+7. **A resilience scoring system** that aggregates simulation results into a quantitative score (0-100) enabling comparison across different infrastructure designs and configurations.
 
-6. **A security resilience engine** that simulates cyberattack scenarios (DDoS, ransomware, SQL injection, supply chain attacks, insider threats, zero-day exploits, etc.) against the in-memory topology model, computes defense effectiveness using a defense matrix that maps security controls to attack mitigations via independent-layer combination (`1 - ∏(1 - mᵢ)`), and models lateral movement propagation through the dependency graph with network segmentation as a blocking factor.
+8. **A security resilience engine** that simulates cyberattack scenarios (DDoS, ransomware, SQL injection, supply chain attacks, insider threats, zero-day exploits, etc.) against the in-memory topology model, computes defense effectiveness using a defense matrix that maps security controls to attack mitigations via independent-layer combination (`1 - ∏(1 - mᵢ)`), and models lateral movement propagation through the dependency graph with network segmentation as a blocking factor.
 
-7. **A financial risk engine** that combines simulation results (cascade severity, likelihood) with revenue data to produce financial risk metrics including Value-at-Risk at the 95th percentile (VaR95), expected annual loss, and mitigation ROI analysis that ranks remediation actions by cost-effectiveness.
+9. **A financial risk engine** that combines simulation results (cascade severity, likelihood) with revenue data to produce financial risk metrics including Value-at-Risk at the 95th percentile (VaR95), expected annual loss, and mitigation ROI analysis that ranks remediation actions by cost-effectiveness.
 
-8. **An infrastructure resilience genome ("Chaos Genome")** system that computes a multi-dimensional fingerprint vector from the topology graph's structural properties (graph density, average path length, clustering coefficient, component diversity, redundancy coverage, failover coverage, circuit breaker coverage, etc.), enabling: (a) benchmarking against industry-specific reference profiles (fintech, e-commerce, healthcare, SaaS, etc.), (b) tracking resilience evolution over time as a genome trajectory, (c) identifying structural weaknesses inherited from architecture decisions, and (d) predicting failure patterns based on structural similarity to known-vulnerable topology patterns.
+10. **An infrastructure resilience genome ("Chaos Genome")** system that computes a multi-dimensional fingerprint vector from the topology graph's structural properties (graph density, average path length, clustering coefficient, component diversity, redundancy coverage, failover coverage, circuit breaker coverage, etc.), enabling: (a) benchmarking against industry-specific reference profiles (fintech, e-commerce, healthcare, SaaS, etc.), (b) tracking resilience evolution over time as a genome trajectory, (c) identifying structural weaknesses inherited from architecture decisions, and (d) predicting failure patterns based on structural similarity to known-vulnerable topology patterns.
 
-9. **A real-time threat feed integration system** that automatically fetches security news from RSS/Atom feeds, extracts threat patterns via keyword and semantic matching, and converts detected threats into executable fault scenarios that are injected into the simulation pipeline, enabling the system to automatically evaluate infrastructure resilience against emerging real-world threats.
+11. **A real-time threat feed integration system** that automatically fetches security news from RSS/Atom feeds, extracts threat patterns via keyword and semantic matching, and converts detected threats into executable fault scenarios that are injected into the simulation pipeline, enabling the system to automatically evaluate infrastructure resilience against emerging real-world threats.
 
-10. **A blast radius predictor** that, prior to any fault injection, predicts the cascading impact with confidence-interval-bounded estimates of: affected component count, per-component impact severity (total outage / major degradation / minor degradation / negligible), propagation depth (hop count from failed component), time-to-impact for each affected component, and whether existing circuit breakers or failover configurations would mitigate the impact.
+12. **A blast radius predictor** that, prior to any fault injection, predicts the cascading impact with confidence-interval-bounded estimates of: affected component count, per-component impact severity (total outage / major degradation / minor degradation / negligible), propagation depth (hop count from failed component), time-to-impact for each affected component, and whether existing circuit breakers or failover configurations would mitigate the impact.
 
-11. **A chaos experiment recommender** that analyzes simulation results to identify coverage gaps in resilience testing and produces a prioritized list of recommended real-world chaos experiments, ranked by risk exposure, potential learning value, and coverage gap severity, thereby bridging the gap between in-memory simulation and real-environment validation.
+13. **A chaos experiment recommender** that analyzes simulation results to identify coverage gaps in resilience testing and produces a prioritized list of recommended real-world chaos experiments, ranked by risk exposure, potential learning value, and coverage gap severity, thereby bridging the gap between in-memory simulation and real-environment validation.
 
 ## 4. DETAILED DESCRIPTION
 
@@ -930,7 +930,7 @@ The recall improvement from 0.499 to 1.000 demonstrates that shared infrastructu
 
 ### 4.27 Agent-Based Model (ABM) Simulation Engine
 
-The system provides an agent-based model (ABM) simulation engine that models each infrastructure component as an independent, autonomous agent capable of observing the health states of its neighboring components and making probabilistic decisions about its own state transitions. Unlike the deterministic breadth-first search (BFS) cascade engine described in Section 4.2, which computes a single deterministic propagation path, the ABM engine discovers **emergent failure patterns** — cascading behaviors that arise from the concurrent interaction of many independent agents and cannot be predicted by graph traversal alone.
+The system provides an agent-based model (ABM) simulation engine that models each infrastructure component as an independent, autonomous agent capable of observing the health states of its neighboring components and making probabilistic decisions about its own state transitions. Unlike the deterministic breadth-first search (BFS) cascade engine described in Section 4.4, which computes a single deterministic propagation path, the ABM engine discovers **emergent failure patterns** — cascading behaviors that arise from the concurrent interaction of many independent agents and cannot be predicted by graph traversal alone.
 
 #### 4.27.1 Agent Construction
 
@@ -2573,7 +2573,7 @@ The integration operates as a four-stage closed-loop pipeline:
 
 1. **Pull:** The system periodically queries the external observability platform's Metrics API (e.g., Datadog Metrics API v2) to retrieve real-time infrastructure metrics including CPU utilization, memory consumption, disk usage, and custom application metrics for all monitored hosts and services within a configurable time window.
 2. **Map:** Retrieved metric series are automatically mapped to the corresponding `ResourceMetrics` fields of components in the in-memory `InfraGraph` topology model. The mapping engine resolves external host identifiers (e.g., Datadog scope tags such as `host:web-1`) to internal graph component identifiers through multi-strategy matching against component name, host attribute, and unique identifier. Fractional metrics (0.0-1.0 scale) are automatically normalized to percentage scale (0-100) for consistency with the simulation model's internal representation.
-3. **Simulate:** Upon completion of the metric-to-graph mapping, the system automatically invokes the full simulation pipeline — including the CascadeEngine (Section 4.3), the Financial Risk Engine (Section 4.11), and any additional configured analysis engines — on the updated graph state, producing a comprehensive `SimulationReport` with resilience scores, cascade predictions, critical findings, and warnings.
+3. **Simulate:** Upon completion of the metric-to-graph mapping, the system automatically invokes the full simulation pipeline — including the CascadeEngine (Section 4.4), the Financial Risk Engine (Section 4.11), and any additional configured analysis engines — on the updated graph state, producing a comprehensive `SimulationReport` with resilience scores, cascade predictions, critical findings, and warnings.
 4. **Push:** Simulation results are automatically transmitted back to the observability platform as both custom metrics (e.g., `faultray.resilience_score`, `faultray.critical_findings`, `faultray.warnings`) and structured events. When critical cascade risks are detected (i.e., the number of critical findings exceeds zero), the system generates an event with severity classification and detailed cascade analysis, enabling the observability platform's native alerting and escalation mechanisms to act on predictive intelligence.
 
 #### 4.78.2 Continuous Polling and Real-Time Resilience Monitoring
@@ -2594,7 +2594,7 @@ When an incident webhook payload is received (supporting both V2 `event.data` an
 
 1. **Parse:** The system extracts incident metadata (identifier, title, urgency/severity, service name) from the webhook payload using a multi-format parser that accommodates varying webhook structures.
 2. **Resolve:** The system maps the incident's affected service to a specific component in the `InfraGraph` through multi-strategy resolution: (a) matching the PagerDuty service name against component names and identifiers, (b) inspecting custom details fields for explicit component identifier references, and (c) scanning the incident title for component name or identifier substrings.
-3. **Cascade:** The `CascadeEngine` (Section 4.3) is automatically invoked with a fault injected at the resolved component, computing the full downstream blast radius — i.e., which additional components transition to DOWN, DEGRADED, or OVERLOADED states as a consequence of the incident.
+3. **Cascade:** The `CascadeEngine` (Section 4.4) is automatically invoked with a fault injected at the resolved component, computing the full downstream blast radius — i.e., which additional components transition to DOWN, DEGRADED, or OVERLOADED states as a consequence of the incident.
 4. **Cost:** For each affected component in the cascade chain, the system computes the estimated financial impact by multiplying the component's configured revenue-per-minute rate by the estimated downtime duration (derived from the component's MTTR operational profile), producing a total cost impact in currency units.
 5. **Enrich:** The computed blast radius, financial impact, affected component list, severity assessment, and resolution recommendations are automatically posted back to the incident management platform as enrichment notes via the platform's REST API, augmenting the incident record with predictive intelligence.
 
@@ -2647,7 +2647,7 @@ The system retrieves vulnerability data from the security platform's API (e.g., 
 
 The generated scenarios are executed through a combined simulation pipeline:
 
-1. **Cascade Analysis:** The `CascadeEngine` (Section 4.3) computes the blast radius for each vulnerability exploitation scenario.
+1. **Cascade Analysis:** The `CascadeEngine` (Section 4.4) computes the blast radius for each vulnerability exploitation scenario.
 2. **Security Posture Factor:** The `SecurityResilienceEngine` (Section 4.10) computes an infrastructure-wide security posture score. The cascade severity for each scenario is amplified by a security posture factor: `combined_risk = cascade_severity * (1.0 + (1.0 - security_score/100) * 0.5)`, reflecting that weaker overall security posture increases the real-world impact of any individual vulnerability exploitation.
 3. **Financial Impact:** The `FinancialRiskEngine` (Section 4.11) computes the aggregate financial cost across all vulnerability exploitation scenarios.
 
@@ -5560,7 +5560,7 @@ In an alternative embodiment, the system continuously compares simulation predic
 
 **Claim 16.** The method of Claim 1, further comprising performing multi-objective optimization between cost constraints and resilience score to identify Pareto-optimal infrastructure configurations.
 
-**Claim 17.** The method of Claim 1, wherein the cascade propagation analysis is performed using a graph neural network trained on simulation results. **[Now implemented — see Section 4.29]**
+**Claim 17.** The method of Claim 1, wherein the cascade propagation analysis is performed using a graph neural network trained on simulation results.
 
 **Claim 18.** The method of Claim 1, further comprising validating simulation predictions against historical incident data and automatically calibrating simulation parameters based on backtest accuracy.
 
@@ -5923,6 +5923,86 @@ In an alternative embodiment, the system continuously compares simulation predic
 - (c) after real chaos experiments are executed on production infrastructure, imports the observed results and computes prediction accuracy metrics including precision (fraction of predicted impacts confirmed), recall (fraction of actual impacts predicted), F1 score (harmonic mean), and severity match (normalized accuracy of severity magnitude predictions for correctly predicted components); and
 - (d) generates a comparison report identifying false positives (predicted but not observed, suggesting over-conservative cascade rules), false negatives (observed but not predicted, suggesting missing dependencies), and calibration recommendations (low recall → review dependency graph completeness; low precision → review failover configurations; severity mismatch → calibrate capacity thresholds), enabling continuous improvement of simulation fidelity through systematic comparison of in-memory predictions against real-world chaos experiment outcomes, wherein the structured predict-then-verify framework with accuracy metrics and model calibration feedback constitutes the inventive step.
 
+**Claim 86.** The method of Claim 1, further comprising an incident response simulation method that:
+- (a) models the complete incident lifecycle by classifying incidents across five severity levels (SEV1 through SEV5) and eight incident categories, and generating for each severity level a multi-step escalation chain with configurable time thresholds (SEV1: 5-minute intervals through page, team lead, VP, war room, executive briefing; lower severities using progressively longer thresholds of 15, 30, 60, 120 minutes);
+- (b) estimates Mean Time To Repair through a multi-factor model computed as `adjusted_mttr = base_mttr * team_factor * automation_factor * runbook_factor * complexity_factor`, where team factor is derived from team size and expertise, automation factor reduces MTTR for automatable recovery actions, runbook factor penalises uncovered failure modes, and complexity factor is derived from the number of downstream dependents in the infrastructure graph;
+- (c) evaluates runbook coverage by enumerating known failure modes per component type and computing coverage percentage as `total_covered / total_failure_modes * 100`, and identifies automation opportunities by computing a priority score for each recovery action as `time_savings / automation_complexity`; and
+- (d) analyses on-call fatigue by computing estimated alerts per week, pages per night, and fatigue score (0-100), and generates post-incident review templates with five-whys root cause analysis and timeline reconstruction decomposed into detection, acknowledgement, mitigation, and resolution phases.
+
+**Claim 87.** The method of Claim 1, further comprising a disaster recovery orchestration method that:
+- (a) generates recovery steps per infrastructure component grouped by eight recovery phases, assigns explicit step dependencies enforcing the invariant that stateful data stores are recovered before stateless application consumers, and performs topological sort on the step dependency graph to produce a valid execution order while detecting cycles;
+- (b) identifies parallelisable step groups, computes critical path analysis as the longest sequential chain yielding `estimated_rto_seconds`, and computes parallel savings as `total_sequential_time - critical_path_time`;
+- (c) executes virtual DR drills by simulating each recovery step with automation time factors (manual: 1.0x, semi-automated: 0.5x, fully automated: 0.1x); and
+- (d) validates data consistency during recovery by examining replication lag, checksum matching, and records-behind counts.
+
+**Claim 88.** The method of Claim 1, further comprising a circuit breaker tuning method that:
+- (a) computes optimal failure thresholds as `optimal_threshold = max(min_threshold, base_error_rate * safety_multiplier * evaluation_window)`, and tunes recovery timeouts as `optimal_recovery = mean_recovery_time * multiplier + jitter`;
+- (b) analyses cascading breaker coordination by walking dependency chains and detecting coordination gaps where downstream breaker openings cause upstream breakers to trip redundantly;
+- (c) detects optimal placement by scoring priority as `error_rate * dependent_count * (1 if no_breaker else 0.1)`; and
+- (d) estimates thundering-herd risk after breaker recovery as `queued_requests_during_open = rps * open_duration`.
+
+**Claim 89.** The method of Claim 1, further comprising an idempotency analysis method that:
+- (a) evaluates idempotency key coverage by classifying HTTP methods by inherent safety and classifying delivery semantics as at-most-once, at-least-once, or exactly-once;
+- (b) traces cross-service idempotency key propagation across dependency edges to detect broken chains; and
+- (c) applies heightened scrutiny to financial operations requiring exactly-once delivery semantics and compensating transaction capabilities.
+
+**Claim 90.** The method of Claim 1, further comprising a timeout budget analysis method that:
+- (a) detects timeout inconsistencies across dependency edges, classifying as CRITICAL when `caller_timeout < callee_timeout` with ratio exceeding 2.0;
+- (b) implements deadline propagation along request paths by decrementing remaining budget by each hop's processing time; and
+- (c) computes optimal timeout values from latency percentiles as `recommended_timeout = p99 * headroom_factor`.
+
+**Claim 91.** The method of Claim 1, further comprising a continuous compliance monitoring method that:
+- (a) performs persistent compliance surveillance across six regulatory frameworks (DORA, SOC 2, ISO 27001, PCI DSS, NIST CSF, HIPAA) by evaluating discrete controls against the in-memory topology graph;
+- (b) captures compliance snapshots for longitudinal tracking and computes trends classified as improving, stable, or degrading; and
+- (c) generates compliance drift alerts for new violations, degradation, upcoming audits, and regulation changes with framework-specific severity classification.
+
+**Claim 92.** The method of Claim 1, further comprising a DORA compliance evidence generation method that:
+- (a) implements 24 controls across five DORA articles and classifies chaos test scenarios into TLPT, Advanced Testing, and Basic Testing categories;
+- (b) generates structured evidence records mapping each executed test to a specific DORA control ID; and
+- (c) exports a structured audit package for regulatory submission.
+
+**Claim 93.** The method of Claim 1, further comprising a data sovereignty analysis method that:
+- (a) maintains region-to-jurisdiction mappings covering seven data protection regimes (GDPR, CCPA, LGPD, PIPEDA, PDPA, APPI, POPIA);
+- (b) detects restricted cross-border data transfers by analysing dependency edges and resolving source and target jurisdictions; and
+- (c) detects ten categories of sovereignty violations with predefined severities and computes an overall sovereignty risk score (0-100).
+
+**Claim 94.** The method of Claim 1, further comprising a compound security-failure simulation method that:
+- (a) assigns each component a security posture based on a weighted security profile score;
+- (b) models how infrastructure failures weaken security controls by mapping failure types to security fields that become disabled;
+- (c) computes compound risk for simultaneous scenarios as `(1 - attack_resistance/100) * (1 - failure_containment/100) * 100`; and
+- (d) automatically discovers critical attack-plus-failure combinations.
+
+**Claim 95.** The method of Claim 1, further comprising a cost-resilience optimization method that:
+- (a) generates improvement options per component with ROI computed as resilience gain divided by monthly cost increase;
+- (b) selects improvements based on four optimization strategies (MIN_COST, MAX_RESILIENCE, COST_EFFICIENT, BALANCED); and
+- (c) constructs a Pareto frontier by incrementally applying improvements sorted by ROI descending.
+
+**Claim 96.** The method of Claim 1, further comprising a consensus protocol analysis method that:
+- (a) computes quorum size, maximum tolerable failures, and quorum margin for Raft, Paxos, ZAB, PBFT, and Viewstamped Replication protocols;
+- (b) evaluates split-brain susceptibility and models consensus latency under multiple failure scenarios; and
+- (c) produces a quantitative CAP trade-off score as a normalised vector (C, A, P) in [0, 1].
+
+**Claim 97.** The method of Claim 1, further comprising a multi-tenant isolation verification method that:
+- (a) defines seven isolation levels mapped to commercial tiers and verifies actual isolation meets tier requirements;
+- (b) simulates noisy-neighbor scenarios with isolation-level-dependent attenuation factors; and
+- (c) computes an overall isolation score (0-100) with tier gap, shared resource, and weak isolation penalties.
+
+**Claim 98.** The method of Claim 1, further comprising an SLO burn rate simulation method that:
+- (a) implements four multi-window multi-burn-rate alerting configurations following Google SRE methodology;
+- (b) simulates error rate pattern scenarios hour-by-hour across all alert windows; and
+- (c) computes alert effectiveness score as the percentage of violation scenarios where at least one alert was triggered.
+
+**Claim 99.** The method of Claim 1, further comprising a state machine chaos method that:
+- (a) models each component as a finite state machine with nine operational states and ten event-triggered transitions;
+- (b) injects chaos by forcing transitions and computing cascade effects via dependency graph traversal;
+- (c) detects deadlock states and unreachable states; and
+- (d) computes shortest recovery paths from each non-healthy state back to healthy.
+
+**Claim 100.** The method of Claim 1, further comprising a digital twin synchronization method that:
+- (a) ingests real-time metric snapshots and computes trends as average rate of change between consecutive observations;
+- (b) predicts future values as `predicted_value = current_value + trend * horizon_minutes` and generates warnings when predictions exceed critical thresholds; and
+- (c) estimates time-to-threshold as `(threshold - current_value) / trend` and produces periodic digital twin reports with predicted system availability.
+
 ---
 
 ## APPENDIX A: Implementation Reference
@@ -5987,6 +6067,71 @@ Key implementation files corresponding to the described components:
 - Gremlin Bridge (Chaos Engineering): `src/faultray/integrations/gremlin_bridge.py` (GremlinBridge class — Gremlin attack-to-Scenario import via REST API v1, attack-type-to-FaultType mapping, CascadeEngine prediction execution, Gremlin result import, precision/recall/F1/severity-match comparison, hybrid workflow report generation, next-test recommendation engine)
 - Domain-Specific Engines (Pareto / BayesOpt / CCF / GameTheory / Fuzzy / Causal): `src/faultray/simulator/domain_specific_engines.py` (ParetoOptimizer class — NSGA-II non-dominated sorting, crowding distance; BayesianOptimizer class — GP surrogate with RBF kernel, Expected Improvement acquisition; CommonCauseFailureAnalyzer class — beta-factor CCF groups; GameTheoryAnalyzer class — Nash equilibrium, minimax, mixed strategies; FuzzyResilienceEngine class — Mamdani inference, centroid defuzzification; CausalInferenceEngine class — SCM, do-calculus, counterfactual reasoning)
 - Integration Pipelines (16 pipelines): `src/faultray/simulator/integration_pipelines.py` (MultiEngineConsensus, ComplianceAuditPipeline, CascadeCostRemediationPipeline, BacktestCalibrationLoop, CrossMethodValidator, MultiCloudAnalyzer, FullLifecycleAutomation, GenomeEvolutionMonitor, ThreatFeedSimulationBridge, UnifiedSecurityResilienceScore, InverseOptimizer, ComparativeSimulator, CompoundWhatIf, EnsemblePredictor, HierarchicalAnalyzer, TemporalUnifiedView)
+- Incident Response Simulator: `src/faultray/simulator/incident_response_simulator.py`
+- Disaster Recovery Orchestrator: `src/faultray/simulator/disaster_recovery_orchestrator.py`
+- Database Failover Analyzer: `src/faultray/simulator/database_failover_analyzer.py`
+- Multi-Region DR Engine: `src/faultray/simulator/multi_region_dr.py`
+- Graceful Degradation Planner: `src/faultray/simulator/graceful_degradation_planner.py`
+- Graceful Shutdown Simulator: `src/faultray/simulator/graceful_shutdown.py`
+- Load Shedding Engine: `src/faultray/simulator/load_shedding.py`
+- Circuit Breaker Tuner: `src/faultray/simulator/circuit_breaker_tuner.py`
+- API Gateway Resilience Analyzer: `src/faultray/simulator/api_gateway_resilience.py`
+- API Versioning Impact Analyzer: `src/faultray/simulator/api_versioning_impact.py`
+- Idempotency Analyzer: `src/faultray/simulator/idempotency_analyzer.py`
+- Throttle Cascade Analyzer: `src/faultray/simulator/throttle_cascade_analyzer.py`
+- Timeout Budget Analyzer: `src/faultray/simulator/timeout_budget_analyzer.py`
+- Webhook Resilience Analyzer: `src/faultray/simulator/webhook_resilience_analyzer.py`
+- Rate Limiter Simulator: `src/faultray/simulator/rate_limiter_simulator.py`
+- Continuous Compliance Monitor: `src/faultray/simulator/compliance_monitor.py`
+- Compliance Drift Detector: `src/faultray/simulator/compliance_drift.py`
+- Compliance Scorecard: `src/faultray/simulator/compliance_scorecard.py`
+- DORA Evidence Generator: `src/faultray/simulator/dora_evidence.py`
+- Data Sovereignty Analyzer: `src/faultray/simulator/data_sovereignty_analyzer.py`
+- Certificate Lifecycle Analyzer: `src/faultray/simulator/certificate_expiry_analyzer.py`
+- Secret Rotation Analyzer: `src/faultray/simulator/secret_rotation_analyzer.py`
+- Supply Chain Engine: `src/faultray/simulator/supply_chain_engine.py`
+- Attack Surface Analyzer: `src/faultray/simulator/attack_surface.py`
+- Compound Security-Failure Simulator: `src/faultray/simulator/security_chaos.py`
+- Cost-Resilience Optimizer: `src/faultray/simulator/cost_resilience_optimizer.py`
+- Infrastructure Cost Optimizer: `src/faultray/simulator/infrastructure_cost_optimizer.py`
+- FinOps Resilience Engine: `src/faultray/simulator/finops_resilience.py`
+- Incident Cost Model: `src/faultray/simulator/incident_cost_model.py`
+- Cost Attribution Engine: `src/faultray/simulator/cost_attribution.py`
+- Consensus Protocol Analyzer: `src/faultray/simulator/consensus_protocol_analyzer.py`
+- Data Replication Analyzer: `src/faultray/simulator/data_replication_analyzer.py`
+- Connection Pool Analyzer: `src/faultray/simulator/connection_pool_analyzer.py`
+- Memory Leak Detector: `src/faultray/simulator/memory_leak_detector.py`
+- K8s Pod Disruption Analyzer: `src/faultray/simulator/k8s_pod_disruption_analyzer.py`
+- Cold Start Analyzer: `src/faultray/simulator/cold_start_analyzer.py`
+- Multi-Tenant Isolation Verifier: `src/faultray/simulator/multi_tenant_isolation.py`
+- Multi-Cloud Resilience Analyzer: `src/faultray/simulator/multi_cloud_resilience.py`
+- Deployment Strategy Analyzer: `src/faultray/simulator/deployment_strategy_analyzer.py`
+- Canary Rollback Simulator: `src/faultray/simulator/canary_rollback.py`
+- Feature Flag Risk Analyzer: `src/faultray/simulator/feature_flag_risk_analyzer.py`
+- Change Risk Predictor: `src/faultray/simulator/change_risk_predictor.py`
+- Service Mesh Resilience Engine: `src/faultray/simulator/service_mesh_resilience.py`
+- DNS Resilience Analyzer: `src/faultray/simulator/dns_resilience_analyzer.py`
+- Log Pipeline Resilience Engine: `src/faultray/simulator/log_pipeline_resilience.py`
+- Health Check Strategy Optimizer: `src/faultray/simulator/health_check_strategy.py`
+- Observability Gap Analyzer: `src/faultray/simulator/observability_gap_analyzer.py`
+- Alert Fatigue Analyzer: `src/faultray/simulator/alert_fatigue.py`
+- Golden Signal Analyzer: `src/faultray/simulator/golden_signal_analyzer.py`
+- SLO Burn Rate Simulator: `src/faultray/simulator/slo_burn_rate.py`
+- SLA Cascade Modeler: `src/faultray/simulator/sla_cascade.py`
+- Error Budget Policy Engine: `src/faultray/simulator/error_budget_policy.py`
+- Resilience Forecast Engine: `src/faultray/simulator/resilience_forecast.py`
+- Resilience Regression Detector: `src/faultray/simulator/resilience_regression.py`
+- Topology Intelligence Engine: `src/faultray/simulator/topology_intelligence.py`
+- Anti-Pattern Detector: `src/faultray/simulator/antipattern_detector.py`
+- Team Topology Resilience Engine: `src/faultray/simulator/team_topology_resilience.py`
+- Chaos Maturity Assessment: `src/faultray/simulator/chaos_maturity.py`
+- Game Day Simulator: `src/faultray/simulator/game_day.py`
+- Incident Learning Engine: `src/faultray/simulator/incident_learning.py`
+- Runbook Validator: `src/faultray/simulator/runbook_validator.py`
+- State Machine Chaos Engine: `src/faultray/simulator/state_machine_chaos.py`
+- Digital Twin Engine: `src/faultray/simulator/digital_twin.py`
+- Autoscaling Policy Evaluator: `src/faultray/simulator/autoscaling_policy_evaluator.py`
+- Event Storm Simulator: `src/faultray/simulator/event_storm_simulator.py`
 
 ---
 
