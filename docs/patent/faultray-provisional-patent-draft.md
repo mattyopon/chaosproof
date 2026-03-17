@@ -1,4 +1,4 @@
-# FaultRay — US Provisional Patent Application Draft
+# FaultRay — US Non-Provisional Patent Application
 
 **Title of Invention:**
 System and Method for In-Memory Infrastructure Resilience Simulation Using Graph-Based Topology Modeling and Multi-Layer Availability Analysis
@@ -7,7 +7,17 @@ System and Method for In-Memory Infrastructure Resilience Simulation Using Graph
 
 **Date:** March 2026
 
-**Status:** DRAFT — For review by patent attorney before filing
+**Status:** FILING READY — Non-provisional patent application
+
+**Application Type:** US Utility Patent Application (Non-Provisional)
+
+**Classification:** G06F 11/36 (Testing software for fault injection); G06F 11/07 (Responding to faults)
+
+---
+
+## ABSTRACT
+
+A computer-implemented system and method for evaluating infrastructure resilience entirely in computer memory without affecting real infrastructure. An infrastructure topology is modeled as a directed graph in which nodes represent infrastructure components with typed attributes and edges represent typed dependencies. A plurality of fault scenarios are automatically generated from the graph, and failure propagation is simulated through the graph to determine cascade effects. A multi-layer availability limit model computes mathematically independent availability ceilings across N distinct constraint categories, establishing the theoretical maximum achievable availability. Multiple simulation methodologies including deterministic graph traversal, stochastic sampling, time-series prediction, and formal verification are executed and their results combined through consensus mechanisms. The system further computes a multi-dimensional resilience fingerprint, simulates compound infrastructure-failure-plus-security-attack scenarios, quantifies financial risk from simulation results, generates regulatory compliance evidence, and performs predictive analysis through continuous metric ingestion and trend projection. The system operates on over one hundred complementary simulation engines covering cascade analysis, capacity planning, disaster recovery, compliance monitoring, cost optimization, and operational readiness assessment.
 
 ---
 
@@ -5504,504 +5514,254 @@ In an alternative embodiment, the system continuously compares simulation predic
 ### Independent Claims
 
 **Claim 1.** A computer-implemented method for evaluating infrastructure resilience, comprising:
+- (a) receiving, by at least one processor, a topology definition describing a plurality of infrastructure components and dependencies therebetween;
+- (b) constructing, in computer memory, a graph representation of said topology, wherein nodes represent infrastructure components annotated with component attributes and edges represent dependencies between components;
+- (c) automatically generating a plurality of fault scenarios from said graph representation;
+- (d) simulating, entirely in computer memory without affecting any real infrastructure, propagation of failure effects of each fault scenario through said graph representation to determine affected components;
+- (e) computing at least one availability metric from component reliability parameters and redundancy configurations represented in said graph; and
+- (f) generating a resilience assessment comprising at least one quantitative score derived from said simulation results.
+
+**Claim 2.** A system for in-memory infrastructure resilience simulation, comprising:
+- at least one processor;
+- a memory coupled to the at least one processor; and
+- instructions stored in the memory that, when executed by the at least one processor, cause the system to:
+  - (a) receive a topology definition describing a plurality of infrastructure components and dependencies therebetween;
+  - (b) construct, in the memory, a graph representation of said topology, wherein nodes represent infrastructure components and edges represent dependencies;
+  - (c) automatically generate a plurality of fault scenarios from said graph representation;
+  - (d) simulate, entirely in the memory without affecting any real infrastructure, propagation of failure effects of each fault scenario through said graph representation to determine affected components;
+  - (e) compute at least one availability metric from component reliability parameters and redundancy configurations; and
+  - (f) generate a resilience assessment comprising at least one quantitative score.
+
+**Claim 3.** A non-transitory computer-readable medium storing instructions that, when executed by at least one processor, cause the at least one processor to perform a method for evaluating infrastructure resilience, the method comprising:
 - (a) receiving a topology definition describing a plurality of infrastructure components and dependencies therebetween;
-- (b) constructing, in computer memory, a directed graph representation of said topology, wherein nodes represent infrastructure components with typed attributes including capacity, metrics, network characteristics, and redundancy configurations, and edges represent typed dependencies between components;
-- (c) automatically generating a plurality of fault scenarios from said directed graph by applying fault generation rules across multiple fault categories including single-component failures, combinatorial failures, component-type-specific failures, and traffic spike scenarios;
-- (d) simulating, entirely in computer memory without affecting any real infrastructure, the propagation of each fault scenario through said directed graph to determine cascade effects on dependent components;
-- (e) computing a multi-layer availability limit model comprising at least a software availability limit, a hardware availability limit based on component MTBF/MTTR and redundancy, and a theoretical availability limit based on irreducible physical noise factors; and
-- (f) generating a resilience assessment comprising quantitative scores and identified vulnerabilities.
+- (b) constructing, in computer memory, a graph representation of said topology, wherein nodes represent infrastructure components and edges represent dependencies;
+- (c) automatically generating a plurality of fault scenarios from said graph representation;
+- (d) simulating, entirely in computer memory without affecting any real infrastructure, propagation of failure effects of each fault scenario through said graph representation to determine affected components;
+- (e) computing at least one availability metric from component reliability parameters and redundancy configurations; and
+- (f) generating a resilience assessment comprising at least one quantitative score.
 
-**Claim 2.** The method of Claim 1, wherein step (d) further comprises simulating cascade propagation using a breadth-first search through the directed graph, wherein propagation behavior is determined by dependency type (required, optional, or asynchronous) and component redundancy, and wherein severity is computed as a function of both impact score and spread score across the total system.
+**Claim 4.** A computer-implemented method for computing multi-layer availability limits for an infrastructure system, comprising:
+- (a) receiving, by at least one processor, a representation of an infrastructure topology comprising a plurality of components with associated reliability parameters and redundancy configurations;
+- (b) computing, for each of N mathematically independent availability layers where N is at least two, a respective availability ceiling value, wherein each layer represents a distinct category of constraint on system availability and is computed independently of the other layers; and
+- (c) determining an effective system availability as a function of the N computed availability ceiling values, wherein the effective system availability is bounded by each individual layer ceiling.
 
-**Claim 3.** The method of Claim 1, further comprising executing a time-stepped dynamic simulation that models, over discrete time intervals, traffic pattern injection, autoscaling responses, circuit breaker activation, failover sequences, and component recovery.
+**Claim 5.** A computer-implemented method for consensus-based infrastructure resilience assessment, comprising:
+- (a) receiving, by at least one processor, a graph representation of an infrastructure topology stored in computer memory and at least one fault scenario;
+- (b) executing a plurality of mathematically independent simulation methodologies on said fault scenario and said graph representation, wherein each methodology produces a respective severity or availability assessment;
+- (c) computing a consensus assessment from the plurality of individual assessments; and
+- (d) identifying divergences among the individual assessments that exceed a threshold, wherein said divergences indicate scenarios requiring additional analysis.
 
-**Claim 4.** The method of Claim 1, wherein the multi-layer availability limit model is an N-layer model generalizable to any number of layers, each layer representing an independent constraint on system availability.
+**Claim 6.** A computer-implemented method for computing a multi-dimensional resilience fingerprint of an infrastructure topology, comprising:
+- (a) constructing, in computer memory, a graph representation of an infrastructure topology;
+- (b) extracting a plurality of structural and operational traits from said graph representation, each trait quantifying a distinct resilience-relevant property of the topology;
+- (c) assembling said traits into a multi-dimensional fingerprint vector; and
+- (d) comparing said fingerprint vector against at least one reference profile to produce a resilience characterization.
 
-**Claim 5.** The method of Claim 1, wherein the fault scenario generation comprises generating at least 30 categories of scenarios, including latency cascade scenarios that model accumulated latency through dependency chains, connection pool exhaustion from retry storms, and circuit breaker activation.
+**Claim 7.** A computer-implemented method for simulating compound infrastructure failures combined with security attacks, comprising:
+- (a) receiving, by at least one processor, a graph representation of an infrastructure topology stored in computer memory;
+- (b) generating at least one compound scenario comprising both an infrastructure failure condition and a security attack condition targeting the same topology;
+- (c) simulating, entirely in computer memory, the combined effects of the infrastructure failure and the security attack, including modeling how the infrastructure failure affects security control effectiveness; and
+- (d) computing a compound risk metric reflecting the interaction between the infrastructure failure and the security attack.
 
-**Claim 6.** A computer-implemented system for in-memory infrastructure resilience simulation, comprising:
-- a topology model module configured to construct a directed graph of infrastructure components in computer memory from a declarative topology definition;
-- a scenario generation module configured to automatically produce a set of fault scenarios from the directed graph;
-- a plurality of simulation engines including at least a cascade engine, a dynamic engine, an operations engine, a what-if engine, and a capacity engine, each configured to evaluate aspects of infrastructure resilience using the in-memory directed graph;
-- an availability model module configured to compute a multi-layer availability limit comprising distinct software, hardware, theoretical, operational, and external SLA layers; and
-- a scoring module configured to aggregate simulation results into a quantitative resilience score.
+**Claim 8.** A computer-implemented method for computing financial risk metrics from infrastructure resilience simulation, comprising:
+- (a) receiving, by at least one processor, simulation results from an in-memory infrastructure resilience simulation, said results comprising at least failure severity and affected component identification for a plurality of fault scenarios;
+- (b) computing, for each fault scenario, a business impact value derived from at least one of revenue impact, contractual penalty exposure, and recovery cost;
+- (c) computing at least one aggregate financial risk metric from the distribution of business impact values across the plurality of fault scenarios; and
+- (d) generating at least one prioritized remediation recommendation based on a ratio of projected risk reduction to implementation cost.
 
-**Claim 7.** A computer-implemented method for computing an infrastructure resilience genome, comprising:
-- (a) constructing a directed graph representation of an infrastructure topology in computer memory;
-- (b) extracting a multi-dimensional trait vector from the directed graph, wherein traits include graph density, average path length, clustering coefficient, component diversity, redundancy coverage, failover coverage, and circuit breaker coverage, each normalized to a range of 0.0 to 1.0;
-- (c) comparing the trait vector against one or more industry-specific benchmark profiles to produce deviation scores and an overall similarity metric; and
-- (d) tracking changes in the trait vector over time to produce a resilience evolution trajectory.
+**Claim 9.** A computer-implemented method for generating regulatory compliance evidence from infrastructure resilience simulation, comprising:
+- (a) receiving, by at least one processor, simulation results from an in-memory infrastructure resilience simulation;
+- (b) mapping said simulation results to control requirements of at least one regulatory compliance framework;
+- (c) evaluating, for each mapped control requirement, whether the simulation results satisfy the control based on predefined criteria; and
+- (d) generating a structured compliance report identifying, for each control requirement, a compliance determination and supporting simulation evidence.
 
-**Claim 8.** A computer-implemented method for simulating cyberattack resilience on an in-memory infrastructure model, comprising:
-- (a) automatically generating attack scenarios from the topology of a directed graph model based on component properties including network exposure, component type, authentication configuration, and network segmentation;
-- (b) for each attack scenario, computing defense effectiveness at the entry point using a defense matrix that maps security controls to attack-type-specific mitigation values, combined via independent-layer formula `1 - ∏(1 - mᵢ)`;
-- (c) simulating lateral movement propagation through the directed graph via bidirectional breadth-first search, wherein network segmentation acts as a deterministic blocking factor; and
-- (d) computing a security resilience score aggregated across encryption, access control, network, monitoring, and recovery categories.
-
-**Claim 9.** A computer-implemented method for estimating financial risk from infrastructure failure simulations, comprising:
-- (a) receiving simulation results comprising cascade severity, likelihood, and affected component data;
-- (b) computing per-scenario business loss as the sum of revenue loss (downtime minutes multiplied by revenue per minute), SLA credit costs, and recovery engineer costs;
-- (c) computing a Value-at-Risk at the 95th percentile (VaR95) from the cumulative probability distribution of scenario losses; and
-- (d) generating mitigation ROI recommendations ranking remediation actions by cost-effectiveness, computed as `(savings - cost) / cost`.
+**Claim 10.** A computer-implemented method for predictive infrastructure analysis using a digital twin, comprising:
+- (a) constructing, in computer memory, a graph representation of an infrastructure topology;
+- (b) ingesting metric data from a monitored infrastructure environment and mapping said metric data to corresponding components in the graph representation;
+- (c) computing trend projections from the ingested metric data to predict future resource states; and
+- (d) automatically invoking at least one resilience simulation on the graph representation updated with the ingested metrics, and generating predictive alerts when simulation results indicate impending resilience degradation.
 
 ### Dependent Claims
 
-**Claim 10.** The method of Claim 1, wherein the fault scenario generation is augmented by a machine learning model that generates additional scenarios based on learned failure patterns.
+**Claim 11.** The method of Claim 1, wherein simulating propagation of failure effects comprises graph traversal with dependency-type-aware propagation rules that differentiate propagation behavior based on dependency classifications associated with edges in the graph representation.
 
-**Claim 11.** The method of Claim 1, further comprising continuously synchronizing the in-memory directed graph with a real infrastructure environment through real-time metric ingestion, automatic topology updates, and statistical inference of undeclared dependencies from metrics correlation, traffic pattern similarity, and failure co-occurrence analysis.
+**Claim 12.** The method of Claim 11, wherein the graph traversal uses breadth-first search with severity scoring based on an impact metric reflecting per-component health degradation and a spread metric reflecting the fraction of total components affected.
 
-**Claim 12.** The method of Claim 1, wherein the topology definition is received as natural language input and automatically converted to the directed graph representation by a language model.
+**Claim 13.** The method of Claim 1, wherein simulating propagation of failure effects comprises stochastic simulation using random sampling of component reliability parameters across a plurality of independent trials.
 
-**Claim 13.** The method of Claim 1, further comprising automatically generating Infrastructure-as-Code modifications to remediate identified vulnerabilities based on simulation results.
+**Claim 14.** The method of Claim 13, wherein random sampling uses an exponential distribution for sampling time-between-failures and a log-normal distribution for sampling repair time, and wherein confidence intervals for system availability are derived from percentile statistics across said trials.
 
-**Claim 14.** The method of Claim 1, wherein the directed graph models infrastructure spanning multiple cloud providers and the simulation includes correlated cross-provider failure analysis.
+**Claim 15.** The method of Claim 1, further comprising executing a time-stepped dynamic simulation that models, over discrete time intervals, at least one of traffic pattern injection, autoscaling responses, circuit breaker state transitions, failover sequences, and component recovery dynamics.
 
-**Claim 15.** The method of Claim 1, further comprising simulating infrastructure evolution over extended time periods to evaluate long-term resilience trajectory.
+**Claim 16.** The method of Claim 15, wherein the time-stepped dynamic simulation models autoscaling responses by simulating scale-up and scale-down decisions based on resource utilization thresholds with configurable response delays.
 
-**Claim 16.** The method of Claim 1, further comprising performing multi-objective optimization between cost constraints and resilience score to identify Pareto-optimal infrastructure configurations.
+**Claim 17.** The method of Claim 1, further comprising executing an operations simulation that models component behavior over an extended operational period using stochastic event generation based on component reliability parameters, deployment events, and gradual degradation patterns.
 
-**Claim 17.** The method of Claim 1, wherein the cascade propagation analysis is performed using a graph neural network trained on simulation results.
+**Claim 18.** The method of Claim 17, wherein the stochastic event generation uses a Poisson process parameterized by component mean time between failures.
 
-**Claim 18.** The method of Claim 1, further comprising validating simulation predictions against historical incident data and automatically calibrating simulation parameters based on backtest accuracy.
+**Claim 19.** The method of Claim 1, further comprising performing parametric sensitivity analysis by varying at least one system parameter across a defined range and computing resilience metrics for each parameter value to produce a response surface.
 
-**Claim 19.** The method of Claim 1, further comprising continuously comparing simulation predictions with real-world monitoring data and generating alerts when prediction accuracy diverges beyond a configurable threshold.
+**Claim 20.** The method of Claim 19, wherein the at least one system parameter comprises at least one of mean time to repair, mean time between failures, traffic load multiplier, and replica count.
 
-**Claim 20.** The method of Claim 1, further comprising automatically fetching security threat information from external feeds, converting detected threats into executable fault scenarios, and injecting said scenarios into the simulation pipeline to evaluate resilience against emerging real-world threats.
+**Claim 21.** The method of Claim 1, wherein automatically generating a plurality of fault scenarios comprises applying fault generation rules across at least three fault categories selected from single-component failures, combinatorial multi-component failures, component-type-specific failures, traffic spike scenarios, resource exhaustion scenarios, and infrastructure-level failures.
 
-**Claim 21.** The method of Claim 1, further comprising a blast radius prediction step that, prior to full simulation execution, estimates the cascading impact of each potential component failure with per-component impact severity classification, propagation depth, time-to-impact estimation, and mitigation assessment.
+**Claim 22.** The method of Claim 21, wherein the fault generation rules further comprise generating latency cascade scenarios that model accumulated latency through dependency chains, connection pool exhaustion from retry amplification, and circuit breaker activation.
 
-**Claim 22.** The method of Claim 1, further comprising analyzing simulation coverage gaps and generating a prioritized list of recommended real-world chaos experiments ranked by risk exposure, learning value, and coverage gap severity.
+**Claim 23.** The method of Claim 1, wherein the graph representation comprises a directed graph in which each node is annotated with typed attributes comprising at least component type, replica count, and operational profile, and each edge is annotated with at least a dependency type selected from required, optional, and asynchronous.
 
-**Claim 23.** The method of Claim 1, further comprising a stochastic simulation mode using Monte Carlo methods wherein component MTBF values are sampled from an exponential distribution and MTTR values from a log-normal distribution across a plurality of trials, producing percentile-based confidence intervals for system availability that complement the deterministic multi-layer availability limit model.
+**Claim 24.** The method of Claim 1, further comprising augmenting the automatically generated fault scenarios using a machine learning model trained on prior simulation results to generate additional fault scenarios based on learned failure patterns.
 
-**Claim 24.** The method of Claim 1, further comprising a mutation-based scenario discovery process inspired by software fuzzing techniques, wherein existing fault scenarios are randomly mutated through operations including fault addition, target reassignment, scenario combination, and severity amplification, and wherein mutated scenarios producing novel failure fingerprints are retained in a growing corpus for iterative failure space exploration.
+**Claim 25.** The method of Claim 24, wherein the machine learning model comprises a generative adversarial network that learns a distribution of failure scenarios and generates novel scenarios not captured by rule-based generation.
 
-**Claim 25.** The method of Claim 1, further comprising automatically generating incident response runbooks from simulation results, wherein each runbook includes detection steps, diagnosis procedures, mitigation actions, recovery steps, post-incident review checklists, and communication templates, each tailored to the specific component types and dependency relationships in the topology.
+**Claim 26.** The method of Claim 24, wherein the machine learning model comprises a variational autoencoder that generates failure scenarios by interpolation in a structured latent space.
 
-**Claim 26.** The method of Claim 1, further comprising simulating compliance posture against regulatory frameworks including SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, and GDPR, by mapping framework control requirements to infrastructure topology properties and evaluating control coverage, effectiveness, and gaps entirely through in-memory simulation.
+**Claim 27.** The method of Claim 1, further comprising discovering worst-case failure scenarios using an evolutionary optimization method that encodes candidate failure scenarios as solution vectors and iteratively improves them through population-based search.
 
-**Claim 27.** The method of Claim 1, further comprising computing a Risk Priority Number (RPN) for each component and failure mode using the formula RPN = Severity × Occurrence × Detection, wherein Severity is derived from cascade simulation results, Occurrence from component MTBF and current metrics, and Detection from monitoring and alerting coverage analysis, adapting Failure Mode and Effects Analysis (FMEA) methodology to cloud infrastructure.
+**Claim 28.** The method of Claim 27, wherein the evolutionary optimization method comprises a genetic algorithm using binary chromosome encoding, tournament selection, crossover, and mutation operators, with fitness evaluated as cascade severity produced by the encoded scenario.
 
-**Claim 28.** The method of Claim 1, further comprising mathematically proving the achievability or unachievability of a target Service Level Agreement (SLA), wherein the proof identifies the specific binding constraint layer from the multi-layer availability model and, when the SLA is unachievable, computes the minimum infrastructure changes required to meet the target.
+**Claim 29.** The method of Claim 27, wherein the evolutionary optimization method comprises a reinforcement learning agent that sequentially selects fault injection actions to maximize cumulative cascade severity.
 
-**Claim 29.** The method of Claim 1, further comprising integration as a quality gate within a continuous integration/continuous deployment (CI/CD) pipeline, wherein proposed infrastructure-as-code changes are automatically imported into the topology model, the simulation suite is executed against the proposed configuration, and the deployment is blocked if the computed resilience score falls below a configurable threshold or if resilience regression is detected relative to the current configuration.
+**Claim 30.** The method of Claim 1, further comprising a mutation-based scenario discovery process wherein existing fault scenarios are randomly mutated through operations comprising at least fault addition, target reassignment, scenario combination, and severity amplification, and wherein mutated scenarios producing novel failure characteristics are retained for iterative failure space exploration.
 
-**Claim 30.** The method of Claim 1, further comprising automatically inferring undeclared dependencies between infrastructure components by:
-- (a) computing pairwise Pearson correlation coefficients between component metrics time series and applying lagged correlation analysis to determine causal direction, wherein a positive optimal lag indicates that the first component leads the second and a negative optimal lag indicates the reverse, constituting a simplified Granger causality test;
-- (b) computing Dynamic Time Warping (DTW) distance between component traffic patterns, after min-max normalization, to identify synchronous behavioral coupling, wherein DTW distance below a configurable threshold indicates a dependency relationship;
-- (c) analyzing failure incident co-occurrence using Jaccard similarity over per-component incident sets to detect components that are consistently affected together; and
-- (d) fusing confidence scores from said multiple inference methods using a boosted-maximum strategy that applies a calibrated uplift factor for multi-method corroboration, and integrating inferred dependencies exceeding a configurable confidence threshold into the directed graph topology model as weighted edges annotated with inference provenance.
+**Claim 31.** The method of Claim 4, wherein the N availability layers comprise at least: a software availability layer accounting for deployment and operational disruptions; a hardware availability layer computed from component reliability parameters and redundancy; and a theoretical availability layer accounting for irreducible physical noise factors.
 
-**Claim 31.** The method of Claim 1, further comprising modeling shared infrastructure dependencies by:
-- (a) analyzing incident root cause descriptions to classify the failure origin as network, control plane, physical infrastructure, or host operating system, using keyword matching against category-specific keyword lists;
-- (b) dynamically injecting shared infrastructure nodes into the directed graph topology model, wherein all service components are connected to the appropriate shared node via required dependencies with weight 1.0, such that the shared node represents an implicit common dependency not declared in the explicit service-level topology;
-- (c) using the shared infrastructure node as the fault injection point for cascade simulation, thereby modeling correlated multi-service failures that originate from a common shared dependency and propagate simultaneously to all dependent service components; and
-- (d) applying intelligent root cause routing that automatically selects the appropriate shared infrastructure node based on keyword analysis of the incident description, with a fallback heuristic that routes to the shared network node when three or more services are concurrently affected, enabling fully automated backtest execution against historical incident databases without manual incident classification.
+**Claim 32.** The method of Claim 31, wherein the N availability layers further comprise at least one of: an operational availability layer accounting for human factor response characteristics; and an external dependency availability layer computed from third-party service level commitments.
 
-**Claim 32.** The method of Claim 1, further comprising an agent-based model (ABM) simulation engine that:
-- (a) models each infrastructure component as an independent autonomous agent possessing a set of prioritized decision rules, a health state selected from HEALTHY, DEGRADED, OVERLOADED, and DOWN, and awareness of the health states of neighboring agents through both forward dependencies and reverse dependencies;
-- (b) simulates fault propagation using synchronous discrete-time steps, wherein at each step all agents simultaneously evaluate their rules against a read-only snapshot of the previous step's global state and transition to the worst matching state;
-- (c) incorporates a probabilistic cascade rule wherein the probability of an agent transitioning to DEGRADED state is computed as `P = (unhealthy_neighbors / total_neighbors) × 0.4`, modeling retry storms, back-pressure propagation, and emergent load amplification that deterministic graph traversal cannot capture;
-- (d) detects convergence when the global state remains unchanged for two consecutive steps; and
-- (e) identifies emergent failure patterns by comparing the set of affected agents against the transitive closure predicted by breadth-first search, thereby discovering both unexpected cascade propagation paths and previously unknown resilience properties.
-
-**Claim 33.** The method of Claim 1, further comprising a reinforcement learning-based scenario generation method that:
-- (a) formulates the infrastructure simulation engine as a reinforcement learning environment, wherein states are immutable snapshots of all component health statuses, actions are fault injections parameterized by target component and fault type, transitions are computed by the cascade simulation engine, and the reward signal is the cascade severity score;
-- (b) trains a tabular Q-learning agent using the update rule `Q[s][a] ← Q[s][a] + α × (r + γ × max Q[s'] − Q[s][a])` with ε-greedy exploration that decays from an initial exploration rate toward a minimum exploitation rate over successive training episodes;
-- (c) generates high-impact failure scenarios by replaying the learned greedy policy from the initial all-healthy state to build multi-fault scenarios of increasing severity, and by extracting the top-K highest-Q-value single-fault actions from the initial state; and
-- (d) produces a reusable Q-table encoding learned knowledge about infrastructure vulnerabilities that enables rapid scenario generation for subsequent analysis cycles without retraining.
-
-**Claim 34.** The method of Claim 1, further comprising a machine learning-based failure prediction method that:
-- (a) extracts a normalized feature vector from each infrastructure component's current metrics, comprising CPU utilization, memory utilization, disk utilization, connection pool saturation, and overall utilization;
-- (b) trains a logistic regression model `P(failure) = sigmoid(w · x + b)` using stochastic gradient descent on binary cross-entropy loss, wherein training data is synthetically generated by running the cascade simulation engine on random fault scenarios with metric perturbation, and positive samples are augmented with high-utilization bias to model pre-failure stress signatures;
-- (c) predicts, for each component, a failure probability, a categorical risk level (critical, high, medium, or low), and an estimated time to failure derived from the current utilization trajectory; and
-- (d) generates an infrastructure-wide prediction report ranking all components by failure probability to enable proactive infrastructure hardening before failures occur.
-
-**Claim 35.** The method of Claim 1, further comprising a Bayesian network failure probability analysis method that:
-- (a) computes, for each component in the directed graph, a prior failure probability from the component's mean time between failures and mean time to repair, adjusted for parallel redundancy by exponentiating by the replica count;
-- (b) computes, for each dependency relationship, a conditional failure probability using Bayes' theorem with dependency-type-based impact factors, wherein `requires` dependencies carry a near-unity impact factor, `optional` dependencies carry a reduced impact factor, and `async` dependencies carry a minimal impact factor;
-- (c) computes posterior failure probabilities for all components given a set of observed component states as evidence, using the law of total probability across all dependency relationships; and
-- (d) identifies the most critical dependency for each component as the dependency whose failure produces the highest conditional failure probability increase, enabling targeted redundancy planning.
-
-**Claim 36.** The method of Claim 1, further comprising a Markov chain availability analysis method that:
-- (a) models each infrastructure component as a three-state continuous-time Markov chain with states HEALTHY, DEGRADED, and DOWN, wherein transition rates between states are derived from the component's MTBF, MTTR, and degradation profile (memory leak rate, disk fill rate);
-- (b) constructs a row-stochastic transition matrix by converting continuous-time rates to discrete-time probabilities using the exponential complementary CDF;
-- (c) computes the steady-state probability distribution using the iterative power method; and
-- (d) derives per-component availability, nines of availability, and mean sojourn time in each state, capturing the dynamic transition behavior between health states including degradation-before-failure paths that static availability models do not represent.
-
-**Claim 37.** The method of Claim 1, further comprising a discrete event simulation (DES) engine that:
-- (a) models infrastructure failure propagation as a sequence of time-stamped events including fault injection, cascade propagation, and recovery events, each carrying a timestamp, target component, event type, and metadata;
-- (b) processes events asynchronously from a min-heap priority queue in strict chronological order, wherein cascade events are scheduled with propagation delays derived from actual network latency and timeout configurations, and recovery events are scheduled at MTTR-derived times;
-- (c) produces a complete event timeline with exact temporal resolution, enabling precise modeling of overlapping failure and recovery dynamics that fixed-interval time-stepped simulation approaches cannot capture; and
-- (d) computes cascade severity from the final component state distribution, providing both temporal dynamics and quantitative impact assessment from a single simulation run.
-
-**Claim 38.** The method of Claim 1, further comprising a genetic algorithm scenario optimization method that:
-- (a) encodes each candidate failure scenario as a binary chromosome of length $N$ (where $N$ is the number of infrastructure components), wherein each bit indicates whether the corresponding component is injected with a failure fault;
-- (b) evaluates the fitness of each chromosome as the total cascade severity produced by simultaneously injecting all flagged faults through the cascade simulation engine;
-- (c) evolves a population of chromosomes over successive generations using tournament selection, single-point crossover, and bit-flip mutation operators; and
-- (d) discovers worst-case simultaneous multi-fault combinations through population-based search, complementing the reinforcement learning scenario generator's sequential fault-injection approach with parallel exploration of the combinatorial failure space.
-
-**Claim 39.** The method of Claim 1, further comprising a Fault Tree Analysis (FTA) method that:
-- (a) constructs a Fault Tree from the infrastructure directed graph by top-down deductive decomposition, wherein the root node represents system failure, intermediate nodes carry Boolean logic gates (OR for single-instance components, VOTING for replicated components), and leaf nodes represent individual component failures with base probabilities derived from MTBF;
-- (b) computes the top-event (system failure) probability by bottom-up evaluation through OR gates using $P = 1 - \prod(1 - P_i)$, AND gates using $P = \prod P_i$, and VOTING gates using combinatorial probability over $k$-of-$n$ failure subsets;
-- (c) computes minimal cut sets — the smallest combinations of basic component failures that cause system failure — by recursive set operations through the tree, followed by removal of non-minimal supersets; and
-- (d) ranks components by criticality based on minimal cut set membership frequency, identifying the highest-leverage points for reliability improvement.
-
-**Claim 40.** The method of Claim 1, further comprising a survival analysis method for infrastructure component lifetime estimation that:
-- (a) generates synthetic failure-time observations from each component's MTBF using the inverse CDF of the exponential distribution and computes a Kaplan-Meier survival curve $S(t) = \prod_{t_i \leq t}(1 - d_i/n_i)$ with right-censoring of the last observation;
-- (b) fits a two-parameter Weibull distribution to observed failure times, estimating the shape parameter from the coefficient of variation and the scale parameter from the mean failure time, wherein the shape parameter characterizes the failure regime (infant mortality, random, or wear-out);
-- (c) computes the Weibull hazard function $h(t) = (k/\lambda)(t/\lambda)^{k-1}$ to determine the instantaneous failure rate at any given time; and
-- (d) predicts remaining useful life for each component by adjusting the effective MTBF for current utilization stress and active degradation patterns (memory leaks, disk fill rate), providing quantitative time-to-failure estimates grounded in established survival analysis theory.
-
-**Claim 41.** The method of Claim 1, further comprising a Petri Net modeling method for concurrent failure analysis that:
-- (a) converts the infrastructure directed graph into a Place/Transition Petri Net, wherein each component generates three places (healthy, degraded, down) with initial token placement reflecting operational state, and each dependency edge generates transitions that propagate failure states through token consumption and production;
-- (b) simulates failure propagation by iteratively firing enabled transitions (transitions whose input places all contain at least one token) according to deterministic priority, consuming tokens from input places and producing tokens in output places;
-- (c) performs reachability analysis via breadth-first search over the state space (set of all reachable markings), detecting deadlock states (markings with no enabled transitions) that represent irrecoverable failure modes; and
-- (d) enables formal verification of safety properties — such as "no reachable state exists where all database replicas are simultaneously DOWN" — through exhaustive state space enumeration, providing guarantees that simulation-based approaches cannot offer.
-
-**Claim 42.** The method of Claim 1, further comprising a cellular automata failure propagation method that:
-- (a) models each infrastructure component as a cell in a grid defined by the bidirectional adjacency structure of the dependency graph, wherein the neighbor set of each cell comprises both upstream dependencies and downstream dependents;
-- (b) applies deterministic threshold transition rules synchronously across all cells on each generation, wherein: two or more DOWN neighbors cause the cell to become DOWN; one or more DOWN neighbors cause the cell to become at least DEGRADED; three or more DEGRADED neighbors cause the cell to become OVERLOADED; and the DOWN state is absorbing;
-- (c) classifies the observed failure propagation dynamics as stable (convergent), oscillating (repeating cycle of length 2-5), or chaotic (no detected pattern), providing qualitative characterization of failure behavior; and
-- (d) produces fully deterministic, reproducible results suitable for formal analysis, complementing the agent-based model's stochastic approach with a deterministic counterpart that identifies the exact conditions under which failures propagate.
-
-**Claim 43.** The method of Claim 1, further comprising a System Dynamics simulation method that:
-- (a) models each infrastructure component's health as a continuous-valued stock $H_i(t) \in [0.0, 1.0]$ governed by an ordinary differential equation $dH_i/dt = r_i - d_i - \sum_{j \in \text{deps}(i)} c_{ji}$, where $r_i$ is the recovery rate, $d_i$ is the degradation rate, and $c_{ji}$ is the cascade impact from dependency $j$ modulated by dependency type;
-- (b) integrates the health dynamics using forward Euler approximation with configurable time-step width, producing a continuous time-series of health values for each component;
-- (c) detects degradation velocity, tipping-point thresholds, and recovery trajectories from the continuous health evolution, capturing phenomena that discrete-state models (ABM, CA, DES) cannot represent; and
-- (d) computes an overall severity score from the average degradation depth and spread fraction across all components.
-
-**Claim 44.** The method of Claim 1, further comprising an RNN/LSTM time-series failure prediction method that:
-- (a) constructs a recurrent neural network comprising either a simple RNN cell computing $h_t = \tanh(W_{hh} \cdot h_{t-1} + W_{xh} \cdot x_t + b_h)$ or an LSTM cell with forget, input, and output gates, followed by a sigmoid output layer;
-- (b) generates training data synthetically from the in-memory simulation model by extracting base metrics from infrastructure components and applying trend injection to simulate resource exhaustion sequences, rather than requiring historical production log data;
-- (c) predicts failure probability from an ordered sequence of infrastructure metric snapshots, capturing temporal dependencies such as monotonic resource increase and oscillatory instability that memoryless classifiers cannot detect; and
-- (d) operates entirely on the in-memory simulation model, differentiating from prior art LSTM-based anomaly detection systems (such as US20170293542A1) that require real-world operational data streams.
-
-**Claim 45.** The method of Claim 1, further comprising a Simulated Annealing scenario optimization method that:
-- (a) represents each candidate failure scenario as a binary vector of length $N$ (number of infrastructure components), where 1 indicates a faulted component;
-- (b) generates neighbor solutions by single-bit-flip perturbation and accepts or rejects each neighbor according to the Metropolis criterion $P = \exp(\Delta E / T)$, where $\Delta E$ is the change in cascade severity and $T$ is the current temperature;
-- (c) applies a geometric cooling schedule $T(k) = T_0 \times \alpha^k$ to transition from exploratory search (high temperature, frequent acceptance of worse solutions) to exploitative refinement (low temperature, convergence to near-optimal solution); and
-- (d) discovers worst-case failure scenarios through single-solution neighborhood search, complementing the population-based Genetic Algorithm (Claim 38) and sequential Reinforcement Learning (Claim 33) approaches with a distinct metaheuristic that trades population diversity for deeper local exploration.
-
-**Claim 46.** The method of Claim 1, further comprising a Reliability Block Diagram (RBD) analysis method that:
-- (a) computes per-component availability from MTBF and MTTR as $A = \text{MTBF} / (\text{MTBF} + \text{MTTR})$, with parallel redundancy modeled as $A_{\text{parallel}} = 1 - (1 - A_{\text{single}})^n$ for components with $n$ replicas or failover enabled;
-- (b) identifies critical paths through the infrastructure dependency graph and models each path as a series block with path availability $P_{\text{path}} = \prod_{i \in \text{path}} A_i$;
-- (c) computes system-level availability as the parallel combination of all critical path availabilities: $A_{\text{system}} = 1 - \prod_{\text{paths}} (1 - P_{\text{path}})$; and
-- (d) provides a structural availability perspective based on block connectivity patterns, complementing the Fault Tree Analysis (Claim 39) which operates on failure event logic gates, by analyzing success paths rather than failure combinations.
-
-**Claim 47.** The method of Claim 1, further comprising an Event Tree Analysis (ETA) method that:
-- (a) starting from an initiating event (component failure), automatically generates branching safety functions from the infrastructure topology, including circuit breaker activation, failover, autoscaling response, and replica redundancy, each with probability parameters derived from the component's configuration;
-- (b) enumerates all $2^n$ outcome paths through the event tree (where $n$ is the number of safety barriers), computing combined probability for each path as the product of individual barrier success/failure probabilities;
-- (c) classifies each outcome by severity based on the number of barrier failures and computes total risk as the probability-weighted sum of severity scores; and
-- (d) performs inductive forward risk assessment from an initiating event, complementing the deductive backward analysis of Fault Tree Analysis (Claim 39) which traces backward from a top event to identify root cause combinations.
-
-**Claim 48.** The method of Claim 1, further comprising an Extreme Value Theory (EVT) analysis method that:
-- (a) fits a Generalised Extreme Value (GEV) distribution $F(x) = \exp(-(1 + \xi(x-\mu)/\sigma)^{-1/\xi})$ to block-maxima of cascade severity data, estimating location ($\mu$), scale ($\sigma$), and shape ($\xi$) parameters via the Method of Moments;
-- (b) computes Return Levels $x_T = \mu + (\sigma/\xi)((-\log(1-1/T))^{-\xi} - 1)$ for configurable return periods, quantifying the cascade severity expected to be exceeded once every $T$ observation windows;
-- (c) computes tail-risk exceedance probabilities $P(X > x) = 1 - F(x)$ for configurable severity thresholds; and
-- (d) models the *magnitude of extreme failures* rather than the *time until failure*, differentiating from Survival Analysis (Claim 40) which estimates component lifetime using Weibull distributions, by applying extreme value statistics to the upper tail of the cascade severity distribution.
-
-**Claim 49.** The method of Claim 1, further comprising a model checking formal verification method that:
-- (a) constructs a finite state space by BFS enumeration of all reachable infrastructure states, where each state assigns a health status to every component and transitions model failure propagation through `requires` dependencies;
-- (b) verifies CTL temporal-logic properties against the state space, including: AG(p) — property $p$ holds in all reachable states ("always globally"); EF(p) — there exists a path where $p$ eventually holds ("exists finally"); AF(p) — on all paths, $p$ eventually holds ("always finally");
-- (c) generates counterexample (or witness) paths via BFS from the initial state to a violating (or satisfying) state, providing concrete execution traces that demonstrate property violations; and
-- (d) provides temporal-logic property verification with strictly greater expressiveness than the reachability analysis of the Petri Net engine (Claim 41), supporting quantification over paths (universal/existential) combined with temporal quantification (always/eventually).
-
-**Claim 50.** The method of Claim 1, further comprising a Random Forest failure prediction method that:
-- (a) constructs an ensemble of decision trees, each trained on a bootstrap sample of synthetically generated training data, with information gain (entropy reduction) as the split criterion and random feature sub-sampling at each node;
-- (b) generates training data from the in-memory infrastructure model by extracting normalized metric features (CPU, memory, disk, connections, replicas) and generating labels using a weighted risk score with stochastic threshold;
-- (c) predicts failure probability as the average prediction across all trees in the ensemble, producing a smoothed estimate with lower variance than any individual tree; and
-- (d) captures non-linear decision boundaries and feature interactions without explicit feature engineering, differentiating from the logistic regression predictor (Claim 34) which is limited to linear separability in the feature space.
-
-**Claim 51.** The method of Claim 1, further comprising an autoencoder anomaly detection method that:
-- (a) trains an encoder-decoder neural network to minimize reconstruction error on normal-state metric vectors generated from the in-memory infrastructure model, where the encoder maps input features to a lower-dimensional bottleneck representation and the decoder reconstructs the original features;
-- (b) computes an anomaly threshold from the configured percentile (default 95th) of training-set reconstruction errors;
-- (c) classifies new metric observations as anomalous when their reconstruction error exceeds the learned threshold, enabling unsupervised anomaly detection that requires only normal data and no labeled failure examples; and
-- (d) operates entirely on simulation-synthesized data from the in-memory model, differentiating from prior art autoencoder anomaly detection systems (such as US11374952B1) that operate on real-time production monitoring telemetry, by detecting anomalous patterns that *would* occur under simulated fault conditions without access to any production environment.
-
-**Claim 52.** The method of Claim 1, further comprising a Transformer-based failure prediction method that:
-- (a) projects input metric sequences to a model embedding space, adds sinusoidal positional encodings, and applies self-attention $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k}) \cdot V$ to compute context-aware representations of each time-step, followed by a feed-forward network with residual connections and layer normalization;
-- (b) mean-pools over the sequence dimension and applies a sigmoid output layer to produce a scalar failure probability;
-- (c) exposes the attention weight matrix for interpretability, showing which time-steps in the metric history the model considers most informative for the failure prediction; and
-- (d) processes all time-steps in parallel via attention, directly capturing long-range temporal dependencies without the sequential processing bottleneck and vanishing-gradient issues of recurrent architectures (Claim 44), while providing attention-based interpretability that recurrent models cannot offer.
-
-**Claim 53.** The method of Claim 1, further comprising a queueing theory-based capacity analysis method that:
-- (a) models each infrastructure component as a queueing system and computes M/M/1 (single-server) steady-state metrics including utilization $\rho = \lambda / \mu$, mean queue length $L_q = \rho^2 / (1 - \rho)$, mean wait time $W_q = \rho / (\mu - \lambda)$, and mean system time $W = 1 / (\mu - \lambda)$;
-- (b) computes M/M/c (multi-server) steady-state metrics using Erlang-C probability $C(c, A) = \frac{(A^c / c!) \cdot (c / (c - A))}{\sum_{k=0}^{c-1}(A^k / k!) + (A^c / c!) \cdot (c / (c - A))}$, where $A = \lambda / \mu$ and $c$ is the number of servers (replicas), to determine the probability that an arriving request must wait, mean queue length, and mean wait time;
-- (c) applies Little's Law ($L = \lambda W$) as an independent cross-validation of derived queueing metrics, verifying consistency between mean queue length, arrival rate, and mean sojourn time; and
-- (d) performs bottleneck analysis across all components by ranking components by utilization and identifying the component with the highest utilization as the system bottleneck, and predicts the arrival rate at which each component reaches a configurable saturation threshold, enabling proactive capacity planning before service degradation occurs, differentiating from the Capacity Engine (Claim 6) which evaluates high-availability configurations and quorum systems rather than arrival-rate-driven steady-state queueing behavior.
-
-**Claim 54.** The method of Claim 1, further comprising a Generative Adversarial Network (GAN) method for failure scenario generation that:
-- (a) trains a generator network $G(z)$ and a discriminator network $D(x)$ in an adversarial min-max game $\min_G \max_D \; \mathbb{E}[\log D(x)] + \mathbb{E}[\log(1 - D(G(z)))]$, where the generator maps random noise vectors from a latent space to synthetic fault scenario vectors and the discriminator classifies inputs as real (from existing simulation scenarios) or generated;
-- (b) trains via alternating gradient descent, updating the discriminator to maximize its classification accuracy and the generator to minimize the discriminator's ability to distinguish generated scenarios from real ones;
-- (c) generates novel failure scenarios by sampling random noise vectors and passing them through the trained generator, producing fault-severity vectors that are decoded into infrastructure component fault assignments; and
-- (d) discovers failure patterns not represented in the rule-based scenario generator (Claim 5) by learning the latent distribution of failure scenarios from simulation data, differentiating from the Genetic Algorithm (Claim 38) which evolves scenarios through crossover and mutation of binary chromosomes, and from the Chaos Fuzzer (Claim 24) which mutates existing scenarios through random perturbation, by instead learning a continuous generative model of the failure scenario distribution.
-
-**Claim 55.** The method of Claim 1, further comprising a Variational Autoencoder (VAE) method for failure scenario generation that:
-- (a) trains an encoder network that maps input fault scenario vectors to a mean vector $\mu$ and log-variance vector $\log \sigma^2$ in a latent space, and a decoder network that reconstructs fault scenario vectors from latent-space samples;
-- (b) optimizes the Evidence Lower Bound (ELBO) loss $\mathcal{L} = \mathcal{L}_{\text{recon}} + \beta \cdot D_{KL}(q(z|x) \| p(z))$, where $\mathcal{L}_{\text{recon}}$ is the mean squared error between input and reconstruction, $D_{KL}$ is the Kullback-Leibler divergence regularizing the latent distribution toward a unit Gaussian prior $\mathcal{N}(0, I)$, and $\beta$ is a weighting coefficient;
-- (c) applies the reparameterization trick $z = \mu + \sigma \odot \epsilon$, where $\epsilon \sim \mathcal{N}(0, I)$, to enable gradient-based optimization through the stochastic sampling step; and
-- (d) generates new failure scenarios by sampling from the learned latent space and decoding, producing scenarios that interpolate between known failure patterns rather than merely combining or mutating existing ones, differentiating from the GAN (Claim 54) which generates via adversarial training without an explicit latent-space structure, and from the Autoencoder (Claim 51) which is trained for anomaly detection rather than generative scenario synthesis.
-
-**Claim 56.** The method of Claim 1, further comprising a failure pattern clustering method that:
-- (a) extracts multi-dimensional feature vectors from simulation results, comprising per-component severity, cascade depth, recovery time, and affected-component-count metrics;
-- (b) initializes cluster centroids using the K-means++ algorithm, which selects initial centroids with probability proportional to the squared distance from the nearest existing centroid, avoiding poor convergence from random initialization;
-- (c) iteratively assigns each simulation result to the nearest centroid by Euclidean distance and recomputes centroids as the mean of assigned points until convergence or a maximum iteration count is reached; and
-- (d) determines the optimal number of clusters using the elbow method, computing within-cluster sum of squares (WCSS) for a range of cluster counts and selecting the number of clusters at which the marginal decrease in WCSS diminishes, differentiating from the Random Forest (Claim 50) which performs supervised classification requiring labeled data, by performing unsupervised discovery of latent failure pattern groupings without prior labeling.
-
-**Claim 57.** The method of Claim 1, further comprising an ARIMA (AutoRegressive Integrated Moving Average) time-series prediction method that:
-- (a) applies differencing of order $d$ to the input time-series of infrastructure metrics to achieve stationarity, computing the differenced series $y'_t = y_t - y_{t-d}$;
-- (b) fits autoregressive (AR) coefficients of order $p$ using the Levinson-Durbin algorithm on the autocorrelation sequence of the differenced series, and estimates moving average (MA) coefficients of order $q$ from the residual autocorrelation after AR fitting;
-- (c) generates multi-step-ahead forecasts using the fitted ARIMA($p$,$d$,$q$) model, producing point predictions and confidence intervals for future metric values; and
-- (d) predicts infrastructure metric trends (e.g., resource exhaustion trajectories, traffic growth patterns) using classical time-series decomposition, differentiating from the RNN/LSTM predictor (Claim 44) which uses neural network sequence modeling, and from the Transformer predictor (Claim 52) which uses self-attention, by providing interpretable closed-form coefficients and requiring no training data beyond the observed time-series.
-
-**Claim 58.** The method of Claim 1, further comprising an AdaBoost boosting method for failure prediction that:
-- (a) initializes uniform sample weights $w_i = 1/N$ across all training samples and iteratively trains a sequence of weak learners (decision stumps), each selecting the single feature and threshold that minimizes weighted classification error;
-- (b) computes, for each weak learner $t$, the weighted error $\epsilon_t = \sum_{i: h_t(x_i) \neq y_i} w_i$ and the learner weight $\alpha_t = 0.5 \cdot \ln((1 - \epsilon_t) / \epsilon_t)$;
-- (c) updates sample weights after each weak learner: $w_i \leftarrow w_i \cdot \exp(-\alpha_t \cdot y_i \cdot h_t(x_i))$, followed by renormalization, so that subsequent weak learners focus on previously misclassified samples; and
-- (d) produces a strong classifier as the sign of the weighted sum $H(x) = \text{sign}(\sum_t \alpha_t \cdot h_t(x))$, differentiating from the Random Forest (Claim 50) which trains independent trees on bootstrap samples (bagging), by instead training sequential trees on adaptively reweighted samples (boosting), and from the logistic regression predictor (Claim 34) which fits a single linear decision boundary.
-
-**Claim 59.** The method of Claim 1, further comprising a Particle Swarm Optimization (PSO) method for infrastructure configuration optimization that:
-- (a) initializes a swarm of particles, each representing a candidate infrastructure configuration vector (e.g., replica counts, timeout values, capacity allocations), with random positions and velocities within configurable bounds;
-- (b) updates each particle's velocity at each iteration according to $v_i \leftarrow w \cdot v_i + c_1 r_1 (p_{\text{best},i} - x_i) + c_2 r_2 (g_{\text{best}} - x_i)$, where $w$ is the inertia weight (linearly decayed from an initial value to a final value over the optimization), $c_1$ and $c_2$ are cognitive and social acceleration coefficients, and $r_1$, $r_2$ are uniform random values;
-- (c) evaluates the fitness of each particle position by running the infrastructure simulation and computing the resilience score (or its negation for minimization), updating personal best $p_{\text{best},i}$ and global best $g_{\text{best}}$ positions; and
-- (d) discovers optimal infrastructure configurations through swarm-based cooperative search, differentiating from the Genetic Algorithm (Claim 38) which uses crossover and mutation on binary chromosomes, from the Simulated Annealing (Claim 45) which uses single-solution neighborhood search with probabilistic acceptance, and from Bayesian Optimization (Claim 61) which uses a Gaussian Process surrogate model, by leveraging velocity-based particle dynamics with social information sharing.
-
-**Claim 60.** The method of Claim 1, further comprising a multi-objective Pareto optimization method using NSGA-II that:
-- (a) formulates infrastructure optimization as a multi-objective problem with $M$ competing objectives (e.g., maximize resilience score, minimize cost, minimize latency), where no single solution simultaneously optimizes all objectives;
-- (b) implements the Non-dominated Sorting Genetic Algorithm II (NSGA-II), sorting the population into Pareto fronts by non-domination rank, where a solution $A$ dominates solution $B$ if and only if $A$ is no worse than $B$ on all objectives and strictly better on at least one;
-- (c) applies crowding distance assignment within each Pareto front to maintain diversity, computed as the sum of normalized distances to neighboring solutions along each objective axis, and uses crowding distance as the secondary sorting criterion after non-domination rank; and
-- (d) produces a Pareto-optimal frontier of infrastructure configurations representing the set of non-dominated trade-off solutions, differentiating from the PSO (Claim 59) and Genetic Algorithm (Claim 38) which optimize a single scalar objective, and from the What-If Engine (Claim 6) which performs parametric sensitivity analysis rather than multi-objective optimization, by providing the complete set of efficient trade-offs across competing infrastructure goals.
-
-**Claim 61.** The method of Claim 1, further comprising a Bayesian Optimization method for infrastructure configuration tuning that:
-- (a) constructs a Gaussian Process (GP) surrogate model with a Radial Basis Function (RBF) kernel $k(x, x') = \sigma^2 \exp(-\|x - x'\|^2 / (2l^2))$, fitting the GP to observed (configuration, resilience-score) pairs by computing the posterior mean $\mu(x) = k_*^T K^{-1} y$ and posterior variance $\sigma^2(x) = k_{**} - k_*^T K^{-1} k_*$;
-- (b) selects the next configuration to evaluate by maximizing the Expected Improvement (EI) acquisition function $\text{EI}(x) = (\mu(x) - f_{\text{best}} - \xi) \Phi(Z) + \sigma(x) \phi(Z)$, where $Z = (\mu(x) - f_{\text{best}} - \xi) / \sigma(x)$, $\Phi$ and $\phi$ are the standard normal CDF and PDF, and $\xi$ is an exploration-exploitation trade-off parameter;
-- (c) iteratively evaluates the selected configuration by running the infrastructure simulation, updates the GP posterior with the new observation, and repeats until a convergence criterion or budget is exhausted; and
-- (d) efficiently optimizes expensive-to-evaluate infrastructure configurations by building a cheap-to-query surrogate model, differentiating from the PSO (Claim 59) which requires many parallel evaluations, from the Genetic Algorithm (Claim 38) which requires a large population of evaluations, and from the Simulated Annealing (Claim 45) which uses random neighborhood sampling, by minimizing the number of simulation runs required to find near-optimal configurations through informed sequential selection.
-
-**Claim 62.** The method of Claim 1, further comprising a Common Cause Failure (CCF) analysis method that:
-- (a) identifies CCF groups — sets of components sharing a common failure cause (e.g., same availability zone, same software version, same hardware type, same power domain) — by analyzing component attributes in the topology model;
-- (b) computes, for each CCF group, a beta factor $\beta$ representing the fraction of failures attributable to the common cause, and derives the CCF probability as $P_{\text{CCF}} = \beta \cdot P_{\text{independent}}$, where $P_{\text{independent}}$ is the individual component failure probability from MTBF;
-- (c) simulates simultaneous failure of all components within each CCF group, propagating the correlated failure through the dependency graph to compute the cascade severity; and
-- (d) quantifies the risk of correlated simultaneous failures that independent-failure models underestimate, differentiating from the Fault Tree Analysis (Claim 39) which decomposes top-event failure into independent basic events, from the Bayesian Network (Claim 35) which computes conditional probabilities along dependency edges, and from the Backtest Engine's shared infrastructure modeling (Claim 31) which injects shared infrastructure nodes for historical incident replay, by explicitly modeling the beta-factor fraction of common-cause failures within component groups.
-
-**Claim 63.** The method of Claim 1, further comprising a game theory-based resilience analysis method that:
-- (a) models the interaction between an infrastructure defender and an attacker as a two-player zero-sum game, constructing a payoff matrix where each row represents a defense strategy (e.g., redundancy allocation, circuit breaker placement, traffic shaping) and each column represents an attack strategy (e.g., DDoS, component targeting, cascade exploitation);
-- (b) computes the payoff for each (defense, attack) strategy pair by running the infrastructure simulation with the corresponding defense configuration and attack scenario, using the resulting resilience score (or cascade severity) as the payoff value;
-- (c) computes the Nash equilibrium by finding the minimax strategy — the defense strategy that maximizes the minimum payoff across all possible attacks — and determines mixed strategies by computing the probability distribution over strategies that equalizes expected payoff; and
-- (d) identifies robust defense strategies that perform well against worst-case adversarial behavior, differentiating from the Genetic Algorithm (Claim 38) and PSO (Claim 59) which optimize against a fixed objective function rather than an adversarial opponent, and from the Security Engine (Claim 8) which evaluates defense effectiveness against predefined attack types using a static defense matrix rather than strategic equilibrium analysis.
-
-**Claim 64.** The method of Claim 1, further comprising a fuzzy logic resilience evaluation method that:
-- (a) defines linguistic variables for infrastructure properties (e.g., "load" with terms low/medium/high, "redundancy" with terms none/partial/full, "health" with terms degraded/fair/good) and maps each to fuzzy membership functions (trapezoidal or triangular) over the continuous metric range;
-- (b) evaluates a rule base of fuzzy if-then rules (e.g., "IF load IS high AND redundancy IS none THEN resilience IS low") using the Mamdani inference method, computing the firing strength of each rule as the minimum of its antecedent membership values;
-- (c) aggregates the consequent fuzzy sets of all fired rules using the maximum operator and defuzzifies the aggregated set using the centroid method $x^* = \int x \mu(x) dx / \int \mu(x) dx$ to produce a crisp resilience score; and
-- (d) provides human-interpretable resilience evaluation using linguistic rules that domain experts can directly author and audit, differentiating from the machine learning predictors (Claims 34, 44, 50, 52) which produce opaque numerical outputs, and from the multi-layer availability model (Claim 4) which computes availability from precise mathematical formulas rather than qualitative linguistic reasoning.
-
-**Claim 65.** The method of Claim 1, further comprising a causal inference method for infrastructure failure analysis that:
-- (a) constructs a Structural Causal Model (SCM) from the infrastructure dependency graph, where each node represents a component's health status as a causally determined variable, and directed edges represent causal mechanisms with structural equations encoding the dependency-type-specific impact;
-- (b) applies the do-calculus intervention operator $\text{do}(X = x)$ to compute the effect of forcing a component to a specific state (e.g., failure), distinguishing the causal effect of the intervention from the merely correlational association observed under passive monitoring;
-- (c) computes counterfactual outcomes by evaluating "what would have happened had component $X$ not failed, given the observed failure of components $Y$", using the three-step abduction-action-prediction procedure on the structural equations; and
-- (d) identifies true root causes of cascade failures by distinguishing causal influence from spurious correlation, differentiating from the Bayesian Network (Claim 35) which computes conditional probabilities that conflate causal and correlational relationships, from the Cascade Engine (Claim 2) which propagates failures along dependency edges without formal causal semantics, and from the ML Dependency Inference (Claim 30) which infers statistical dependencies rather than causal mechanisms.
-
-**Claim 66.** The method of Claims 1 and 6, further comprising a multi-engine consensus method that:
-- (a) executes a plurality of independent simulation engines — including at least a cascade engine, a dynamic engine, and one or more analytical engines — on the same fault scenario and topology;
-- (b) collects the severity assessment from each engine and computes an agreement score as the fraction of engines whose severity assessments agree within a configurable tolerance;
-- (c) computes a consensus severity as the weighted mean of individual engine severities, where weights are configurable per engine; and
-- (d) identifies discrepant engines whose assessments diverge from the consensus beyond the tolerance threshold, flagging scenarios requiring human review, wherein the combination of multiple independent simulation methodologies into a single consensus assessment with divergence detection constitutes the inventive step.
-
-**Claim 67.** The method of Claims 1 and 6, further comprising a compliance audit pipeline that:
-- (a) executes one or more simulation engines (cascade, security, financial risk) on the infrastructure topology;
-- (b) evaluates simulation results against a configurable set of regulatory compliance rules mapped to specific frameworks (SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, GDPR);
-- (c) generates a structured audit report identifying, for each compliance rule, the pass/fail status, the simulation evidence supporting the determination, and specific remediation recommendations for failed rules; and
-- (d) bridges the gap between technical simulation results and regulatory compliance requirements by automatically mapping simulation outcomes to compliance controls, wherein the automated translation from simulation evidence to compliance findings constitutes the inventive step.
-
-**Claim 68.** The method of Claims 1 and 9, further comprising a cascade-cost-remediation pipeline that:
-- (a) executes a cascade simulation to identify failure severity and affected components;
-- (b) feeds cascade results into a financial risk engine to compute business impact (revenue loss, SLA penalties, recovery costs) and Value-at-Risk;
-- (c) automatically generates a ranked set of remediation actions, each with estimated implementation cost and projected risk reduction, sorted by ROI = (projected_savings − implementation_cost) / implementation_cost; and
-- (d) produces an end-to-end pipeline from fault simulation through financial quantification to prioritized remediation, wherein the automated chaining of cascade → financial → remediation analysis with ROI-based prioritization constitutes the inventive step.
-
-**Claim 69.** The method of Claim 1, further comprising a backtest-calibration loop that:
-- (a) runs the simulation against a database of historical incidents with known outcomes (affected components, severity, duration);
-- (b) computes accuracy metrics (precision, recall, F1 score) comparing predicted outcomes against actual incident outcomes;
-- (c) adjusts simulation parameters (propagation weights, severity thresholds, timeout values) based on backtest error signals using gradient-free optimization or heuristic tuning; and
-- (d) iterates the simulate-measure-adjust cycle until prediction accuracy exceeds a configurable threshold or a maximum number of calibration rounds is reached, wherein the closed-loop automatic calibration of simulation parameters from historical incident data constitutes the inventive step.
-
-**Claim 70.** The method of Claim 1, further comprising a cross-method validation method that:
-- (a) selects two or more simulation engines with independent mathematical foundations (e.g., a graph-based cascade engine and a Markov chain engine, or a Monte Carlo engine and an analytical availability model);
-- (b) executes all selected engines on the same topology and fault scenario;
-- (c) compares the results across engines and computes a correlation coefficient quantifying the agreement between engine outputs; and
-- (d) flags scenarios where independent methods produce significantly divergent results as requiring additional investigation or model refinement, wherein the systematic cross-validation of simulation results using methodologically independent engines constitutes the inventive step.
-
-**Claim 71.** The method of Claim 1, further comprising a multi-cloud comparative analysis method that:
-- (a) receives topology definitions for the same logical application deployed across two or more cloud providers or deployment configurations;
-- (b) executes the full simulation suite (cascade, security, financial, availability) independently on each cloud topology;
-- (c) produces a normalized comparison report showing per-metric differences between cloud deployments, including resilience score differential, cost differential, and vulnerability differential; and
-- (d) identifies cloud-provider-specific risks and advantages, enabling informed multi-cloud strategy decisions, wherein the parallel simulation and normalized comparison of the same application across heterogeneous cloud environments constitutes the inventive step.
-
-**Claim 72.** The method of Claims 1 and 6, further comprising a full lifecycle automation method that:
-- (a) receives an infrastructure topology definition;
-- (b) executes, in an automated pipeline without human intervention between stages, the following sequence: scenario generation, multi-engine simulation (cascade + dynamic + security), availability model computation, financial risk quantification, resilience genome extraction, and remediation recommendation generation;
-- (c) produces a unified lifecycle report aggregating all stage outputs with cross-references between stages (e.g., linking cascade vulnerabilities to their financial impact and recommended remediations); and
-- (d) delivers a comprehensive resilience assessment from a single topology input, wherein the end-to-end automated orchestration of multiple analysis stages with cross-stage data flow and unified reporting constitutes the inventive step.
-
-**Claim 73.** The method of Claims 1 and 7, further comprising a genome evolution monitoring method that:
-- (a) computes the resilience genome (multi-dimensional trait vector) for the current topology;
-- (b) compares the current genome against one or more previously recorded genome snapshots to compute per-trait deltas and an overall drift magnitude;
-- (c) classifies each trait change as improvement, regression, or stable based on configurable thresholds; and
-- (d) generates an evolution report tracking resilience trajectory over time, enabling detection of gradual resilience drift before it reaches critical levels, wherein the longitudinal comparison of multi-dimensional resilience genomes with trend classification constitutes the inventive step.
-
-**Claim 74.** The method of Claims 1 and 8, further comprising a threat feed-simulation bridge that:
-- (a) fetches security threat intelligence from external feeds (RSS/Atom, structured threat intelligence formats);
-- (b) extracts threat patterns from feed entries using keyword and semantic matching;
-- (c) automatically converts extracted threats into executable fault scenarios compatible with the simulation engine, mapping threat types to component-specific fault injections; and
-- (d) executes the converted scenarios against the current topology and produces a threat-specific resilience assessment, wherein the automated translation from external threat intelligence to executable simulation scenarios with immediate resilience evaluation constitutes the inventive step.
-
-**Claim 75.** The method of Claims 1, 6, and 8, further comprising a unified security-resilience scoring method that:
-- (a) executes both resilience simulation engines (cascade, dynamic, availability) and security simulation engines (attack simulation, defense effectiveness, lateral movement) on the same topology;
-- (b) normalizes the resilience score and security score to a common scale;
-- (c) computes a unified score as a weighted combination of the normalized resilience and security scores, with configurable weighting; and
-- (d) generates a gap analysis identifying areas where resilience and security postures diverge, wherein the integration of traditionally separate resilience engineering and security assessment into a single unified metric with gap analysis constitutes the inventive step.
-
-**Claim 76.** The method of Claim 1, further comprising an inverse optimization method that:
-- (a) receives a target resilience score or availability objective;
-- (b) computes, via iterative simulation with parameter adjustment, the minimum infrastructure changes (added replicas, circuit breakers, failover configurations) required to achieve the target;
-- (c) ranks the computed changes by cost-effectiveness (resilience improvement per unit cost); and
-- (d) solves the inverse problem — "what infrastructure do I need to achieve target X?" — differentiating from forward simulation which answers "what resilience does infrastructure X provide?", wherein the automated inverse mapping from target objectives to minimum-cost infrastructure configurations constitutes the inventive step.
-
-**Claim 77.** The method of Claim 1, further comprising a comparative simulation method that:
-- (a) receives two or more infrastructure topology definitions representing alternative designs or configurations;
-- (b) executes the full simulation suite on each topology under identical fault scenarios;
-- (c) produces a side-by-side comparison of all simulation metrics (resilience score, availability, financial risk, security score) with statistical significance indicators; and
-- (d) generates a recommendation identifying the superior topology for each metric and overall, enabling data-driven architecture decision-making, wherein the controlled comparative evaluation of alternative infrastructure designs under identical simulation conditions constitutes the inventive step.
-
-**Claim 78.** The method of Claim 1, further comprising a compound what-if analysis method that:
-- (a) receives a sequence of infrastructure change proposals (e.g., add replicas to component A, then enable circuit breaker on component B, then increase capacity of component C);
-- (b) applies each change incrementally to the topology model and executes the simulation after each change;
-- (c) computes the marginal resilience improvement attributable to each individual change; and
-- (d) produces a cumulative impact analysis showing how each successive change contributes to the overall resilience improvement, enabling identification of the most impactful changes and detection of diminishing returns, wherein the sequential incremental evaluation of compound changes with per-change marginal impact attribution constitutes the inventive step.
-
-**Claim 79.** The method of Claim 1, further comprising an ensemble prediction method that:
-- (a) executes a plurality of prediction engines — including at least a static cascade engine, a dynamic simulation engine, and a stochastic Monte Carlo engine — on the same topology and scenario;
-- (b) collects the failure probability or severity estimate from each engine;
-- (c) computes an ensemble prediction as a weighted combination of individual engine predictions, where weights are derived from each engine's historical backtest accuracy; and
-- (d) produces a prediction with lower variance and higher accuracy than any individual engine, including a confidence interval derived from the spread of individual engine predictions, wherein the accuracy-weighted fusion of methodologically diverse prediction engines with empirically calibrated weights constitutes the inventive step.
-
-**Claim 80.** The method of Claim 1, further comprising a hierarchical infrastructure analysis method that:
-- (a) decomposes the infrastructure topology into hierarchical levels (e.g., system → service → component → sub-component) based on dependency graph structure;
-- (b) executes simulation independently at each hierarchical level, computing level-specific resilience metrics;
-- (c) propagates resilience assessments upward through the hierarchy, computing how component-level vulnerabilities aggregate into service-level and system-level risks; and
-- (d) generates a hierarchical resilience map showing risk concentration at each level, enabling both top-down strategic planning and bottom-up detailed analysis, wherein the multi-level decomposition with bidirectional resilience propagation constitutes the inventive step.
-
-**Claim 81.** The method of Claim 1, further comprising a continuous observability-to-predictability pipeline method that:
-- (a) periodically retrieves real-time infrastructure metrics from an external observability platform (e.g., Datadog Metrics API) including host-level CPU utilization, memory consumption, and disk usage within a configurable polling interval;
-- (b) automatically maps the retrieved metric series to corresponding resource metric fields of components in the in-memory infrastructure graph by resolving external host identifiers to internal component identifiers through multi-strategy matching (name, host attribute, unique identifier);
-- (c) upon completion of the metric-to-graph mapping, automatically invokes the cascade simulation engine and financial risk engine on the updated graph state to produce a simulation report with resilience scores, cascade predictions, and critical findings; and
-- (d) transmits the simulation results back to the external observability platform as custom metrics and structured events, wherein critical cascade risk detections trigger alert events that enable the observability platform's native alerting mechanisms to act on predictive simulation intelligence, thereby transforming passive observability into proactive resilience prediction through continuous closed-loop integration between real-time metrics and simulated cascade analysis, wherein the automatic metrics-driven simulation invocation and bidirectional closed-loop integration constitute the inventive step.
-
-**Claim 82.** The method of Claim 1, further comprising a real-time incident-triggered cascade analysis pipeline method that:
-- (a) receives an incident notification from an external incident management platform (e.g., PagerDuty webhook) and resolves the affected service to a specific component in the in-memory infrastructure graph through multi-strategy matching against service names, custom detail fields, and incident title content;
-- (b) automatically invokes the cascade simulation engine with a fault injected at the resolved component to compute the full downstream blast radius, identifying all components that transition to DOWN, DEGRADED, or OVERLOADED states;
-- (c) computes the estimated financial impact for each affected component by multiplying the component's configured revenue-per-minute rate by the estimated downtime duration derived from the component's mean-time-to-repair operational profile; and
-- (d) automatically generates and posts back to the incident management platform: (i) enrichment notes containing blast radius, financial impact, and resolution recommendations, and (ii) a structured runbook document containing incident metadata, prioritized resolution steps derived from component failover, autoscaling, and replica configurations, cascade chain details, and a verification checklist, wherein the automatic incident-to-cascade-to-runbook pipeline with real-time financial impact computation constitutes the inventive step.
-
-**Claim 83.** The method of Claim 1, further comprising a topology conversion and AI operations export method that:
-- (a) retrieves an auto-discovered infrastructure topology from an external AI operations platform (e.g., Dynatrace Smartscape via Environment API v2), including entity types (HOST, SERVICE, PROCESS_GROUP, APPLICATION, DATABASE), entity properties, and inter-entity relationships;
-- (b) converts the external topology into the in-memory infrastructure graph by mapping external entity types to internal component types and converting external entity relationships into directed dependency edges preserving cascade propagation semantics;
-- (c) calibrates the converted graph by querying the external platform's metrics API for entity-level metrics and applying them to the corresponding resource metrics of converted components; and
-- (d) exports simulation results in a format compatible with the external platform's AI engine, including structured prediction objects with severity classification and affected entity lists, topology risk objects identifying single points of failure, and automatic submission of failure predictions exceeding a configurable severity threshold to the external platform's Problems/Events API for AI-driven correlation and root cause analysis, wherein the bidirectional topology-to-graph conversion with simulation-to-AI-ops export constitutes the inventive step.
-
-**Claim 84.** The method of Claim 1, further comprising a vulnerability-to-business-impact re-prioritization method that:
-- (a) retrieves vulnerability data (CVE identifiers, CVSS scores, severity levels, affected package names, exploit maturity) from an external security scanning platform (e.g., Snyk API);
-- (b) converts each vulnerability into one or more executable fault scenarios by mapping vulnerability severity to fault types (critical → COMPONENT_DOWN, high → CPU_SATURATION, medium/low → LATENCY_SPIKE) and resolving affected components through package-name-to-component matching, component tag matching, framework-type matching, or infrastructure-wide targeting;
-- (c) executes the generated scenarios through a combined simulation pipeline comprising the cascade engine, the security resilience engine (which amplifies cascade severity by a security posture factor reflecting overall infrastructure security weakness), and the financial risk engine; and
-- (d) re-ranks the vulnerabilities by a composite business impact score (0-100) computed from four weighted factors: CVSS score (0-40), infrastructure-specific blast radius (0-30), exploit maturity (0-20), and estimated downtime cost (0-10), producing a prioritized vulnerability list with per-vulnerability business impact scores, infrastructure blast radii, estimated costs, and human-readable scoring decompositions that supersede generic CVSS-only prioritization, wherein the automated conversion of security vulnerabilities into simulated infrastructure failure scenarios with business-impact-based re-ranking constitutes the inventive step.
-
-**Claim 85.** The method of Claim 1, further comprising a prediction-verification hybrid workflow method that:
-- (a) imports chaos experiment definitions from an external chaos engineering platform (e.g., Gremlin REST API) and converts them to executable simulation scenarios by mapping external attack types (cpu, memory, shutdown, latency, packet_loss, etc.) to internal fault types and resolving target identifiers to infrastructure graph components;
-- (b) executes the cascade simulation engine on each imported scenario to produce predictions of affected components and per-component severity scores;
-- (c) after real chaos experiments are executed on production infrastructure, imports the observed results and computes prediction accuracy metrics including precision (fraction of predicted impacts confirmed), recall (fraction of actual impacts predicted), F1 score (harmonic mean), and severity match (normalized accuracy of severity magnitude predictions for correctly predicted components); and
-- (d) generates a comparison report identifying false positives (predicted but not observed, suggesting over-conservative cascade rules), false negatives (observed but not predicted, suggesting missing dependencies), and calibration recommendations (low recall → review dependency graph completeness; low precision → review failover configurations; severity mismatch → calibrate capacity thresholds), enabling continuous improvement of simulation fidelity through systematic comparison of in-memory predictions against real-world chaos experiment outcomes, wherein the structured predict-then-verify framework with accuracy metrics and model calibration feedback constitutes the inventive step.
-
-**Claim 86.** The method of Claim 1, further comprising an incident response simulation method that:
-- (a) models the complete incident lifecycle by classifying incidents across five severity levels (SEV1 through SEV5) and eight incident categories, and generating for each severity level a multi-step escalation chain with configurable time thresholds (SEV1: 5-minute intervals through page, team lead, VP, war room, executive briefing; lower severities using progressively longer thresholds of 15, 30, 60, 120 minutes);
-- (b) estimates Mean Time To Repair through a multi-factor model computed as `adjusted_mttr = base_mttr * team_factor * automation_factor * runbook_factor * complexity_factor`, where team factor is derived from team size and expertise, automation factor reduces MTTR for automatable recovery actions, runbook factor penalises uncovered failure modes, and complexity factor is derived from the number of downstream dependents in the infrastructure graph;
-- (c) evaluates runbook coverage by enumerating known failure modes per component type and computing coverage percentage as `total_covered / total_failure_modes * 100`, and identifies automation opportunities by computing a priority score for each recovery action as `time_savings / automation_complexity`; and
-- (d) analyses on-call fatigue by computing estimated alerts per week, pages per night, and fatigue score (0-100), and generates post-incident review templates with five-whys root cause analysis and timeline reconstruction decomposed into detection, acknowledgement, mitigation, and resolution phases.
-
-**Claim 87.** The method of Claim 1, further comprising a disaster recovery orchestration method that:
-- (a) generates recovery steps per infrastructure component grouped by eight recovery phases, assigns explicit step dependencies enforcing the invariant that stateful data stores are recovered before stateless application consumers, and performs topological sort on the step dependency graph to produce a valid execution order while detecting cycles;
-- (b) identifies parallelisable step groups, computes critical path analysis as the longest sequential chain yielding `estimated_rto_seconds`, and computes parallel savings as `total_sequential_time - critical_path_time`;
-- (c) executes virtual DR drills by simulating each recovery step with automation time factors (manual: 1.0x, semi-automated: 0.5x, fully automated: 0.1x); and
-- (d) validates data consistency during recovery by examining replication lag, checksum matching, and records-behind counts.
-
-**Claim 88.** The method of Claim 1, further comprising a circuit breaker tuning method that:
-- (a) computes optimal failure thresholds as `optimal_threshold = max(min_threshold, base_error_rate * safety_multiplier * evaluation_window)`, and tunes recovery timeouts as `optimal_recovery = mean_recovery_time * multiplier + jitter`;
-- (b) analyses cascading breaker coordination by walking dependency chains and detecting coordination gaps where downstream breaker openings cause upstream breakers to trip redundantly;
-- (c) detects optimal placement by scoring priority as `error_rate * dependent_count * (1 if no_breaker else 0.1)`; and
-- (d) estimates thundering-herd risk after breaker recovery as `queued_requests_during_open = rps * open_duration`.
-
-**Claim 89.** The method of Claim 1, further comprising an idempotency analysis method that:
-- (a) evaluates idempotency key coverage by classifying HTTP methods by inherent safety and classifying delivery semantics as at-most-once, at-least-once, or exactly-once;
-- (b) traces cross-service idempotency key propagation across dependency edges to detect broken chains; and
-- (c) applies heightened scrutiny to financial operations requiring exactly-once delivery semantics and compensating transaction capabilities.
-
-**Claim 90.** The method of Claim 1, further comprising a timeout budget analysis method that:
-- (a) detects timeout inconsistencies across dependency edges, classifying as CRITICAL when `caller_timeout < callee_timeout` with ratio exceeding 2.0;
-- (b) implements deadline propagation along request paths by decrementing remaining budget by each hop's processing time; and
-- (c) computes optimal timeout values from latency percentiles as `recommended_timeout = p99 * headroom_factor`.
-
-**Claim 91.** The method of Claim 1, further comprising a continuous compliance monitoring method that:
-- (a) performs persistent compliance surveillance across six regulatory frameworks (DORA, SOC 2, ISO 27001, PCI DSS, NIST CSF, HIPAA) by evaluating discrete controls against the in-memory topology graph;
-- (b) captures compliance snapshots for longitudinal tracking and computes trends classified as improving, stable, or degrading; and
-- (c) generates compliance drift alerts for new violations, degradation, upcoming audits, and regulation changes with framework-specific severity classification.
-
-**Claim 92.** The method of Claim 1, further comprising a DORA compliance evidence generation method that:
-- (a) implements 24 controls across five DORA articles and classifies chaos test scenarios into TLPT, Advanced Testing, and Basic Testing categories;
-- (b) generates structured evidence records mapping each executed test to a specific DORA control ID; and
-- (c) exports a structured audit package for regulatory submission.
-
-**Claim 93.** The method of Claim 1, further comprising a data sovereignty analysis method that:
-- (a) maintains region-to-jurisdiction mappings covering seven data protection regimes (GDPR, CCPA, LGPD, PIPEDA, PDPA, APPI, POPIA);
-- (b) detects restricted cross-border data transfers by analysing dependency edges and resolving source and target jurisdictions; and
-- (c) detects ten categories of sovereignty violations with predefined severities and computes an overall sovereignty risk score (0-100).
-
-**Claim 94.** The method of Claim 1, further comprising a compound security-failure simulation method that:
-- (a) assigns each component a security posture based on a weighted security profile score;
-- (b) models how infrastructure failures weaken security controls by mapping failure types to security fields that become disabled;
-- (c) computes compound risk for simultaneous scenarios as `(1 - attack_resistance/100) * (1 - failure_containment/100) * 100`; and
-- (d) automatically discovers critical attack-plus-failure combinations.
-
-**Claim 95.** The method of Claim 1, further comprising a cost-resilience optimization method that:
-- (a) generates improvement options per component with ROI computed as resilience gain divided by monthly cost increase;
-- (b) selects improvements based on four optimization strategies (MIN_COST, MAX_RESILIENCE, COST_EFFICIENT, BALANCED); and
-- (c) constructs a Pareto frontier by incrementally applying improvements sorted by ROI descending.
-
-**Claim 96.** The method of Claim 1, further comprising a consensus protocol analysis method that:
-- (a) computes quorum size, maximum tolerable failures, and quorum margin for Raft, Paxos, ZAB, PBFT, and Viewstamped Replication protocols;
-- (b) evaluates split-brain susceptibility and models consensus latency under multiple failure scenarios; and
-- (c) produces a quantitative CAP trade-off score as a normalised vector (C, A, P) in [0, 1].
-
-**Claim 97.** The method of Claim 1, further comprising a multi-tenant isolation verification method that:
-- (a) defines seven isolation levels mapped to commercial tiers and verifies actual isolation meets tier requirements;
-- (b) simulates noisy-neighbor scenarios with isolation-level-dependent attenuation factors; and
-- (c) computes an overall isolation score (0-100) with tier gap, shared resource, and weak isolation penalties.
-
-**Claim 98.** The method of Claim 1, further comprising an SLO burn rate simulation method that:
-- (a) implements four multi-window multi-burn-rate alerting configurations following Google SRE methodology;
-- (b) simulates error rate pattern scenarios hour-by-hour across all alert windows; and
-- (c) computes alert effectiveness score as the percentage of violation scenarios where at least one alert was triggered.
-
-**Claim 99.** The method of Claim 1, further comprising a state machine chaos method that:
-- (a) models each component as a finite state machine with nine operational states and ten event-triggered transitions;
-- (b) injects chaos by forcing transitions and computing cascade effects via dependency graph traversal;
-- (c) detects deadlock states and unreachable states; and
-- (d) computes shortest recovery paths from each non-healthy state back to healthy.
-
-**Claim 100.** The method of Claim 1, further comprising a digital twin synchronization method that:
-- (a) ingests real-time metric snapshots and computes trends as average rate of change between consecutive observations;
-- (b) predicts future values as `predicted_value = current_value + trend * horizon_minutes` and generates warnings when predictions exceed critical thresholds; and
-- (c) estimates time-to-threshold as `(threshold - current_value) / trend` and produces periodic digital twin reports with predicted system availability.
+**Claim 33.** The method of Claim 31, wherein the hardware availability layer is computed, for each component, as a function of a single-instance availability derived from mean time between failures and mean time to repair, adjusted for parallel redundancy based on replica count and further adjusted for failover penalty based on promotion time and detection latency.
+
+**Claim 34.** The method of Claim 4, wherein the effective system availability is computed as the minimum of the N computed availability ceiling values.
+
+**Claim 35.** The method of Claim 4, further comprising identifying, for a target availability objective, the specific layer that constitutes the binding constraint preventing achievement of the target, and computing minimum infrastructure changes to relax said binding constraint.
+
+**Claim 36.** The method of Claim 5, wherein the plurality of mathematically independent simulation methodologies comprises at least two selected from: graph-based cascade propagation, Markov chain steady-state analysis, Monte Carlo stochastic simulation, Bayesian network conditional probability computation, discrete event simulation, and analytical reliability block diagram computation.
+
+**Claim 37.** The method of Claim 5, wherein computing the consensus assessment comprises computing a weighted mean of the individual severity assessments, wherein weights are derived from historical accuracy of each methodology.
+
+**Claim 38.** The method of Claim 5, further comprising computing a correlation coefficient quantifying agreement between pairs of methodologies and flagging methodology pairs with low correlation as requiring model refinement.
+
+**Claim 39.** The method of Claim 5, further comprising an ensemble prediction that combines the individual assessments with accuracy-weighted fusion and produces a confidence interval derived from the spread of individual assessments.
+
+**Claim 40.** The method of Claim 6, wherein the plurality of structural and operational traits comprises at least three selected from: graph density, average path length, clustering coefficient, component diversity, redundancy coverage, failover coverage, and circuit breaker coverage.
+
+**Claim 41.** The method of Claim 6, wherein each trait is normalized to a common scale and the at least one reference profile comprises an industry-specific benchmark profile, and wherein comparing produces deviation scores and an overall similarity metric.
+
+**Claim 42.** The method of Claim 6, further comprising tracking changes in the fingerprint vector over time to produce a resilience evolution trajectory with per-trait trend classification as improving, regressing, or stable.
+
+**Claim 43.** The method of Claim 7, wherein modeling how the infrastructure failure affects security control effectiveness comprises mapping failure types to specific security controls that become degraded or disabled during the failure condition.
+
+**Claim 44.** The method of Claim 7, further comprising automatically enumerating combinations of infrastructure failure conditions and security attack conditions to discover critical compound scenarios.
+
+**Claim 45.** The method of Claim 7, further comprising simulating lateral movement propagation through the graph representation, wherein network segmentation boundaries act as propagation blocking factors and the infrastructure failure condition selectively disables segmentation controls.
+
+**Claim 46.** The method of Claim 8, wherein the at least one aggregate financial risk metric comprises a Value-at-Risk computed at a specified confidence percentile from the cumulative probability distribution of business impact values.
+
+**Claim 47.** The method of Claim 8, wherein computing the business impact value comprises summing at least: revenue loss computed from estimated downtime duration and revenue rate, contractual penalty costs, and recovery labor costs.
+
+**Claim 48.** The method of Claim 8, further comprising generating a cost-resilience optimization that identifies Pareto-optimal infrastructure improvement options by evaluating the trade-off between implementation cost and projected risk reduction.
+
+**Claim 49.** The method of Claim 9, wherein the at least one regulatory compliance framework comprises at least one selected from: SOC 2, ISO 27001, PCI DSS, DORA, HIPAA, and GDPR.
+
+**Claim 50.** The method of Claim 9, further comprising generating structured evidence records that map each executed simulation to a specific regulatory control identifier, and exporting said evidence records as an audit package.
+
+**Claim 51.** The method of Claim 9, further comprising performing persistent compliance surveillance by capturing compliance snapshots over time and computing trend classifications as improving, stable, or degrading.
+
+**Claim 52.** The method of Claim 10, wherein ingesting metric data comprises periodically retrieving infrastructure metrics from an external observability platform and mapping the retrieved metrics to component resource fields through identifier resolution.
+
+**Claim 53.** The method of Claim 10, further comprising transmitting simulation results back to the monitored infrastructure environment as custom metrics or structured events, enabling alerting mechanisms to act on predictive simulation intelligence.
+
+**Claim 54.** The method of Claim 10, wherein computing trend projections comprises estimating a rate of change from consecutive metric observations and predicting future values based on said rate of change, and wherein predictive alerts are generated when predicted future values exceed critical thresholds within a configurable time horizon.
+
+**Claim 55.** The method of Claim 1, further comprising simulating failure propagation using a Bayesian network probability model that computes, for each component, a conditional failure probability given the observed or simulated states of components upon which it depends, using dependency-type-based impact factors.
+
+**Claim 56.** The method of Claim 55, wherein the Bayesian network probability model computes prior failure probabilities from component reliability parameters adjusted for parallel redundancy, and computes posterior failure probabilities given a set of observed component states as evidence.
+
+**Claim 57.** The method of Claim 1, further comprising computing per-component steady-state availability using a Markov chain model that represents each component as a multi-state continuous-time Markov chain with transition rates derived from component operational profiles.
+
+**Claim 58.** The method of Claim 57, wherein the multi-state continuous-time Markov chain comprises at least three states representing healthy, degraded, and down conditions, and wherein the steady-state probability distribution is computed using an iterative matrix method.
+
+**Claim 59.** The method of Claim 1, further comprising simulating failure propagation using discrete event simulation with a priority queue of time-stamped events, wherein cascade events are scheduled with propagation delays derived from network characteristics and recovery events are scheduled based on repair time parameters.
+
+**Claim 60.** The method of Claim 1, further comprising constructing a fault tree from the graph representation by top-down deductive decomposition and computing system failure probability by bottom-up evaluation through logic gates, and computing minimal cut sets identifying the smallest combinations of component failures causing system failure.
+
+**Claim 61.** The method of Claim 1, further comprising predicting failure probability for each component using a machine learning model trained on data synthetically generated from the in-memory simulation rather than from production operational data.
+
+**Claim 62.** The method of Claim 61, wherein the machine learning model comprises at least one selected from: a logistic regression classifier, an ensemble of decision trees, a recurrent neural network, and a transformer-based attention model.
+
+**Claim 63.** The method of Claim 61, wherein the machine learning model comprises a graph neural network that performs message passing across the graph representation to predict per-node failure probability based on both node features and graph structure.
+
+**Claim 64.** The method of Claim 1, further comprising performing survival analysis for each component to estimate remaining useful life by fitting a parametric lifetime distribution to reliability parameters adjusted for current utilization stress and active degradation patterns.
+
+**Claim 65.** The method of Claim 64, wherein the parametric lifetime distribution comprises a Weibull distribution and the method further comprises computing a hazard function to determine instantaneous failure rate and classifying the failure regime as infant mortality, random, or wear-out based on the distribution shape parameter.
+
+**Claim 66.** The method of Claim 1, further comprising simulating failure propagation using an agent-based model wherein each component is modeled as an autonomous agent with a set of decision rules and a health state, agents simultaneously evaluate their rules against a snapshot of neighbor states at each discrete time step, and emergent failure patterns are identified by comparing agent-based outcomes against deterministic graph traversal predictions.
+
+**Claim 67.** The method of Claim 1, further comprising modeling failure propagation using continuous-valued health dynamics governed by differential equations, wherein each component health evolves continuously based on degradation, recovery, and cascade impact rates, and wherein tipping-point thresholds and degradation velocities are detected from the continuous health evolution.
+
+**Claim 68.** The method of Claim 1, further comprising simulating failure propagation using a Petri net model wherein the graph representation is converted to a Place/Transition net with reachability analysis and deadlock detection, enabling formal verification of safety properties through exhaustive state space enumeration.
+
+**Claim 69.** The method of Claim 1, further comprising performing model checking formal verification by constructing a finite state space of reachable infrastructure states and verifying temporal logic properties against said state space, with counterexample generation for property violations.
+
+**Claim 70.** The method of Claim 1, further comprising performing extreme value analysis on cascade severity results by fitting an extreme value distribution to severity block-maxima and computing return levels for configurable return periods and tail-risk exceedance probabilities.
+
+**Claim 71.** The method of Claim 1, further comprising simulating incident response procedures by modeling incident escalation chains across severity levels, estimating effective mean time to repair through a multi-factor model incorporating team characteristics and automation level, and evaluating runbook coverage across known failure modes.
+
+**Claim 72.** The method of Claim 71, further comprising analyzing on-call fatigue by computing estimated alert volume and generating post-incident review templates with root cause analysis structures.
+
+**Claim 73.** The method of Claim 1, further comprising generating a disaster recovery orchestration plan by computing recovery step dependencies from the graph representation, performing topological sort to produce a valid execution order, identifying parallelizable step groups, and computing a critical path analysis yielding an estimated recovery time objective.
+
+**Claim 74.** The method of Claim 73, further comprising executing virtual disaster recovery drills by simulating each recovery step with automation-level-dependent time factors and validating data consistency during simulated recovery.
+
+**Claim 75.** The method of Claim 1, further comprising computing circuit breaker tuning recommendations by analyzing dependency chains for cascading breaker coordination gaps, computing optimal failure thresholds from error rate parameters, and estimating thundering-herd risk after breaker recovery.
+
+**Claim 76.** The method of Claim 1, further comprising performing idempotency analysis by evaluating idempotency key coverage across components, tracing cross-service idempotency key propagation across dependency edges to detect broken chains, and applying heightened scrutiny to operations requiring exactly-once delivery semantics.
+
+**Claim 77.** The method of Claim 1, further comprising performing data sovereignty analysis by maintaining region-to-jurisdiction mappings for a plurality of data protection regimes, detecting restricted cross-border data transfers by analyzing dependency edges and resolving source and target jurisdictions, and computing an overall sovereignty risk score.
+
+**Claim 78.** The method of Claim 1, further comprising computing a cost-resilience optimization that generates improvement options per component with return-on-investment computed as resilience gain divided by cost increase, and constructs a Pareto frontier by incrementally applying improvements in order of decreasing return-on-investment.
+
+**Claim 79.** The method of Claim 1, further comprising verifying multi-tenant isolation by defining isolation levels mapped to commercial tiers, simulating noisy-neighbor scenarios with isolation-level-dependent attenuation factors, and computing an isolation score reflecting how actual isolation meets tier requirements.
+
+**Claim 80.** The method of Claim 1, further comprising simulating SLO burn rate by implementing multi-window multi-burn-rate alerting configurations, simulating error rate pattern scenarios across alert windows, and computing an alert effectiveness score as the percentage of violation scenarios where at least one alert was triggered.
+
+**Claim 81.** The method of Claim 1, further comprising modeling each component as a finite state machine with a plurality of operational states and event-triggered transitions, injecting chaos by forcing state transitions and computing cascade effects via dependency traversal, detecting deadlock states and unreachable states, and computing shortest recovery paths from each non-healthy state to a healthy state.
+
+**Claim 82.** The method of Claim 1, further comprising simulating event storms by injecting a plurality of concurrent fault events and modeling the interaction effects of simultaneous failures including resource contention, cascading timeouts, and queue saturation across the graph representation.
+
+**Claim 83.** The method of Claim 1, further comprising automatically inferring undeclared dependencies between infrastructure components by computing at least one of: statistical correlation between component metric time series, behavioral similarity between component traffic patterns, and failure co-occurrence analysis, and integrating inferred dependencies exceeding a confidence threshold into the graph representation.
+
+**Claim 84.** The method of Claim 83, wherein computing statistical correlation comprises computing pairwise correlation coefficients between component metric time series with lagged analysis to determine causal direction, and wherein behavioral similarity is computed using dynamic time warping distance between normalized traffic patterns.
+
+**Claim 85.** The method of Claim 1, further comprising validating simulation predictions against historical incident data by computing prediction accuracy metrics and automatically calibrating simulation parameters based on divergence between predicted and actual outcomes.
+
+**Claim 86.** The method of Claim 85, further comprising modeling shared infrastructure dependencies by dynamically injecting shared infrastructure nodes into the graph representation to model common-cause failures affecting multiple components simultaneously.
+
+**Claim 87.** The method of Claim 1, further comprising automatically generating incident response artifacts from simulation results, said artifacts comprising at least one of: runbooks with detection, diagnosis, mitigation, and recovery steps tailored to the specific component types; Infrastructure-as-Code modifications to remediate identified vulnerabilities; and prioritized chaos experiment recommendations ranked by risk exposure and coverage gap severity.
+
+**Claim 88.** The method of Claim 1, further comprising integration as a quality gate within a deployment pipeline, wherein proposed infrastructure changes are automatically evaluated against the simulation and deployment is blocked if a computed resilience metric falls below a configurable threshold or if resilience regression is detected.
+
+**Claim 89.** The method of Claim 1, further comprising performing causal inference on infrastructure failures by constructing a structural causal model from the graph representation, applying interventional reasoning to distinguish causal effects from correlational associations, and computing counterfactual outcomes.
+
+**Claim 90.** The method of Claim 1, further comprising game-theoretic resilience analysis by modeling defender-attacker interactions, constructing a payoff matrix from simulation results across defense and attack strategy combinations, and computing equilibrium defense strategies.
+
+**Claim 91.** The method of Claim 1, further comprising fuzzy logic resilience evaluation using linguistic variables for infrastructure properties, evaluating a rule base of fuzzy if-then rules using fuzzy inference, and defuzzifying the aggregated result to produce a human-interpretable resilience score.
+
+**Claim 92.** The method of Claim 1, further comprising common cause failure analysis by identifying groups of components sharing common failure causes based on component attributes, computing a correlated failure probability for each group, and simulating simultaneous failure of all components within each group.
+
+**Claim 93.** The method of Claim 1, further comprising performing queueing theory-based capacity analysis by modeling infrastructure components as queueing systems, computing steady-state metrics including utilization and wait time, performing bottleneck analysis across all components, and predicting arrival rates at which components reach saturation thresholds.
+
+**Claim 94.** The method of Claim 93, wherein modeling infrastructure components as queueing systems comprises computing single-server and multi-server steady-state metrics and applying cross-validation using a throughput-delay relationship to verify consistency of derived metrics.
+
+**Claim 95.** The method of Claim 1, further comprising analyzing consensus protocol resilience by computing quorum parameters, maximum tolerable failures, and split-brain susceptibility for distributed consensus configurations represented in the graph.
+
+**Claim 96.** The method of Claim 1, further comprising performing timeout budget analysis by detecting timeout inconsistencies across dependency edges, implementing deadline propagation along request paths, and computing recommended timeout values from latency distribution parameters.
+
+**Claim 97.** The method of Claim 1, further comprising receiving an incident notification from an external incident management system, resolving the affected component in the graph representation, automatically executing cascade simulation to compute blast radius and financial impact, and generating response artifacts back to the incident management system.
+
+**Claim 98.** The method of Claim 1, further comprising bidirectional integration with an external AI operations platform by importing a discovered infrastructure topology into the graph representation, executing resilience simulation, and exporting simulation results in a format compatible with the external platform for AI-driven correlation and root cause analysis.
+
+**Claim 99.** The method of Claim 1, further comprising retrieving vulnerability data from an external security scanning system, converting each vulnerability into at least one executable fault scenario, executing the scenario through a combined simulation pipeline, and re-ranking vulnerabilities by a business impact score that supersedes generic severity scoring.
+
+**Claim 100.** The method of Claim 1, further comprising a prediction-verification workflow that imports chaos experiment definitions from an external chaos engineering platform, executes cascade simulation to produce predictions, compares predictions against observed real-world outcomes after experiment execution, computes prediction accuracy metrics, and generates calibration recommendations for improving simulation fidelity.
 
 ---
 
