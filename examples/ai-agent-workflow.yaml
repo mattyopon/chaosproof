@@ -53,7 +53,7 @@ components:
     capacity:
       max_rps: 1000
       timeout_seconds: 60
-    parameters:
+    llm_config:
       provider: anthropic
       model_id: claude-sonnet-4-20250514
       rate_limit_rpm: 1000
@@ -72,7 +72,7 @@ components:
     capacity:
       max_rps: 500
       timeout_seconds: 60
-    parameters:
+    llm_config:
       provider: openai
       model_id: gpt-4o
       rate_limit_rpm: 500
@@ -88,10 +88,10 @@ components:
     capacity:
       max_rps: 100
       timeout_seconds: 10
-    parameters:
+    tool_config:
       tool_type: web_search
-      idempotent: 1
-      side_effects: 0
+      idempotent: true
+      side_effects: false
       failure_rate: 0.02
 
   - id: db-query-tool
@@ -103,10 +103,10 @@ components:
     capacity:
       max_rps: 500
       timeout_seconds: 5
-    parameters:
+    tool_config:
       tool_type: database_query
-      idempotent: 1
-      side_effects: 0
+      idempotent: true
+      side_effects: false
       failure_rate: 0.01
 
   # Agent layer
@@ -119,12 +119,12 @@ components:
     capacity:
       max_connections: 100
       timeout_seconds: 120
-    parameters:
+    orchestrator_config:
       framework: langchain
       pattern: hierarchical
       max_agents: 5
       max_iterations: 30
-      circuit_breaker_on_hallucination: 1
+      circuit_breaker_on_hallucination: true
 
   - id: research-agent
     name: Research Agent
@@ -135,13 +135,13 @@ components:
     capacity:
       max_connections: 50
       timeout_seconds: 90
-    parameters:
+    agent_config:
       framework: langchain
       model_id: claude-sonnet-4-20250514
       max_context_tokens: 200000
       temperature: 0.3
       hallucination_risk: 0.03
-      requires_grounding: 1
+      requires_grounding: true
 
   - id: writer-agent
     name: Writer Agent
@@ -152,13 +152,13 @@ components:
     capacity:
       max_connections: 30
       timeout_seconds: 120
-    parameters:
+    agent_config:
       framework: langchain
       model_id: claude-sonnet-4-20250514
       max_context_tokens: 200000
       temperature: 0.7
       hallucination_risk: 0.08
-      requires_grounding: 0
+      requires_grounding: false
 
 dependencies:
   # User -> Router

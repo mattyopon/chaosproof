@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [11.0.0] — 2026-03-17
+
+### Added — AI Agent Resilience Simulation
+
+FaultRay now simulates AI agent failure modes alongside traditional infrastructure,
+enabling unified resilience analysis across the full stack.
+
+#### New Component Types
+- `ai_agent` — AI agent nodes (LangChain, CrewAI, AutoGen, etc.)
+- `llm_endpoint` — LLM API endpoints (Anthropic, OpenAI, etc.)
+- `tool_service` — Tools that agents use (web search, DB query, MCP servers)
+- `agent_orchestrator` — Multi-agent orchestration systems
+
+#### New Fault Types
+- `hallucination` — Agent produces ungrounded outputs
+- `context_overflow` — Context window exceeded
+- `llm_rate_limit` — LLM provider rate limiting
+- `token_exhaustion` — Token budget depleted
+- `tool_failure` — Tool service failure
+- `agent_loop` — Agent enters infinite loop
+- `prompt_injection` — Malicious input compromises agent behavior
+
+#### New Engines
+- **PREDICT**: Agent-specific cascade simulation with cross-layer hallucination detection
+- **ADOPT**: `AdoptionEngine` — Risk assessment for AI agent introduction
+- **MANAGE**: `AgentMonitorEngine` — Monitoring rule generation for agent infrastructure
+
+#### Cross-Layer Analysis
+- Infrastructure failures (DB down, cache miss) automatically assessed for agent hallucination risk
+- Blast radius calculation spans both infrastructure and agent layers
+
+#### CLI
+- `faultray agent assess <topology>` — Agent adoption risk assessment
+- `faultray agent monitor <topology>` — Generate monitoring rules
+- `faultray agent scenarios <topology>` — List agent-specific chaos scenarios
+
+#### YAML Schema
+- Schema version bumped to 4.0
+- New `agent_config`, `llm_config`, `tool_config`, `orchestrator_config` YAML syntax
+- Backward compatible — existing v3.0 topologies work unchanged
+
+### Changed
+- `CascadeEngine` now delegates to `AgentCascadeEngine` for agent-specific faults
+- `SimulationEngine.run_all_defaults()` now includes agent scenarios automatically
+
 ## [10.3.0] - 2026-03-16
 
 ### Added

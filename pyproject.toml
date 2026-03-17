@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "faultray"
-version = "10.3.0"
+version = "11.0.0"
 description = "FaultRay — Zero-risk infrastructure chaos engineering. Prove your availability ceiling mathematically."
 readme = "README.md"
 license = {text = "BSL-1.1"}
@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: System :: Monitoring",
     "Typing :: Typed",
 ]
-keywords = ["chaos-engineering", "sre", "devops", "infrastructure", "simulation", "reliability", "slo", "fault-injection", "resilience-testing", "availability", "disaster-recovery", "incident-response", "terraform", "prometheus", "dora-compliance"]
+keywords = ["chaos-engineering", "sre", "devops", "infrastructure", "simulation", "reliability", "slo", "fault-injection", "resilience-testing", "availability", "disaster-recovery", "incident-response", "terraform", "prometheus", "dora-compliance", "ai-agent", "agentic-ai"]
 dependencies = [
     "typer>=0.15",
     "rich>=13.0",

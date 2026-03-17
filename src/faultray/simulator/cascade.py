@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 from faultray.model.components import Component, HealthStatus
 from faultray.model.graph import InfraGraph
-from faultray.simulator import agent_cascade
 from faultray.simulator.scenarios import Fault, FaultType
 
 
@@ -101,6 +100,8 @@ class CascadeEngine:
 
     def simulate_fault(self, fault: Fault) -> CascadeChain:
         """Simulate a single fault and calculate cascade effects."""
+        from faultray.simulator import agent_cascade  # noqa: F811 — lazy to avoid circular import
+
         total = len(self.graph.components)
         chain = CascadeChain(
             trigger=f"{fault.fault_type.value} on {fault.target_component_id}",
@@ -414,6 +415,8 @@ class CascadeEngine:
         scenario. Likelihood (how close current state is to the failure) is tracked
         separately.
         """
+        from faultray.simulator import agent_cascade  # noqa: F811 — lazy to avoid circular import
+
         # Delegate agent-specific faults to agent_cascade
         if agent_cascade.is_agent_fault(fault.fault_type.value):
             effect = agent_cascade.apply_agent_direct_effect(component, fault.fault_type.value)
@@ -508,6 +511,8 @@ class CascadeEngine:
         Returns a value from 0.2 (very unlikely) to 1.0 (imminent/already happening).
         This reduces the risk score for scenarios that are far from actually occurring.
         """
+        from faultray.simulator import agent_cascade  # noqa: F811 — lazy to avoid circular import
+
         # Delegate agent-specific faults to agent_cascade
         agent_likelihood = agent_cascade.calculate_agent_likelihood(component, fault.fault_type.value)
         if agent_likelihood is not None:
