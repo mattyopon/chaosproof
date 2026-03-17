@@ -4,7 +4,7 @@
 > **Prove your system's availability ceiling mathematically.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-orange.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-19%2C757%20passed-brightgreen.svg)]()
 [![Version](https://img.shields.io/badge/version-10.3.0-blue.svg)]()
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](Dockerfile)
@@ -563,7 +563,7 @@ FaultRay has been evaluated against all known chaos engineering patents (US11397
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+BSL 1.1 (Business Source License) - see [LICENSE](LICENSE). Patent pending. Converts to Apache 2.0 on 2030-03-17.
 
 ---
 
@@ -651,4 +651,4 @@ FaultRay は「本番環境に障害を注入しない純粋なオフライン�
 
 ### ライセンス
 
-MIT License - [LICENSE](LICENSE) を参照
+BSL 1.1 (Business Source License) - [LICENSE](LICENSE) を参照。特許出願中。2030-03-17にApache 2.0へ移行。
