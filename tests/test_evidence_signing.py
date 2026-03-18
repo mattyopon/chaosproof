@@ -98,8 +98,30 @@ class TestEvidenceSignerVerify:
         other_signer = EvidenceSigner(signing_key="wrong-key")
         assert other_signer.verify_report(evidence, SAMPLE_REPORT) is False
 
-    def test_default_key_works(self) -> None:
-        signer = EvidenceSigner()  # default key
+    def test_no_key_raises_signing_key_error(self) -> None:
+        """EvidenceSigner without a key must raise SigningKeyError on sign attempt.
+
+        A hardcoded default key is not permitted in a financial compliance
+        context (DORA Art. 28 evidence integrity requirement).
+        """
+        from faultray.reporter.evidence_signing import SigningKeyError
+        import os
+        # Ensure the environment variable is not set so no key is resolved
+        env_backup = os.environ.pop("FAULTRAY_SIGNING_KEY", None)
+        env_file_backup = os.environ.pop("FAULTRAY_SIGNING_KEY_FILE", None)
+        try:
+            signer = EvidenceSigner()
+            with pytest.raises(SigningKeyError):
+                signer.sign_report(SAMPLE_REPORT, SAMPLE_TOPOLOGY, SAMPLE_RESULTS)
+        finally:
+            if env_backup is not None:
+                os.environ["FAULTRAY_SIGNING_KEY"] = env_backup
+            if env_file_backup is not None:
+                os.environ["FAULTRAY_SIGNING_KEY_FILE"] = env_file_backup
+
+    def test_explicit_key_works(self) -> None:
+        """An explicitly provided key must allow sign and verify."""
+        signer = EvidenceSigner(signing_key="explicit-test-key")
         ev = signer.sign_report(SAMPLE_REPORT, SAMPLE_TOPOLOGY, SAMPLE_RESULTS)
         assert signer.verify_report(ev, SAMPLE_REPORT) is True
 
