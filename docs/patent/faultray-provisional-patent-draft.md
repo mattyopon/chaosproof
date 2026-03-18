@@ -152,6 +152,30 @@ The invention provides a computer-implemented system and method comprising:
 
 13. **A chaos experiment recommender** that analyzes simulation results to identify coverage gaps in resilience testing and produces a prioritized list of recommended real-world chaos experiments, ranked by risk exposure, potential learning value, and coverage gap severity, thereby bridging the gap between in-memory simulation and real-environment validation.
 
+14. **An AI agent resilience simulation system** that extends the infrastructure topology model to include AI-specific component types and failure modes, enabling resilience evaluation of AI agent architectures within the same in-memory simulation framework:
+
+    **Four new component types in the graph model:**
+    - `ai_agent`: An LLM-powered agent that processes requests using tools and makes autonomous decisions, modeled as a vertex with attributes for context window size, supported tool list, fallback policy, and maximum retry count
+    - `llm_endpoint`: An LLM API endpoint (Anthropic, OpenAI, Google, self-hosted) with rate limit thresholds, SLA constraints, token-per-minute quotas, and cost-per-token attributes
+    - `tool_service`: An external tool or API that agents invoke (database queries, web search, MCP servers), modeled with availability SLA, response time distribution, and payload size constraints
+    - `agent_orchestrator`: A multi-agent coordination layer supporting sequential, parallel, and hierarchical orchestration patterns, modeled with coordination protocol type, timeout policy, and partial-failure handling strategy
+
+    **Seven agent-specific fault types not present in traditional infrastructure:**
+    - `hallucination`: The agent produces confident but factually incorrect output when grounding data sources (databases, retrieval indices, tool outputs) become unavailable, modeled as a probabilistic fault that activates when dependency edges to grounding `tool_service` nodes are severed
+    - `context_overflow`: The agent exceeds its token limit, causing loss of critical context from earlier in the conversation, modeled as a capacity fault triggered when cumulative input tokens across chained requests exceed the `ai_agent` vertex's context window attribute
+    - `llm_rate_limit`: The API provider throttles requests during peak load, modeled as a throughput constraint on `llm_endpoint` vertices with queueing delay propagation to upstream `ai_agent` vertices
+    - `token_exhaustion`: The API budget is depleted mid-operation, modeled as a resource exhaustion fault on `llm_endpoint` vertices that transitions the endpoint to DOWN state when cumulative token consumption exceeds the budget attribute
+    - `tool_failure`: External tools the agent depends on become unavailable, modeled as a standard component DOWN fault on `tool_service` vertices but with AI-specific cascade rules that may trigger `hallucination` faults on dependent `ai_agent` vertices
+    - `agent_loop`: The agent enters infinite retry or self-referential reasoning cycles, modeled as a livelock fault detected when an `ai_agent` vertex's simulated request count exceeds a threshold within a time window without state progression
+    - `prompt_injection`: Malicious input hijacks agent behavior through the input channel, modeled as a security fault that compromises the `ai_agent` vertex's output integrity, propagating tainted outputs to downstream consumers
+
+    **Cross-layer cascade analysis** that models how infrastructure failures (e.g., database outage) propagate through the AI layer (e.g., causing agent hallucination due to loss of grounding data), a failure mode invisible to traditional infrastructure monitoring. The cascade engine traverses edges that cross the boundary between infrastructure component types and AI component types, applying AI-specific propagation rules at each boundary crossing. This enables detection of emergent failure modes such as: database outage causing retrieval-augmented generation failure causing hallucination causing downstream decision errors; or network partition isolating an MCP server causing tool failure causing agent loop as the agent repeatedly retries the unavailable tool.
+
+    **Three analytical pillars applied to AI agent topologies:**
+    - **PREDICT:** Generate agent-specific chaos scenarios from topology, including simultaneous LLM endpoint rate limiting under traffic spikes, coordinated tool service failures, and context overflow under high-concurrency orchestration patterns
+    - **ADOPT:** Assess deployment risk with blast-radius analysis for agent components, quantifying how many downstream decisions, workflows, or end-user interactions are affected when a single LLM endpoint or tool service fails
+    - **MANAGE:** Generate monitoring rules from simulation results, including token consumption rate alerts, hallucination probability thresholds derived from grounding-source availability, agent loop detection rules, and context utilization warnings
+
 ## 4. DETAILED DESCRIPTION
 
 ### 4.1 System Architecture Overview
@@ -203,7 +227,7 @@ The invention provides a computer-implemented system and method comprising:
 The infrastructure topology is represented as a directed graph G = (V, E) where:
 
 - **V (Vertices):** Each vertex represents an infrastructure component with the following typed attributes:
-  - `type`: One of {load_balancer, web_server, app_server, database, cache, queue, storage, dns, external_api, custom}
+  - `type`: One of {load_balancer, web_server, app_server, database, cache, queue, storage, dns, external_api, ai_agent, llm_endpoint, tool_service, agent_orchestrator, custom}
   - `replicas`: Integer replica count for parallel redundancy modeling
   - `metrics`: Current resource utilization (CPU%, memory%, disk%, network connections, open files)
   - `capacity`: Resource limits (max connections, max RPS, connection pool size, timeout, retry multiplier)

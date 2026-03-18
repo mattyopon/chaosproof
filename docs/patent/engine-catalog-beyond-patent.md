@@ -1,13 +1,13 @@
 # Engine/Analyzer Classes Beyond the Patent's 36 Engines
 
-Generated: 2026-03-17
+Generated: 2026-03-18
 Purpose: Patent attorney review - additional IP not yet covered in provisional patent draft
 
 ## Summary
 
 - Patent draft claims: **36 engines**
-- Actually implemented engine/analyzer classes: **~160 additional classes**
-- All implemented in `/src/faultray/simulator/`
+- Actually implemented engine/analyzer classes: **~164 additional classes**
+- All implemented in `/src/faultray/simulator/` (integration/reporter classes in respective subdirectories)
 - All pure Python (no external ML dependencies)
 
 ---
@@ -201,3 +201,14 @@ Purpose: Patent attorney review - additional IP not yet covered in provisional p
 | `MultiCloudResilienceAnalyzer` | `multi_cloud_resilience.py` | Multi-cloud/hybrid deployment resilience |
 | `MultiEnvAnalyzer` | `multi_env.py` | Cross-environment resilience comparison |
 | `MultiTenantIsolationEngine` | `multi_tenant_isolation.py` | Multi-tenant isolation verification |
+
+---
+
+### MCP & Integration Layer (4 classes)
+
+| Class | File | Description |
+|---|---|---|
+| `OvermindBridge` | `integrations/overmind_bridge.py` | Overmind blast radius integration with cascade enrichment |
+| `AWSResilienceHubBridge` | `integrations/aws_resilience_hub_bridge.py` | AWS Resilience Hub pre-deploy prediction bridge |
+| `DORAuditReportGenerator` | `reporter/dora_audit_report.py` | DORA regulator-ready audit package generator with 8-file export |
+| `MCPServer` | `mcp_server.py` | Model Context Protocol server for AI agent integration (12 tools) |
