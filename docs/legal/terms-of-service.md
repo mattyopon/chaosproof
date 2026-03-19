@@ -1,8 +1,5 @@
 # FaultRay Terms of Service
 
-> **DRAFT -- Not yet reviewed by legal counsel.**
-> This document is a working draft and does not constitute a binding legal agreement until formally reviewed, approved, and published by qualified legal counsel.
-
 **Effective Date:** [To be determined]
 **Last Updated:** 2026-03-16
 
@@ -261,4 +258,4 @@ For questions about these Terms of Service:
 
 ---
 
-*DRAFT -- This document has not been reviewed by legal counsel. It is provided as a starting point and must be reviewed and approved by a qualified attorney before publication or enforcement.*
+*本文書は法務レビュー前の暫定版です。*
