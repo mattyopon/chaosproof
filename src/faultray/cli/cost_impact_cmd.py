@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json as json_module
 from pathlib import Path
 
 import typer

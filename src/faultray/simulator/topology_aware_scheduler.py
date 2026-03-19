@@ -9,15 +9,13 @@ respecting resource limits.
 from __future__ import annotations
 
 import hashlib
-import math
 from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType
+from faultray.model.components import Component
 from faultray.model.graph import InfraGraph
 
 

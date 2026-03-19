@@ -20,16 +20,13 @@ integration can be tested without a Datadog account.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
 
 import httpx
 
 from faultray.model.graph import InfraGraph
-from faultray.simulator.cascade import CascadeChain, CascadeEngine
 from faultray.simulator.engine import SimulationEngine, SimulationReport
 
 logger = logging.getLogger(__name__)

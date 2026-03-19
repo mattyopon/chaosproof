@@ -12,17 +12,13 @@ and circuit-breaker testing-coverage analysis.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 from faultray.model.components import (
     CircuitBreakerConfig,
-    Component,
     ComponentType,
-    Dependency,
-    RetryStrategy,
 )
 from faultray.model.graph import InfraGraph
 

@@ -15,7 +15,6 @@ Usage:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -23,11 +22,9 @@ from enum import Enum
 import networkx as nx
 
 from faultray.model.components import (
-    CircuitBreakerConfig,
     Component,
     Dependency,
     HealthStatus,
-    RetryStrategy,
 )
 from faultray.model.graph import InfraGraph
 

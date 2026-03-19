@@ -9,15 +9,12 @@ coordination, connection storm prevention, and pool metrics modelling.
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Sequence
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component
 from faultray.model.graph import InfraGraph
 
 

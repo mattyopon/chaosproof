@@ -11,13 +11,11 @@ integration analysis, and a custom scoring rubric.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Sequence
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

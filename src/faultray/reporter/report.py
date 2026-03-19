@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
-from faultray.model.components import ComponentType, HealthStatus
+from faultray.model.components import HealthStatus
 from faultray.model.graph import InfraGraph
 from faultray.simulator.engine import SimulationReport, ScenarioResult
 

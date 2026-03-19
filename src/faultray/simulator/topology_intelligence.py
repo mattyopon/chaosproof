@@ -7,7 +7,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

@@ -19,7 +19,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 
@@ -304,7 +304,7 @@ class DependencyDriftEngine:
                             component_id=dep_comp.id,
                             drift_type=DriftType.CAPACITY_IMBALANCE,
                             severity=DriftSeverity.HIGH,
-                            expected_value=f"util<70%",
+                            expected_value="util<70%",
                             actual_value=f"util={target_util:.0f}%",
                             remediation=(
                                 f"{dep_comp.name} is at {target_util:.0f}% utilization "
@@ -732,7 +732,7 @@ class DependencyDriftEngine:
                             component_id=source_id,
                             drift_type=DriftType.PROTOCOL_MISMATCH,
                             severity=DriftSeverity.MEDIUM,
-                            expected_value=f"consistent_protocol",
+                            expected_value="consistent_protocol",
                             actual_value=f"protocol={proto} (target has: {proto_list})",
                             remediation=(
                                 f"Standardise protocol for connections to {target.name}"

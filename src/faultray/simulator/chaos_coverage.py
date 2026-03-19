@@ -14,7 +14,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
 from faultray.model.graph import InfraGraph
 
 

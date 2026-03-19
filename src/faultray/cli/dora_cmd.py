@@ -108,7 +108,6 @@ def dora_assess(
     report = gen.generate_full_report(graph, reporting_entity=entity)
 
     if json_output:
-        import json
         out = {
             "report_id": report.report_id,
             "overall_status": report.overall_status.value,
@@ -321,7 +320,6 @@ def dora_gap_analysis(
     report = gen.generate_full_report(graph, reporting_entity=entity)
 
     if json_output:
-        import json
         out = {
             "report_id": report.report_id,
             "gap_analyses": [
@@ -1022,7 +1020,6 @@ def dora_tlpt_readiness(
     readiness_status, deficiencies = assessor.assess_readiness(engagement)
 
     if json_output:
-        import json
         out = {
             "tlpt_id": engagement.tlpt_id,
             "readiness_status": readiness_status.value,
@@ -1255,14 +1252,12 @@ def dora_rts_export(
         faultray dora rts-export infra.yaml --output ./rts-export/
         faultray dora rts-export infra.yaml --output ./rts-export/ --format csv
     """
-    import json
 
     from faultray.simulator.dora_rts_formats import (
         RegisterOfInformationFormatter,
         ThirdPartyProviderRecord,
         CriticalityAssessment,
         RiskManagementFrameworkFormatter,
-        RegulatoryPackageExporter,
     )
     from faultray.model.components import ComponentType
 

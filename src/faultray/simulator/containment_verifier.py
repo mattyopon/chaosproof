@@ -13,14 +13,6 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import (
-    Component,
-    ComponentType,
-    HealthStatus,
-    Dependency,
-    CircuitBreakerConfig,
-    FailoverConfig,
-)
 from faultray.model.graph import InfraGraph
 
 

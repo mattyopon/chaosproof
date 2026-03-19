@@ -11,14 +11,13 @@ All data models use Pydantic v2 BaseModel.
 from __future__ import annotations
 
 import logging
-import math
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component, HealthStatus
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

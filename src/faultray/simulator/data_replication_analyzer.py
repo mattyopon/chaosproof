@@ -18,9 +18,8 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import HealthStatus
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

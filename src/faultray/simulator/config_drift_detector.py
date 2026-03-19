@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from faultray.model.components import Component, Dependency
+from faultray.model.components import Component
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

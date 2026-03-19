@@ -117,7 +117,6 @@ def load_infrastructure(yaml_content: str) -> str:
     Returns:
         A summary of the loaded infrastructure (component count, resilience score).
     """
-    import io
 
     import yaml as _yaml
 

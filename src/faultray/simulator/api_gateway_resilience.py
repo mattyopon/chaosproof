@@ -14,15 +14,12 @@ validation, and gateway caching strategy and invalidation.
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import ComponentType
 from faultray.model.graph import InfraGraph
 
 

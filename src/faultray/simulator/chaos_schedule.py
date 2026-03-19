@@ -8,15 +8,11 @@ validation.
 
 from __future__ import annotations
 
-import hashlib
-import itertools
-import math
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import ComponentType, HealthStatus
 from faultray.model.graph import InfraGraph
 
 

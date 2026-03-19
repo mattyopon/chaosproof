@@ -545,7 +545,7 @@ class EvidenceSigner:
 
     def _sign_with_cert(self, payload: str) -> tuple[str, str]:
         """Sign ``payload`` with the loaded RSA private key.  Returns (hex_sig, algo)."""
-        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import padding
 
         raw_sig = self._private_key.sign(

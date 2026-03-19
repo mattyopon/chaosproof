@@ -17,13 +17,11 @@ TLS/SSL certificate weaknesses before they cause outages.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Sequence
 
-from faultray.model.components import Component, ComponentType, Dependency
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

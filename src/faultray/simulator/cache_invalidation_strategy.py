@@ -12,14 +12,13 @@ window analysis across cache layers.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Sequence
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

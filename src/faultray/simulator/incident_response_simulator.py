@@ -25,7 +25,6 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
 
 from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
@@ -1404,7 +1403,7 @@ class IncidentResponseSimulator:
         entries.append(TimelineEntry(
             timestamp_offset_minutes=round(detect_time, 1),
             phase="Detection",
-            description=f"Alert detected and routed to on-call",
+            description="Alert detected and routed to on-call",
             actor="Alert Router",
             action_type="notification",
         ))

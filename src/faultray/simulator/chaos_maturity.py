@@ -657,7 +657,7 @@ class ChaosMaturityEngine:
             if combined >= 0.5:
                 evidence.append(f"Autoscaling: {as_count}/{total}, Failover: {fo_count}/{total}")
             else:
-                gaps.append(f"Low autoscaling/failover coverage")
+                gaps.append("Low autoscaling/failover coverage")
                 actions.append("Enable autoscaling and failover on more components")
 
             avg_auto = sum(c.team.automation_percent for c in components) / total

@@ -8,14 +8,13 @@ data plane saturation, and policy enforcement.
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

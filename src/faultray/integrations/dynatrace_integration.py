@@ -30,10 +30,8 @@ from faultray.model.components import (
     Component,
     ComponentType,
     Dependency,
-    ResourceMetrics,
 )
 from faultray.model.graph import InfraGraph
-from faultray.simulator.cascade import CascadeEngine
 from faultray.simulator.engine import SimulationEngine
 
 logger = logging.getLogger(__name__)

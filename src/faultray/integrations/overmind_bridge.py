@@ -60,7 +60,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from faultray.model.components import Component, ComponentType, Dependency, HealthStatus
 from faultray.model.graph import InfraGraph
 from faultray.simulator.cascade import CascadeChain, CascadeEngine
 from faultray.simulator.scenarios import Fault, FaultType

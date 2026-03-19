@@ -9,13 +9,11 @@ accountability mappings so teams can keep flag sprawl under control.
 
 from __future__ import annotations
 
-import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

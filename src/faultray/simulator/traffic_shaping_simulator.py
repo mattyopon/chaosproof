@@ -17,11 +17,9 @@ import math
 import random
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Sequence
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

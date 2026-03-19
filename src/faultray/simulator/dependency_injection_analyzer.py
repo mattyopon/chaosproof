@@ -18,9 +18,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Sequence
 
-from faultray.model.components import Component, ComponentType, Dependency
 from faultray.model.graph import InfraGraph
 
 

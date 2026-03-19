@@ -14,7 +14,6 @@ Regulatory references:
 from __future__ import annotations
 
 import logging
-import math
 from datetime import date, datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -24,7 +23,7 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from faultray.model.graph import InfraGraph
 
-from faultray.model.components import Component, ComponentType
+from faultray.model.components import ComponentType
 
 logger = logging.getLogger(__name__)
 

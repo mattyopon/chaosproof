@@ -14,7 +14,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

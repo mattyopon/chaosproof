@@ -79,7 +79,6 @@ def predict(
     """
     from faultray.integrations.aws_resilience_hub_bridge import (
         AWSResilienceHubBridge,
-        ResiliencyPolicy,
     )
 
     if not plan_file.exists():
@@ -180,7 +179,7 @@ def compare(
 
     if not json_output:
         console.print(
-            f"[cyan]Comparing FaultRay prediction against Resilience Hub assessment...[/]"
+            "[cyan]Comparing FaultRay prediction against Resilience Hub assessment...[/]"
         )
 
     policy = _load_policy(policy_file, min_score)

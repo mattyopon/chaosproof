@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from faultray.api.auth import hash_api_key
 from faultray.api.database import (
     AuditLog,
     Base,
@@ -32,6 +33,10 @@ from faultray.api.database import (
     reset_engine,
     _get_engine,
 )
+
+# Test API key used for authenticated requests
+_TEST_API_KEY = "test-extended-api-key"
+_TEST_API_KEY_HASH = hash_api_key(_TEST_API_KEY)
 from faultray.api.server import (
     RateLimiter,
     _rate_limiter,
@@ -139,6 +144,14 @@ def db_setup(tmp_path: Path):
     Base.metadata.create_all(sync_engine)
     sync_engine.dispose()
 
+    # Seed a test user so auth doesn't block API requests
+    _seed_sync(db_path, "users", [{
+        "email": "test@faultray.local",
+        "name": "Test Admin",
+        "api_key_hash": _TEST_API_KEY_HASH,
+        "role": "admin",
+    }])
+
     # Now configure the global async engine/session factory
     _get_engine(url)
     get_session_factory(url)
@@ -197,9 +210,11 @@ def db_client(db_setup):
 
     Patches init_db to prevent the lifespan from overwriting our test engine.
     Attaches db_path as tc._db_path for sync seeding.
+    Includes auth headers so API endpoints don't return 401/403.
     """
     with patch("faultray.api.database.init_db", new_callable=AsyncMock):
         tc = TestClient(app, raise_server_exceptions=False)
+        tc.headers["Authorization"] = f"Bearer {_TEST_API_KEY}"
         tc._db_path = db_setup
         yield tc
 
@@ -219,6 +234,7 @@ def demo_db_client(db_setup):
     set_graph(graph)
     with patch("faultray.api.database.init_db", new_callable=AsyncMock):
         tc = TestClient(app, raise_server_exceptions=False)
+        tc.headers["Authorization"] = f"Bearer {_TEST_API_KEY}"
         tc._db_path = db_setup
         yield tc
 
@@ -257,7 +273,7 @@ class TestRateLimiter:
 class TestRateLimitMiddleware:
     """Cover line 133: middleware returning 429."""
 
-    def test_rate_limit_429_response(self, client):
+    def test_rate_limit_429_response(self, db_client):
         """Exhaust rate limiter to trigger 429 response (line 133)."""
         # Replace global rate limiter with a very small one
         import faultray.api.server as srv
@@ -265,11 +281,11 @@ class TestRateLimitMiddleware:
         srv._rate_limiter = RateLimiter(max_requests=1, window_seconds=60)
         try:
             # First request succeeds
-            resp1 = client.get("/api/graph-data")
+            resp1 = db_client.get("/api/graph-data")
             assert resp1.status_code == 200
 
             # Second request should be rate limited
-            resp2 = client.get("/api/graph-data")
+            resp2 = db_client.get("/api/graph-data")
             assert resp2.status_code == 429
             data = resp2.json()
             assert data["error"]["code"] == 429
@@ -423,12 +439,12 @@ class TestDashboardWithReport:
 # ===================================================================
 
 class TestAnalyzeWithNoReport:
-    def test_api_analyze_runs_simulation_if_no_report(self, demo_client):
+    def test_api_analyze_runs_simulation_if_no_report(self, demo_db_client):
         """Cover lines 391-392: run simulation if _last_report is None."""
         import faultray.api.server as srv
         srv._last_report = None
         try:
-            resp = demo_client.get("/api/analyze")
+            resp = demo_db_client.get("/api/analyze")
             assert resp.status_code == 200
             data = resp.json()
             assert "summary" in data
@@ -1348,6 +1364,10 @@ class TestDBErrorBranches:
     def test_create_project_db_error(self, client):
         """Cover lines 701-703: create_project returns 503 on DB error."""
         with patch(
+            "faultray.api.auth.get_current_user",
+            new_callable=AsyncMock,
+            return_value=None,
+        ), patch(
             "faultray.api.database.get_session_factory",
             side_effect=Exception("DB unavailable"),
         ):
@@ -1359,6 +1379,10 @@ class TestDBErrorBranches:
     def test_list_projects_db_error(self, client):
         """Cover lines 742-744: list_projects returns fallback on DB error."""
         with patch(
+            "faultray.api.auth.get_current_user",
+            new_callable=AsyncMock,
+            return_value=None,
+        ), patch(
             "faultray.api.database.get_session_factory",
             side_effect=Exception("DB unavailable"),
         ):
@@ -1371,6 +1395,10 @@ class TestDBErrorBranches:
     def test_list_audit_logs_db_error(self, client):
         """Cover lines 791-793: list_audit_logs returns fallback on DB error."""
         with patch(
+            "faultray.api.auth.get_current_user",
+            new_callable=AsyncMock,
+            return_value=None,
+        ), patch(
             "faultray.api.database.get_session_factory",
             side_effect=Exception("DB unavailable"),
         ):

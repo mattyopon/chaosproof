@@ -17,15 +17,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import math
-from collections import deque
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

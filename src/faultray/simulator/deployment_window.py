@@ -7,7 +7,6 @@ deployment windows and simulates peak-hour deployment impact.
 
 from __future__ import annotations
 
-import math
 from enum import Enum
 
 from pydantic import BaseModel, Field

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 

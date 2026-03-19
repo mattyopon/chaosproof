@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from faultray.model.components import Component, ComponentType, Dependency
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)
@@ -1304,7 +1303,7 @@ class PodDisruptionAnalyzer:
                         "DaemonSet with fully restrictive PDB will block "
                         "all node drains and cluster upgrades."
                     ),
-                    current_config=f"maxUnavailable=0 (DaemonSet)",
+                    current_config="maxUnavailable=0 (DaemonSet)",
                     suggested_config="maxUnavailable=1",
                     estimated_improvement="Allow node-by-node upgrades",
                 ))

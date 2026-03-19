@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from faultray.model.components import Component, ComponentType, HealthStatus
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
-from faultray.simulator.cascade import CascadeEffect
 
 
 @dataclass

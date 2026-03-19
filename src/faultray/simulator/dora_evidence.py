@@ -22,11 +22,9 @@ This module is the core evaluator. Higher-level report formatting lives in
 
 from __future__ import annotations
 
-import math
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 

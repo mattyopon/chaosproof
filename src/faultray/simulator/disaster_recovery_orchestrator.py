@@ -23,12 +23,11 @@ procedures.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component
 from faultray.model.graph import InfraGraph
 
 

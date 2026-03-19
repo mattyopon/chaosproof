@@ -59,10 +59,23 @@ def _util_color(util: float) -> str:
 # ---------------------------------------------------------------------------
 
 def _build_finding(result: ScenarioResult) -> dict:
-    """Convert a ScenarioResult into a template-friendly dict."""
+    """Convert a ScenarioResult (or DynamicScenarioResult) into a template-friendly dict."""
     effects = []
     prev_time = 0
-    for eff in result.cascade.effects:
+
+    # DynamicScenarioResult has snapshots with cascade_effects instead of cascade
+    if hasattr(result, "cascade"):
+        raw_effects = result.cascade.effects
+    elif hasattr(result, "snapshots"):
+        raw_effects = [
+            eff
+            for snap in result.snapshots
+            for eff in snap.cascade_effects
+        ]
+    else:
+        raw_effects = []
+
+    for eff in raw_effects:
         time_str = ""
         if eff.estimated_time_seconds > 0:
             delta = eff.estimated_time_seconds - prev_time
@@ -77,10 +90,15 @@ def _build_finding(result: ScenarioResult) -> dict:
             "time_str": time_str,
         })
 
+    # DynamicScenarioResult uses peak_severity instead of risk_score
+    risk = getattr(result, "risk_score", None)
+    if risk is None:
+        risk = getattr(result, "peak_severity", 0.0)
+
     return {
         "name": result.scenario.name,
         "description": result.scenario.description,
-        "risk_score": f"{result.risk_score:.1f}",
+        "risk_score": f"{risk:.1f}",
         "effects": effects,
     }
 

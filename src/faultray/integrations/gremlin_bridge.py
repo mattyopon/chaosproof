@@ -34,7 +34,6 @@ import httpx
 from faultray.model.components import HealthStatus
 from faultray.model.graph import InfraGraph
 from faultray.simulator.cascade import CascadeChain, CascadeEngine
-from faultray.simulator.engine import SimulationEngine
 from faultray.simulator.scenarios import Fault, FaultType, Scenario
 
 logger = logging.getLogger(__name__)

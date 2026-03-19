@@ -126,8 +126,8 @@ class TestGetCurrentUser:
         result = await get_current_user(request, credentials=None)
         assert result is None
 
-    async def test_protected_path_no_users_returns_none(self, auth_db):
-        """When no users exist in DB, auth is disabled (backward-compat)."""
+    async def test_protected_path_no_users_raises_403(self, auth_db):
+        """When no users exist in DB, protected paths raise 403."""
         factory, engine = auth_db
 
         # Monkey-patch get_session_factory to use our test DB
@@ -137,8 +137,10 @@ class TestGetCurrentUser:
 
         try:
             request = FakeRequest("/api/simulate")
-            result = await get_current_user(request, credentials=None)
-            assert result is None
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(request, credentials=None)
+            assert exc_info.value.status_code == 403
+            assert "No users configured" in exc_info.value.detail
         finally:
             auth_module.get_session_factory = original_factory
 

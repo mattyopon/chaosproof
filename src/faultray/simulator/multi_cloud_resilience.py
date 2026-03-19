@@ -24,7 +24,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
-from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

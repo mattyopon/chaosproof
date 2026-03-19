@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType
+from faultray.model.components import Component
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

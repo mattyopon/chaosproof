@@ -15,14 +15,13 @@ resource consumption spike during cold start.
 from __future__ import annotations
 
 import logging
-import math
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from faultray.model.components import Component, ComponentType, Dependency
+from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph
 
 logger = logging.getLogger(__name__)

@@ -13,11 +13,10 @@ from __future__ import annotations
 import logging
 import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 
-from pydantic import BaseModel, Field
 
 from faultray.model.components import Component, ComponentType
 from faultray.model.graph import InfraGraph

@@ -7,7 +7,6 @@ recommendations for robust health checking strategies.
 
 from __future__ import annotations
 
-import math
 from enum import Enum
 
 from pydantic import BaseModel, Field

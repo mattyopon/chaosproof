@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from faultray.model.graph import InfraGraph
-from faultray.simulator.cascade import CascadeChain, CascadeEngine, CascadeEffect
+from faultray.simulator.cascade import CascadeChain, CascadeEngine
 from faultray.simulator.scenarios import Fault, FaultType
 
 logger = logging.getLogger(__name__)

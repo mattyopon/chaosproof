@@ -13,7 +13,7 @@ from statistics import linear_regression
 
 from pydantic import BaseModel, Field
 
-from faultray.model.components import Component, ComponentType
+from faultray.model.components import ComponentType
 from faultray.model.graph import InfraGraph
 
 
