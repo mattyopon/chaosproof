@@ -5791,7 +5791,7 @@ In an alternative embodiment, the system continuously compares simulation predic
 
 ## APPENDIX A: Implementation Reference
 
-The described system is implemented as the FaultRay software, available at https://github.com/mattyopon/faultray under the Business Source License 1.1 (BSL-1.1). The first public commit was made on March 9, 2026. The implementation is in Python 3.11+ and utilizes the networkx library for graph operations and pydantic for data model validation. All patent rights are reserved by the inventor; the source license does not grant any patent rights for commercial or production use.
+The described system is implemented as the FaultRay software, available at https://github.com/mattyopon/faultray under the Business Source License 1.1 (BSL-1.1). The implementation was first committed on March 9, 2026. The implementation is in Python 3.11+ and utilizes the networkx library for graph operations and pydantic for data model validation. All patent rights are reserved by the inventor; the source license does not grant any patent rights for commercial or production use.
 
 Key implementation files corresponding to the described components:
 - Graph model: `src/faultray/model/graph.py` (InfraGraph class using networkx DiGraph)
