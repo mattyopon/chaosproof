@@ -756,9 +756,15 @@ Fastly CDN outage          & 2021 & 3 components & 3 components & 1.000 & 1.000 
 \end{tabular}
 \end{table*}
 
-The perfect $F_1$ score indicates that \textsc{FaultRay}'s cascade engine
-correctly identifies the set of affected components for all tested
-incidents.  The severity accuracy of 0.819 reflects the inherent
+The perfect $F_1$ score warrants careful interpretation.
+Topologies were constructed \emph{post-hoc} from public incident reports,
+so the topology model already encodes knowledge of which components were
+affected.  The $F_1 = 1.000$ therefore validates that the cascade engine's
+propagation rules correctly reproduce \emph{known} cascade paths given
+an accurate topology, rather than demonstrating predictive power on
+unseen infrastructures.  Prospective validation---applying \textsc{FaultRay}
+to a live topology \emph{before} an incident occurs---is future work.
+The severity accuracy of 0.819 reflects the inherent
 difficulty of mapping continuous severity scores to discrete incident
 severity levels (critical/high/medium/low), as real-world incident
 reports use inconsistent severity definitions.
@@ -848,9 +854,12 @@ validation on live systems is future work.
 \textbf{Hallucination model calibration.}
 The hallucination probability model (Eq.~\ref{eq:hallucination}) uses
 default parameters ($\delta = 0.5$, $\omega = 0.3$) derived from
-engineering judgment rather than empirical measurement.  Calibrating
-these parameters against real AI agent failure data is an important
-direction.
+engineering judgment rather than empirical measurement.  The model is
+currently a \emph{theoretical framework} that has not been validated
+against real AI agent failure data in production.  Calibrating
+these parameters---and validating the independence assumption underlying
+the combined probability formula---against measured hallucination rates
+under infrastructure degradation is a critical direction for future work.
 
 \textbf{Scalability.}
 The $O(|C| + |E|)$ cascade engine scales well to hundreds of
