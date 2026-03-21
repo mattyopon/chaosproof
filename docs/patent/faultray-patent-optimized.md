@@ -1,5 +1,5 @@
 **Title of Invention:**
-System and Method for In-Memory Infrastructure Resilience Simulation Using Graph-Based Topology Modeling, Multi-Layer Availability Analysis, and AI Agent Cross-Layer Failure Simulation
+System and Method for In-Memory Infrastructure Resilience Simulation Using Graph-Based Cascade Propagation with Multi-Layer Availability Constraints and AI Agent Cross-Layer Failure Modeling
 
 **Inventor:** Yutaro Maeda
 
@@ -13,13 +13,13 @@ System and Method for In-Memory Infrastructure Resilience Simulation Using Graph
 
 ## ABSTRACT
 
-A computer-implemented system and method for evaluating infrastructure resilience entirely in computer memory without affecting real infrastructure. An infrastructure topology — including both traditional infrastructure components and AI agent components — is modeled as a directed graph in which nodes represent components with typed attributes and edges represent typed dependencies. Fault scenarios are automatically generated and failure propagation is simulated through the graph using a formally-specified cascade engine grounded in Labeled Transition System semantics with proven termination, soundness, and monotonicity properties. A multi-layer availability limit model computes mathematically independent availability ceilings across five or more distinct constraint categories, establishing the theoretical maximum achievable availability. The system further models AI agent failure modes including hallucination probability as a computable function of infrastructure state, cross-layer cascade from infrastructure failure through data source unavailability to agent behavior degradation, and agent-to-agent cascade propagation with compound probability computation.
+A computer-implemented system and method for evaluating infrastructure resilience entirely in computer memory without affecting real infrastructure. An infrastructure topology — including both traditional infrastructure components and AI agent components — is modeled as a directed graph in which nodes represent components with typed attributes and edges represent typed dependencies classified as required, optional, or asynchronous. Fault scenarios are automatically generated and failure propagation is simulated through the graph using a cascade engine whose semantics are formally defined as a Labeled Transition System (LTS) with a state tuple of (health map, latency map, elapsed time, visited set) and typed transition rules that differentiate propagation behavior based on dependency type. Per-layer availability ceilings are computed across at least five independent constraint layers — hardware, software, theoretical, operational, and external SLA — and the binding constraint layer producing the minimum availability ceiling is identified. Simulation results exceeding any layer ceiling are flagged as physically unrealizable, and infrastructure modification specifications are generated to relax the binding constraint. The system further models AI agent failure modes including hallucination probability as a computable function of infrastructure state, cross-layer cascade from infrastructure failure through data source unavailability to agent behavior degradation, and agent-to-agent cascade propagation with compound probability computation, generating infrastructure monitoring thresholds that maintain agent hallucination probability below configured acceptable levels.
 
 ---
 
 ## 1. FIELD OF THE INVENTION
 
-The present invention relates to systems and methods for evaluating the resilience of computing infrastructure. More specifically, the invention pertains to an in-memory simulation system that models infrastructure topologies as directed graphs, injects virtual faults into the model without affecting any real systems, computes availability limits through a novel multi-layer mathematical framework, and simulates AI agent failure modes — including hallucination, context overflow, and agent-to-agent cascade propagation — as functions of infrastructure state.
+The present invention relates to systems and methods for evaluating the resilience of computing infrastructure. More specifically, the invention pertains to an in-memory simulation system that models infrastructure topologies as directed graphs, injects virtual faults into the model without affecting any real systems, simulates failure propagation using formally-specified Labeled Transition System semantics with dependency-type-aware cascade rules, computes availability limits through a multi-layer mathematical framework that constrains simulation results by physically realizable ceilings, and simulates AI agent failure modes — including hallucination, context overflow, and agent-to-agent cascade propagation — as functions of infrastructure state, revealing emergent failure modes invisible to infrastructure monitoring and AI evaluation benchmarks operating independently.
 
 ## 2. BACKGROUND OF THE INVENTION
 
@@ -31,7 +31,7 @@ The emergence of AI agent architectures — where LLM-powered agents orchestrate
 
 ### 2.2 Limitations of Existing Approaches
 
-Existing approaches to infrastructure resilience evaluation fall into three categories, all with significant limitations:
+Existing approaches to infrastructure resilience evaluation fall into several categories, all with significant limitations:
 
 **A) Real-Environment Fault Injection (Chaos Engineering)**
 
@@ -45,35 +45,47 @@ Tools such as HPE's SPOF analysis (US9280409B2) perform static analysis of infra
 
 LLM evaluation benchmarks and red-teaming tools evaluate model outputs for hallucination, toxicity, and correctness at the prompt/response level. They do not simulate the infrastructure conditions that cause hallucinations and do not model how infrastructure failures propagate through data availability layers to affect agent behavior.
 
+**D) Graph-Based Reliability Analysis**
+
+Existing graph-based approaches to infrastructure reliability, such as Krasnovsky & Zorkin's connectivity-based model, use graph connectivity metrics (vertex connectivity, edge connectivity) to assess resilience. These approaches treat all dependencies as equivalent, do not distinguish between required, optional, and asynchronous dependency types, do not model cascade propagation dynamics using formal transition semantics, lack circuit breaker containment modeling, and cannot simulate the differential behavior of failure propagation across dependency types. They compute static graph-theoretic metrics rather than simulating dynamic failure cascade behavior.
+
+**E) Traditional Reliability Engineering Tools**
+
+Tools such as Isograph Reliability Workbench and similar RAMS (Reliability, Availability, Maintainability, Safety) software compute availability using single-layer models — typically hardware reliability (MTBF/MTTR) with redundancy configurations. They do not compute independent availability ceilings across multiple constraint layers (software, operational, theoretical noise floor, external SLA), cannot identify the binding constraint layer limiting system availability, and do not generate infrastructure modification specifications targeting the specific constraint layer that limits availability.
+
+**F) Graph Analysis for Fault Targeting**
+
+Dell's US11356324B2 performs graph analysis of infrastructure topologies to select optimal targets for fault injection into real environments. This approach uses graph metrics for target selection rather than performing in-memory failure simulation, requires access to actual infrastructure for fault execution, and does not model cascade propagation dynamics, multi-layer availability constraints, or AI agent failure behavior.
+
+**G) AI Agent Chaos Engineering**
+
+Emerging tools such as agent-chaos/balagan-agent inject real faults into AI agent environments to observe failure behavior. These approaches inject actual faults rather than simulating in-memory, do not model hallucination probability as a computable function of infrastructure state, and cannot exhaustively evaluate all failure combinations across infrastructure and agent layers.
+
 ### 2.3 Unmet Need
 
 There exists no system that:
 1. Models infrastructure topology entirely in memory without requiring access to real systems
-2. Simulates thousands of failure scenarios automatically from a topology definition
-3. Computes mathematically rigorous availability limits accounting for software, hardware, operational, and external dependency factors
-4. Models dynamic behaviors including cascading failures, autoscaling responses, circuit breaker activation, and failover sequences
-5. Simulates AI agent failure modes as functions of infrastructure state, including cross-layer cascade from infrastructure failure to agent hallucination to downstream decision errors
-6. Produces quantitative resilience scores that enable comparison across different infrastructure designs
+2. Simulates thousands of failure scenarios automatically from a topology definition using formally-specified Labeled Transition System semantics with dependency-type-aware cascade rules
+3. Computes mathematically rigorous availability limits across multiple independent constraint layers and constrains simulation results by physically realizable ceilings
+4. Models dynamic behaviors including cascading failures with differential propagation based on dependency type, autoscaling responses, circuit breaker activation, and failover sequences
+5. Simulates AI agent failure modes as functions of infrastructure state, including cross-layer cascade from infrastructure failure to agent hallucination to downstream decision errors, and generates infrastructure monitoring thresholds from hallucination probability computations
+6. Produces quantitative resilience scores and infrastructure modification specifications that identify specific changes to relax binding constraints
 
 The present invention addresses all of these needs.
 
 ## 3. SUMMARY OF THE INVENTION
 
-The invention provides a computer-implemented system and method built on three core innovations:
+The invention provides a computer-implemented system and method built on two core innovations:
 
-**Innovation 1: Formally-Specified Graph-Based Cascade Simulation**
+**Innovation 1: Formally-Specified Graph-Based Cascade Simulation with Multi-Layer Availability Constraints**
 
-An infrastructure topology is modeled as a directed graph stored entirely in computer memory, where nodes represent infrastructure components (including AI agents, LLM endpoints, tool services, and agent orchestrators) annotated with typed attributes, and edges represent typed dependencies (required, optional, asynchronous). Fault scenarios are automatically generated from the graph, and failure propagation is simulated using a cascade engine whose semantics are formally defined as a Labeled Transition System (LTS) with eight transition rules governing fault injection, cascade propagation through dependency types, circuit breaker containment, timeout propagation, and termination. The cascade engine has proven termination in O(|C| + |E|) time for acyclic graphs, proven monotonicity of failure (health can only worsen during simulation), and proven causality (every failure has an explainable causal chain to the injected fault).
+An infrastructure topology is modeled as a directed graph stored entirely in computer memory, where nodes represent infrastructure components (including AI agents, LLM endpoints, tool services, and agent orchestrators) annotated with typed attributes including component type, replica count, MTBF, MTTR, and operational profile, and edges represent typed dependencies classified as required, optional, or asynchronous. Fault scenarios are automatically generated from the graph, and failure propagation is simulated using a cascade engine whose semantics are formally defined as a Labeled Transition System (LTS) comprising a state tuple of (health map, latency map, elapsed time, visited set) and typed transition rules that differentiate propagation behavior based on dependency type — required dependencies propagate failures unconditionally, optional dependencies degrade performance without cascade, and asynchronous dependencies propagate with configurable delay. Per-layer availability ceilings are computed across at least five independent constraint layers — hardware, software, theoretical, operational, and external SLA — and the binding constraint layer producing the minimum availability ceiling is identified. Simulation results exceeding any layer ceiling are flagged as physically unrealizable, identifying the binding constraint. The system generates infrastructure modification specifications identifying specific changes to relax the binding constraint layer. The method enables exhaustive combinatorial failure scenario analysis that is physically impossible with real-environment fault injection, and a visited-set mechanism guarantees simulation termination in O(|C| + |E|) for acyclic dependency graphs.
 
-**Innovation 2: N-Layer Availability Limit Model**
+**Innovation 2: AI Agent Cross-Layer Failure Simulation**
 
-A multi-layer mathematical model computes independent availability ceilings across five formally-defined constraint categories: (1) Hardware layer computing single-instance availability from MTBF/MTTR with parallel redundancy and failover penalty; (2) Software layer accounting for deployment downtime, human error rate, and configuration drift; (3) Theoretical layer computing the irreducible physical noise floor from packet loss, GC pauses, and scheduling jitter; (4) Operational layer modeling human factor availability from incident frequency, response time, and automation level; (5) External SLA layer computing the hard ceiling from third-party service availability. The effective system availability is bounded by the minimum across all layers: A_system = min(A_layer1, ..., A_layerN).
+The system models AI agent failure as a function of infrastructure state through a formal hallucination probability model H(a, D, I) that computes the probability of agent hallucination given the agent's base rate, data source dependencies with per-source weights, and the current infrastructure health state. The system simulates four-layer cross-layer cascade: (L1) infrastructure fault causes component failure; (L2) data source becomes unavailable or degraded; (L3) agent hallucination probability increases above threshold; (L4) hallucinated output propagates to downstream agents with compound probability amplification. The system computes compound hallucination probability for downstream agents incorporating amplification factors from upstream agent outputs, and generates infrastructure monitoring thresholds derived from hallucination probabilities, wherein a threshold for data source health degradation is computed such that agent hallucination probability remains below a configured acceptable level. The method reveals emergent failure modes invisible to infrastructure monitoring and AI evaluation benchmarks operating independently, by exposing causal chains from infrastructure faults through data availability degradation to agent behavioral failures.
 
-**Innovation 3: AI Agent Cross-Layer Failure Simulation**
-
-The system models AI agent failure as a function of infrastructure state through a formal hallucination probability model H(a, D, I) that computes the probability of agent hallucination given the agent's base rate, data source dependencies with per-source weights, and the current infrastructure health state. The system simulates four-layer cross-layer cascade: (L1) infrastructure fault causes component failure; (L2) data source becomes unavailable or degraded; (L3) agent hallucination probability increases above threshold; (L4) hallucinated output propagates to downstream agents with compound probability amplification. A 10-mode failure taxonomy covers hallucination, context overflow, token exhaustion, prompt injection, tool call loop, confidence miscalibration, chain-of-thought collapse, output amplification, grounding data staleness, and rate limit cascade, each formally defined with infrastructure-state triggers integrated into the cascade simulation engine.
-
-The system further provides multiple complementary simulation methodologies organized as a multi-engine architecture, including stochastic simulation (Monte Carlo), time-stepped dynamic simulation, agent-based modeling, discrete event simulation, Bayesian network analysis, Markov chain availability computation, fault tree analysis, and additional analytical engines, with results combined through consensus mechanisms.
+The system further provides multiple complementary simulation methodologies organized as a multi-engine architecture, including stochastic simulation (Monte Carlo), time-stepped dynamic simulation, agent-based modeling, discrete event simulation, Bayesian network analysis, Markov chain availability computation, fault tree analysis, and additional analytical engines.
 
 ## 4. DETAILED DESCRIPTION
 
@@ -109,8 +121,8 @@ The system further provides multiple complementary simulation methodologies orga
 |                    v         v       v                 |
 |            +----------------------------+              |
 |            | N-Layer Availability       |              |
-|            | Limit Model               |              |
-|            | (5+ mathematical layers)  |              |
+|            | Constraint Model          |              |
+|            | (5+ constraint layers)    |              |
 |            +-------------+------------+               |
 |                          v                             |
 |            +----------------------------+              |
@@ -120,8 +132,9 @@ The system further provides multiple complementary simulation methodologies orga
 |            +-------------+------------+               |
 |                          v                             |
 |            +----------------------------+              |
-|            | Resilience Score &         |              |
-|            | Report Generation          |              |
+|            | Infrastructure Modification|              |
+|            | Specification & Monitoring |              |
+|            | Threshold Generation       |              |
 |            +----------------------------+              |
 |                                                       |
 +-------------------------------------------------------+
@@ -170,7 +183,7 @@ The scenario generator produces fault scenarios across 30 categories, including 
 
 ### 4.4 Cascade Engine — Formal Specification
 
-The Cascade Engine simulates failure propagation through the dependency graph. Its semantics are formally defined as a Labeled Transition System (LTS), providing provable correctness properties.
+The Cascade Engine simulates failure propagation through the dependency graph. Its semantics are formally defined as a Labeled Transition System (LTS), providing provable correctness properties. The LTS formalism is not optional; it is the defining mechanism of the cascade engine, distinguishing this system from connectivity-based or heuristic failure models.
 
 #### 4.4.1 Labeled Transition System Definition
 
@@ -213,6 +226,8 @@ L_0(c) = { latency_direct(c_0, f)        if c = c_0
 **Actions:** Act = {inject, propagate, timeout, trip_cb, degrade, terminate}
 
 #### 4.4.2 Transition Rules
+
+The LTS defines eight transition rules that govern cascade behavior. Critically, these rules differentiate propagation based on dependency type — a distinction absent from connectivity-based approaches that treat all edges identically.
 
 **Rule 1: Fault Injection (Initial)**
 ```
@@ -357,9 +372,9 @@ CPS predictions have been validated against documented cascade failure patterns 
 
 Backtest against 18 documented public cloud incidents (AWS us-east-1 2021, AWS S3 2017, Meta BGP 2021, Cloudflare 2022, GCP 2019, Azure 2023, and others) achieves: Avg Precision 1.000, Avg Recall 1.000, Avg F1 Score 1.000, Avg Severity Accuracy 0.819 (with shared infrastructure modeling).
 
-### 4.5 N-Layer Availability Limit Model — Formal Specification
+### 4.5 N-Layer Availability Constraint Model — Formal Specification
 
-The N-Layer Availability Limit Model provides mathematically distinct availability ceilings. The core insight is that system availability is bounded by multiple independent factors, each of which imposes a ceiling that cannot be exceeded regardless of improvements in other layers.
+The N-Layer Availability Constraint Model provides mathematically distinct availability ceilings that constrain cascade simulation results. The core insight is that system availability is bounded by multiple independent factors, each of which imposes a ceiling that cannot be exceeded regardless of improvements in other layers. When a cascade simulation predicts an availability exceeding any layer ceiling, the result is flagged as physically unrealizable, and the binding constraint layer — the layer producing the minimum ceiling — is identified as the target for infrastructure modification.
 
 **Mathematical Formulation:**
 
@@ -417,6 +432,13 @@ The model is extensible to N layers. Additional layers include but are not limit
 A_system = min(A_layer1, A_layer2, ..., A_layerN)
 ```
 
+**Binding Constraint Identification:**
+```
+binding_layer = argmin over k (A_layer_k)
+```
+
+The binding constraint layer is the layer producing the minimum availability ceiling. The system generates an infrastructure modification specification targeting the binding layer, identifying specific parameter changes (e.g., "increase MTBF of component X from 720h to 2000h" or "add 2 replicas to component Y") required to relax the binding constraint and shift the bottleneck to the next most constraining layer.
+
 **Cascade Path Availability Computation:**
 
 The model integrates with the cascade engine's dependency graph to compute availability along each cascade path. For a cascade path P = [c_1, c_2, ..., c_k] where each c_i depends on c_{i-1}, the path availability is:
@@ -426,9 +448,21 @@ A_path(P) = product{i=1}^{k} A_tier(c_i) * attenuation(dep_type(c_i, c_{i-1}))
 
 Where attenuation is 1.0 for requires, 0.3 for optional, and 0.1 for async dependencies.
 
+**Simulation Result Constraining:**
+
+After the cascade engine computes simulation-predicted availability for each scenario, the N-Layer model constrains the results:
+```
+If A_simulation > A_system:
+    Flag result as "physically unrealizable"
+    Report: "Simulation predicts {A_simulation} but {binding_layer} imposes ceiling of {A_system}"
+    Generate modification specification for binding_layer
+```
+
+This integration ensures that optimistic simulation predictions are bounded by physical reality, preventing unrealizable availability claims.
+
 ### 4.6 AI Agent Cross-Layer Failure Simulation — Formal Specification
 
-The system extends the infrastructure topology model to include AI-specific component types and failure modes, enabling resilience evaluation of AI agent architectures within the same in-memory simulation framework. This is the first system to model infrastructure components and AI agents in a single directed graph, enabling simulation of how infrastructure faults propagate through data availability layers to affect agent behavior.
+The system extends the infrastructure topology model to include AI-specific component types and failure modes, enabling resilience evaluation of AI agent architectures within the same in-memory simulation framework. This is the first system to model infrastructure components and AI agents in a single directed graph, enabling simulation of how infrastructure faults propagate through data availability layers to affect agent behavior, and generating infrastructure monitoring thresholds from the resulting hallucination probability computations.
 
 #### 4.6.1 AI Component Types
 
@@ -561,7 +595,25 @@ H_chain(a_n) = 1 - product{i=1}^{n} (1 - H_effective(a_i))
 
 **Properties:** (1) Amplification — H_chain(a_n) >= max(H(a_i)) for all i; (2) Monotonic growth — adding agents never decreases compound risk; (3) Mitigation — validation gates between agents reduce amplification_factor, bounding cascade growth.
 
-#### 4.6.6 Grounding Data Dependency Tracking
+#### 4.6.6 Infrastructure Monitoring Threshold Generation
+
+The system derives infrastructure monitoring thresholds from the hallucination probability model. For each AI agent a with a configured maximum acceptable hallucination probability H_max(a), the system computes the minimum data source health required to maintain H(a, D, I) <= H_max(a):
+
+```
+For each data source d in D(a):
+    threshold_health(d, a) = minimum health state of d such that
+        H(a, D, I) <= H_max(a) given current state of all other data sources
+
+    monitoring_alert(d, a) = {
+        trigger: status(d, I) degradation approaching threshold_health(d, a),
+        severity: proportional to w(d) * (H_max(a) - h_0(a)),
+        action: "Data source {d} health degradation threatens agent {a} hallucination threshold"
+    }
+```
+
+These monitoring thresholds bridge the gap between infrastructure monitoring (which tracks component health) and AI agent reliability (which depends on grounding data availability), providing concrete, actionable alerts that infrastructure operators can use to prevent agent behavioral degradation before it occurs.
+
+#### 4.6.7 Grounding Data Dependency Tracking
 
 The system maintains a dependency map from each ai_agent vertex to its grounding data sources (tool_service vertices providing database queries, retrieval indices, web search results). When the cascade engine processes a fault that affects any tool_service vertex, the system:
 
@@ -570,13 +622,9 @@ The system maintains a dependency map from each ai_agent vertex to its grounding
 3. If H(a, D, I) exceeds the configured hallucination threshold, transitions the agent to DEGRADED state
 4. Propagates the degradation through the agent dependency subgraph using the compound cascade probability model
 
-#### 4.6.7 Tool Call Loop Detection
+#### 4.6.8 Tool Call Loop Detection
 
 The system detects tool call loops by monitoring simulated request patterns on ai_agent vertices. A loop is detected when: (1) the agent's simulated request count exceeds max_iterations within a time window; (2) no state progression is detected (the agent is not making progress toward task completion); (3) the same tool is being invoked repeatedly with similar parameters. Upon detection, the agent vertex transitions to DOWN state and cascade propagation continues to its dependents.
-
-#### 4.6.8 Security Attack and Agent Failure Compound Scenarios
-
-The system simulates compound scenarios combining infrastructure security attacks with AI agent failure modes. For example: a DDoS attack on a load balancer causes latency spike to a tool_service, which degrades agent grounding, increasing hallucination probability. The compound severity is computed by combining the infrastructure cascade severity with the agent cascade severity, weighted by the criticality of affected agent outputs. Additionally, prompt injection attacks are modeled as security faults that compromise agent output integrity, with tainted outputs propagating to downstream consumers through the agent dependency subgraph.
 
 ### 4.7 Additional Simulation Engines (Summary)
 
@@ -632,8 +680,7 @@ The system provides over one hundred complementary simulation and analysis engin
 | | Compliance Framework Simulation | SOC2, ISO27001, PCI-DSS, DORA, HIPAA, GDPR |
 | | FMEA Engine | Failure Mode and Effects Analysis with RPN |
 | | SLA Mathematical Provability | Formal SLA achievability proof |
-| **Operational** | Resilience Genome (Chaos Genome) | Multi-dimensional fingerprint with industry benchmarks |
-| | Blast Radius Predictor | Pre-simulation impact estimation with confidence intervals |
+| **Operational** | Blast Radius Predictor | Pre-simulation impact estimation with confidence intervals |
 | | Chaos Experiment Recommender | Prioritized real-world experiment recommendations |
 | | Backtest Engine | Historical incident validation with auto-calibration |
 | | Digital Twin Synchronization | Continuous shadow simulation from live metrics |
@@ -690,70 +737,82 @@ In an alternative embodiment, the system performs multi-objective optimization t
 ### Independent Claims
 
 **Claim 1.** A computer-implemented method for evaluating infrastructure resilience, comprising:
-- (a) receiving, by at least one processor, a topology definition describing a plurality of infrastructure components and dependencies therebetween;
-- (b) constructing, in computer memory, a directed graph representation of said topology, wherein nodes represent infrastructure components annotated with component attributes including at least component type, replica count, and operational profile, and edges represent typed dependencies between components, each edge annotated with a dependency type selected from at least required, optional, and asynchronous;
-- (c) automatically generating a plurality of fault scenarios from said directed graph representation;
-- (d) simulating, entirely in computer memory without affecting any real infrastructure, propagation of failure effects of each fault scenario through said directed graph representation by traversing dependency edges according to dependency-type-aware propagation rules, wherein the propagation rules differentiate cascade behavior based on the dependency type of each edge and the replica count of each dependent component, and wherein a visited-set mechanism ensures each component is processed at most once per simulation, guaranteeing termination in O(|C| + |E|) time for acyclic graphs;
-- (e) computing at least one availability metric from component reliability parameters and redundancy configurations represented in said directed graph; and
-- (f) generating a resilience assessment comprising at least one quantitative score derived from said simulation results.
+- (a) constructing, in computer memory, a directed graph representation of an infrastructure topology, wherein nodes represent infrastructure components annotated with component attributes including at least component type, replica count, MTBF, MTTR, and operational profile, and edges represent typed dependency relationships between components, each edge classified as one of required, optional, or asynchronous;
+- (b) simulating failure propagation entirely in computer memory without affecting any real infrastructure, using a formally-defined labeled transition system comprising a state tuple of (health map, latency map, elapsed time, visited set) and typed transition rules that differentiate propagation behavior based on dependency type, wherein:
+  - required dependencies propagate failures unconditionally from a failed component to its single-replica dependents,
+  - optional dependencies degrade performance of dependent components without further cascade propagation,
+  - asynchronous dependencies propagate degradation with configurable delay reflecting queue buildup behavior;
+- (c) computing per-layer availability ceilings across at least five independent constraint layers — a hardware layer computing single-instance availability from MTBF and MTTR with parallel redundancy, a software layer accounting for deployment downtime and human error rate, a theoretical layer computing the irreducible physical noise floor from packet loss and garbage collection pauses, an operational layer modeling human factor availability from incident frequency and response time, and an external SLA layer computing a hard ceiling from third-party service availability — and determining the binding constraint layer as the layer producing the minimum availability ceiling;
+- (d) constraining the simulation results of step (b) by said per-layer ceilings of step (c), wherein a simulation-predicted availability exceeding any layer ceiling triggers an indication that the result is physically unrealizable and identifies the binding constraint layer;
+- (e) generating an infrastructure modification specification identifying specific changes to component attributes in the directed graph that would relax the binding constraint layer, thereby enabling higher achievable system availability;
+- wherein the method enables exhaustive combinatorial failure scenario analysis that is physically impossible with real-environment fault injection due to the exponential growth of failure combinations, and wherein a visited-set mechanism in the labeled transition system guarantees simulation termination in O(|C| + |E|) time for acyclic dependency graphs where |C| is the number of components and |E| is the number of dependency edges.
 
-**Claim 2.** A computer-implemented method for computing multi-layer availability limits for an infrastructure system, comprising:
-- (a) receiving, by at least one processor, an infrastructure topology comprising a plurality of components with associated reliability parameters and a dependency graph connecting said components;
-- (b) computing a hardware availability layer by, for each component, calculating single-instance availability as A_single = MTBF / (MTBF + MTTR), computing parallel redundancy availability as A_tier = 1 - (1 - A_single)^replicas, applying a failover penalty based on promotion time and detection latency, and computing system hardware availability as the product of all critical-path tier availabilities determined by dependency graph edge types;
-- (c) computing a software availability layer accounting for deployment downtime frequency, human error rate, and configuration drift probability, bounded by the hardware availability;
-- (d) computing a theoretical availability layer representing the irreducible physical noise floor from network packet loss, garbage collection pauses, and scheduling jitter, applied as multiplicative penalties on hardware availability;
-- (e) computing an operational availability layer modeling human factor availability from incident frequency, mean response time adjusted by on-call coverage, runbook coverage, and automation level;
-- (f) computing an external dependency availability layer as the product of all external dependency SLA values;
-- (g) determining the effective system availability as the minimum across all computed availability layers: A_system = min(A_hw, A_sw, A_theoretical, A_ops, A_external); and
-- (h) outputting said effective system availability and per-layer availability ceilings, wherein each layer represents a mathematically independent constraint category such that improvements in one layer cannot increase availability beyond the ceiling imposed by any other layer.
-
-**Claim 3.** A computer-implemented method for simulating AI agent failure behavior as a function of infrastructure state, comprising:
-- (a) receiving, by at least one processor, an infrastructure topology comprising both traditional infrastructure components and AI agent components, modeled as a directed graph wherein AI agent components include at least one AI agent vertex with a base hallucination rate attribute and dependency edges to data source vertices;
-- (b) simulating an infrastructure fault on at least one component in said directed graph and computing the resulting infrastructure state I, wherein each component is assigned a health status from the set {HEALTHY, DEGRADED, OVERLOADED, DOWN};
-- (c) for each AI agent vertex a in said graph, computing a hallucination probability H(a, D, I) as a function of the agent's base hallucination rate, the dependency weights of the agent's data sources, and the infrastructure health state of each data source, wherein for each data source d with health status DOWN, the per-source hallucination contribution is h_d = h_0(a) + (1 - h_0(a)) * w(d), and the combined probability uses the complementary product: H(a, D, I) = 1 - product over all non-healthy data sources of (1 - h_d);
-- (d) simulating cross-layer cascade propagation across four layers: (L1) infrastructure fault causes component failure, (L2) data source becomes unavailable causing grounding loss, (L3) agent hallucination probability exceeds threshold causing agent to enter degraded state, (L4) degraded agent output propagates to downstream agent consumers;
-- (e) for each pair of agents (a_s, a_t) where a_t consumes output of a_s, computing a compound hallucination probability H_effective(a_t) = 1 - (1 - H(a_t, D, I)) * (1 - H(a_s) * amplification_factor), wherein the amplification_factor reflects whether the consuming agent has independent verification capability; and
-- (f) generating an AI agent resilience assessment comprising the hallucination probability for each agent under the simulated infrastructure state, the cross-layer cascade path from infrastructure fault to agent failure, and the compound cascade probability through agent chains.
+**Claim 2.** A computer-implemented method for simulating AI agent failure behavior as a function of infrastructure state, comprising:
+- (a) modeling AI agent components within an infrastructure dependency graph stored in computer memory, each AI agent vertex having a base hallucination rate attribute and weighted dependency edges to data source vertices, wherein each data source vertex represents a grounding information source with an associated dependency weight indicating the criticality of that source to the agent's output quality;
+- (b) simulating infrastructure faults affecting data source vertices within said dependency graph and computing health states for each affected vertex, wherein each vertex is assigned a health status from the set {HEALTHY, DEGRADED, OVERLOADED, DOWN};
+- (c) computing a hallucination probability H(a, D, I) for each AI agent a as a function of the agent's base hallucination rate h_0(a), data source dependency weights w(d), and infrastructure health states of data sources, using the formula: for each unavailable data source d with health status DOWN, computing per-source hallucination contribution h_d = h_0(a) + (1 - h_0(a)) * w(d), and computing the combined hallucination probability as H(a, D, I) = 1 - product over all non-healthy data sources d of (1 - h_d);
+- (d) simulating cross-layer cascade propagation across four layers: (L1) infrastructure fault causes component failure, (L2) data source becomes unavailable causing grounding data loss for dependent agents, (L3) agent hallucination probability exceeds a configured threshold causing the agent to enter a degraded behavioral state, (L4) degraded agent output propagates to downstream agent consumers through the agent dependency subgraph;
+- (e) computing compound hallucination probability for each downstream agent a_t that consumes output from an upstream agent a_s, incorporating an amplification factor reflecting whether the downstream agent has independent verification capability, using the formula: H_effective(a_t) = 1 - (1 - H(a_t, D, I)) * (1 - H(a_s) * amplification_factor(a_s, a_t));
+- (f) generating infrastructure monitoring thresholds derived from said hallucination probabilities, wherein for each AI agent and each of its data source dependencies, a threshold for data source health degradation is computed such that the agent's hallucination probability remains below a configured acceptable level, said thresholds providing actionable alerts to infrastructure operators;
+- wherein said method reveals emergent failure modes invisible to infrastructure monitoring and AI evaluation benchmarks operating independently, by exposing causal chains from infrastructure faults through data availability degradation to agent behavioral failures that propagate through agent-to-agent dependency chains.
 
 ### Dependent Claims
 
-**Claim 4.** The method of Claim 1, wherein simulating propagation of failure effects comprises breadth-first search (BFS) with dependency-type-aware rules wherein: a required dependency to a DOWN component with a single replica causes the dependent to transition to DOWN; a required dependency to a DOWN component with multiple replicas causes the dependent to transition to DEGRADED without further propagation; an optional dependency to a DOWN component causes the dependent to transition to DEGRADED without further propagation; and an async dependency to a DOWN component causes the dependent to transition to DEGRADED with a delayed time delta reflecting queue buildup.
+**Claim 3.** The method of Claim 1, wherein the labeled transition system comprises eight transition rules: (1) fault injection establishing initial failure state, (2) cascade propagation through required dependencies with single replica causing dependent transition to DOWN, (3) cascade propagation through required dependencies with multiple replicas causing dependent transition to DEGRADED without further propagation due to remaining replicas absorbing load, (4) optional dependency degradation without further cascade, (5) asynchronous dependency degradation with delayed time delta reflecting queue buildup, (6) circuit breaker trip when accumulated latency exceeds dependent timeout causing cascade termination through that path, (7) timeout propagation when circuit breaker is disabled causing dependent transition to DOWN, and (8) termination when no further applicable rules exist.
 
-**Claim 5.** The method of Claim 1, further comprising performing stochastic simulation by repeatedly sampling random fault combinations according to component failure probabilities derived from MTBF parameters, simulating cascade propagation for each sample, and computing statistical availability metrics including mean, standard deviation, and percentile distributions from the aggregate simulation results.
+**Claim 4.** The method of Claim 1, wherein simulating failure propagation further comprises modeling circuit breaker containment, wherein for each edge with an enabled circuit breaker configuration, when accumulated latency through the dependency chain exceeds the dependent component's timeout threshold, the circuit breaker trips, the dependent component transitions to DEGRADED rather than DOWN, and cascade propagation is halted through that path, thereby bounding the blast radius of latency-induced failures.
 
-**Claim 6.** The method of Claim 1, further comprising executing time-stepped dynamic simulation over discrete time intervals, incorporating traffic pattern injection with at least sinusoidal, spike, and ramp patterns, autoscaling response modeling with configurable delays and thresholds, circuit breaker state transitions between open, half-open, and closed states, and failover sequence simulation with health check detection time and promotion time.
+**Claim 5.** The method of Claim 1, wherein simulating failure propagation further comprises replica-aware degradation calculation, wherein for each dependent component with a replica count greater than one and a required dependency to a DOWN component, the dependent transitions to DEGRADED rather than DOWN, modeling the capacity of remaining replicas to absorb load from the failed dependency, and cascade propagation does not continue through the degraded multi-replica component.
 
-**Claim 7.** The method of Claim 1, further comprising automatically generating fault scenarios from said directed graph representation by analyzing the graph topology to identify single-component failures, pairwise combination failures, component-type-specific faults, traffic spike scenarios at multiple magnitudes, and AI agent-specific scenarios including LLM endpoint rate limiting and coordinated grounding source failures.
+**Claim 6.** The method of Claim 1, wherein computing per-layer availability ceilings comprises: computing the hardware layer ceiling as A_hw = product of A_tier(c_i) for all components in the critical path, where A_single(c_i) = MTBF(c_i) / (MTBF(c_i) + MTTR(c_i)) and A_tier(c_i) = 1 - (1 - A_single(c_i))^replicas(c_i), with failover penalty applied as a multiplicative factor; computing the software layer ceiling as A_sw = min(1 - (deploy_frequency * avg_deploy_downtime / period + human_error_rate + config_drift_rate), A_hw); computing the theoretical layer ceiling as A_theoretical = A_hw * (1 - avg_packet_loss) * (1 - avg_gc_fraction); computing the operational layer ceiling as A_ops = 1 - (incidents_per_year * effective_response / 8760); and computing the external layer ceiling as A_external = product of SLA(c_i) for all external dependencies.
 
-**Claim 8.** The method of Claim 1, embodied as a system comprising: at least one processor; a memory coupled to the at least one processor; and instructions stored in the memory that, when executed by the at least one processor, cause the system to perform the method of Claim 1.
+**Claim 7.** The method of Claim 2, wherein the AI agent components are associated with a failure taxonomy comprising at least ten failure modes: hallucination, context overflow, token exhaustion, prompt injection, tool call loop, confidence miscalibration, chain-of-thought collapse, output amplification, grounding data staleness, and rate limit cascade, each mode having a defined health impact on the agent vertex, a trigger condition based on infrastructure state, and a recovery characteristic.
 
-**Claim 9.** The method of Claim 1, further comprising ingesting metric data from a monitored infrastructure environment, mapping said metric data to corresponding components in the graph representation, computing trend projections from the ingested metric data to predict future resource states, and automatically invoking at least one resilience simulation on the graph representation updated with the ingested metrics and generating predictive alerts when simulation results indicate impending resilience degradation.
+**Claim 8.** The method of Claim 2, further comprising computing a compound cascade probability for a chain of agents [a_1, a_2, ..., a_n] as H_chain(a_n) = 1 - product over i=1 to n of (1 - H_effective(a_i)), wherein H_chain is monotonically non-decreasing as agents are added to the chain, demonstrating that longer agent chains amplify compound failure risk.
 
-**Claim 10.** The method of Claim 2, wherein computing the hardware availability layer further comprises, for each component with failover enabled, computing the expected number of failover events per year based on MTBF and replica count, computing the failover downtime fraction from promotion time and detection latency, and applying said downtime fraction as a multiplicative penalty on the parallel redundancy availability.
+**Claim 9.** The method of Claim 1, further comprising simulating latency cascade propagation through the dependency graph by tracking accumulated latency through each dependency hop, evaluating circuit breaker thresholds at each edge, computing connection pool exhaustion when accumulated latency causes request pileup, modeling retry storms as connection multiplication factors, and modeling singleflight request coalescing as a load reduction factor.
 
-**Claim 11.** The method of Claim 2, wherein computing the software availability layer comprises computing A_sw = min(1 - (deploy_frequency * average_deploy_downtime / period + human_error_rate + config_drift_rate), A_hw), wherein the software limit is bounded by the hardware limit.
+**Claim 10.** The method of Claim 1, further comprising simulating autoscaling response to failure conditions by modeling horizontal pod autoscaler (HPA) and event-driven autoscaler (KEDA) configurations, including minimum and maximum replica counts, scaling thresholds, scale-up and scale-down delays, and step size, and computing the time-dependent replica count during failure propagation to determine whether autoscaling can mitigate cascade effects before they propagate to dependent components.
 
-**Claim 12.** The method of Claim 2, wherein computing the operational availability layer comprises adjusting mean response time by dividing by on-call coverage percentage, multiplying by a runbook coverage factor, and multiplying by an automation level factor to produce an effective response time, and computing A_ops = 1 - (incidents_per_year * effective_response_hours / 8760).
+**Claim 11.** The method of Claim 1, further comprising performing what-if parameter sweep analysis by systematically varying component attributes including replica counts, MTBF values, timeout thresholds, and circuit breaker configurations across a defined parameter space, executing the failure simulation of step (b) and the availability computation of step (c) for each parameter combination, and identifying the parameter changes that produce the largest improvement in resilience score per unit of infrastructure cost.
 
-**Claim 13.** The method of Claim 2, wherein computing the external dependency availability layer comprises identifying all components with external SLA attributes in the dependency graph and computing the product of their SLA values.
-
-**Claim 14.** The method of Claim 1, further comprising ingesting vulnerability information from at least one external security threat feed, wherein said threat feed comprises at least one of Common Vulnerabilities and Exposures (CVE) entries, Cybersecurity and Infrastructure Security Agency (CISA) advisories, and National Vulnerability Database (NVD) records, and automatically generating fault scenarios corresponding to said vulnerabilities by mapping vulnerability characteristics to infrastructure components and failure modes in the graph representation.
-
-**Claim 15.** The method of Claim 3, wherein computing the hallucination probability further comprises, for each data source d with health status DEGRADED, computing h_d = h_0(a) + (1 - h_0(a)) * w(d) * delta where delta is a degradation factor in (0, 1), and for each data source d with health status OVERLOADED, computing h_d = h_0(a) + (1 - h_0(a)) * w(d) * omega where omega is an overload factor in (0, 1).
-
-**Claim 16.** The method of Claim 3, wherein the AI agent components are associated with a failure taxonomy comprising at least ten failure modes: hallucination, context overflow, token exhaustion, prompt injection, tool call loop, confidence miscalibration, chain-of-thought collapse, output amplification, grounding data staleness, and rate limit cascade, each mode having a defined health impact, trigger condition based on infrastructure state, and recovery characteristic.
-
-**Claim 17.** The method of Claim 3, further comprising computing a compound cascade probability for a chain of agents [a_1, a_2, ..., a_n] as H_chain(a_n) = 1 - product over i=1 to n of (1 - H_effective(a_i)), wherein H_chain is monotonically non-decreasing as agents are added to the chain.
-
-**Claim 18.** The method of Claim 3, further comprising maintaining a grounding data dependency map from each AI agent vertex to its data source vertices, and upon simulating a fault affecting any data source vertex, automatically identifying all dependent AI agent vertices, recomputing their hallucination probabilities, and propagating degradation through the agent dependency subgraph.
-
-**Claim 19.** The method of Claim 3, further comprising detecting tool call loops on AI agent vertices by monitoring simulated request counts within time windows, detecting absence of state progression, and transitioning the agent vertex to DOWN state upon detection, with cascade propagation to dependent vertices.
-
-**Claim 20.** The method of Claim 3, further comprising simulating compound scenarios combining infrastructure security attacks with AI agent failure modes, wherein a security attack on an infrastructure component causes latency or availability degradation to tool services, which increases hallucination probability of dependent AI agents, and wherein prompt injection attacks are modeled as security faults that compromise agent output integrity with propagation of tainted outputs through the agent dependency subgraph.
+**Claim 12.** The method of Claim 1, embodied as a system comprising: at least one processor; a memory coupled to the at least one processor; and instructions stored in the memory that, when executed by the at least one processor, cause the system to perform the method of Claim 1.
 
 ---
 
-## APPENDIX A: Implementation Reference
+## APPENDIX A: Prior Art Differentiation
+
+### A.1 Detailed Prior Art Comparison
+
+**Krasnovsky & Zorkin (Connectivity-Based Resilience Model):**
+Krasnovsky and Zorkin model infrastructure resilience using graph connectivity metrics — vertex connectivity and edge connectivity — to measure how many components or links must fail before a system becomes disconnected. Their model treats all dependencies as equivalent graph edges, computes static connectivity metrics, and does not simulate dynamic failure cascade behavior. The present invention differs fundamentally: (i) the cascade engine uses a formally-defined Labeled Transition System with eight typed transition rules, not connectivity metrics; (ii) dependency types (required, optional, asynchronous) produce qualitatively different propagation behaviors — required dependencies cascade unconditionally while optional and asynchronous dependencies attenuate; (iii) circuit breaker containment modeling halts cascade through protected paths; (iv) the LTS state tuple tracks health maps, latency maps, elapsed time, and visited sets, enabling dynamic simulation of cascade propagation through time; (v) the system integrates multi-layer availability constraints and AI agent failure modeling, neither of which is addressed by connectivity-based approaches.
+
+**GMOR (2016) (Generalized Multi-Hazard Outage Risk):**
+GMOR models physical infrastructure (power grids, water systems) exposure to natural hazards using fragility curves and Monte Carlo simulation. It analyzes physical damage propagation through infrastructure networks but does not model IT infrastructure dependency types, does not distinguish between required/optional/asynchronous software dependencies, does not incorporate circuit breaker containment or timeout-based cascade, and has no AI agent behavior modeling. The present invention operates in the IT infrastructure domain with software-specific dependency semantics.
+
+**Dell US11356324B2 (Graph Analysis for Fault Injection Target Selection):**
+Dell's patent describes a system that analyzes infrastructure topology graphs to select optimal targets for real-environment fault injection. The graph analysis is used for target prioritization, not for in-memory failure simulation. After targets are selected, faults are injected into actual infrastructure. The present invention performs complete failure simulation entirely in memory without affecting real infrastructure, simulates cascade propagation dynamics using formal LTS semantics, computes multi-layer availability ceilings, and models AI agent failure behavior — none of which is addressed by Dell's target selection system.
+
+**agent-chaos/balagan-agent (AI Agent Chaos Engineering):**
+This tool injects real faults into AI agent environments to observe agent failure behavior. It operates by actually disrupting agent infrastructure — modifying API endpoints, injecting latency, restricting access to tools. The present invention does not inject real faults; it models hallucination probability H(a, D, I) as a computable function of infrastructure state entirely in memory, enabling exhaustive evaluation of failure combinations without risking real agent operation. The hallucination probability model — connecting infrastructure health states to agent behavioral degradation through formal mathematical functions — is not present in any real-fault-injection approach.
+
+**Isograph Reliability Workbench (Single-Layer Availability):**
+Isograph and similar RAMS tools compute availability using hardware reliability models (MTBF/MTTR with redundancy). They operate within a single constraint layer. The present invention computes independent availability ceilings across five or more constraint layers (hardware, software, theoretical, operational, external SLA), identifies the binding constraint layer, and generates infrastructure modification specifications targeting that specific layer — a multi-layer constraint analysis absent from single-layer reliability tools.
+
+**Bell-LaPadula Model:**
+The Bell-LaPadula model is a formal state machine model for enforcing mandatory access control in computer security. It addresses information flow control (no read up, no write down), not infrastructure resilience or failure simulation. It is not relevant prior art for the present invention.
+
+### A.2 Novel Contributions Summary
+
+| Aspect | Present Invention | Nearest Prior Art | Distinction |
+|--------|------------------|-------------------|-------------|
+| Cascade Engine | LTS with 8 typed transition rules, dependency-type differentiation | Krasnovsky (connectivity metrics) | Formal semantics vs. static metrics; dependency types vs. uniform edges |
+| Availability Model | 5+ independent constraint layers with binding constraint identification | Isograph (single-layer MTBF/MTTR) | Multi-layer ceiling analysis vs. single-layer computation |
+| AI Agent Failure | H(a,D,I) as computable function of infrastructure state | balagan-agent (real fault injection) | In-memory mathematical model vs. real-environment observation |
+| Simulation Scope | Exhaustive combinatorial in-memory | Dell US11356324B2 (graph for target selection) | Complete in-memory simulation vs. target selection for real injection |
+| Output | Infrastructure modification specifications + monitoring thresholds | All prior art | Actionable remediation targeting binding constraints |
+
+## APPENDIX B: Implementation Reference
 
 The described system is implemented as the FaultRay software, available at https://github.com/mattyopon/faultray under the Business Source License 1.1 (BSL-1.1). The implementation was first committed on March 9, 2026. The implementation is in Python 3.11+ and utilizes the networkx library for graph operations and pydantic for data model validation. All patent rights are reserved by the inventor; the source license does not grant any patent rights for commercial or production use.
 
@@ -769,30 +828,6 @@ Key implementation files:
 - Financial Risk Engine: `src/faultray/simulator/financial_risk.py`
 - Integration Pipelines: `src/faultray/simulator/integration_pipelines.py`
 - 100+ additional engine files in `src/faultray/simulator/`
-
-## APPENDIX B: Prior Art Differentiation
-
-| Prior Art | Approach | Key Difference |
-|-----------|----------|----------------|
-| US11397665B2 (JPMorgan) | Real-environment fault injection | Present invention operates entirely in-memory |
-| US11307947B2 (Huawei) | Software fault injection in real systems | Present invention uses mathematical simulation |
-| US9280409B2 (HPE) | Static SPOF analysis | Present invention performs dynamic simulation with cascade propagation |
-| US11392445B2 (Cognizant) | IT vulnerability assessment | Present invention computes availability limits from mathematical models |
-| Netflix Chaos Monkey | Random VM termination in production | Present invention requires no production access |
-| AWS FIS | Managed fault injection into AWS resources | Present invention is cloud-agnostic and requires no resource access |
-| Gremlin SaaS | Agent-based fault injection | Present invention is agentless, operates on topology models |
-| LLM evaluation frameworks | Prompt/response level hallucination testing | Present invention models hallucination as function of infrastructure state |
-| ML model testing (MLOps) | Model accuracy/drift testing | Present invention connects model failures to infrastructure root causes |
-
-**Novel Contributions Beyond All Prior Art:**
-
-1. **Cross-Layer Simulation (Infrastructure + AI Agent Behavior in a Unified Model):** First system to model infrastructure components and AI agents in a single directed graph, enabling simulation of how infrastructure faults propagate through data availability layers to affect agent behavior. No prior system combines L1-L4 in one simulation.
-
-2. **Hallucination Probability as a Function of Infrastructure State:** The formal model H(a, D, I) defines hallucination probability as a computable function of which infrastructure components are up, down, or degraded. Prior art: hallucination = f(model). Novel: hallucination = f(model, infrastructure_state).
-
-3. **Agent Cascade Propagation with Compound Probability:** The model of agent-to-agent cascade with compound probability H_chain is not addressed by any existing chaos engineering or ML testing tool.
-
-4. **Formally-Specified Cascade Engine:** The LTS-based formal specification with proven termination, soundness, monotonicity, and causality properties distinguishes this from heuristic-based failure simulation approaches.
 
 ---
 
