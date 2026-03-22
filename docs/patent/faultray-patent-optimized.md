@@ -1,5 +1,4 @@
-**Title of Invention:**
-System and Method for In-Memory Infrastructure Resilience Simulation Using Graph-Based Cascade Propagation with Multi-Layer Availability Constraints and AI Agent Cross-Layer Failure Modeling
+# System and Method for In-Memory Infrastructure Resilience Simulation Using Graph-Based Cascade Propagation with Multi-Layer Availability Constraints and AI Agent Cross-Layer Failure Modeling
 
 **Inventor:** Yutaro Maeda
 
@@ -756,6 +755,8 @@ In an alternative embodiment, the system performs multi-objective optimization t
 - (f) generating infrastructure monitoring thresholds derived from said hallucination probabilities, wherein for each AI agent and each of its data source dependencies, a threshold for data source health degradation is computed such that the agent's hallucination probability remains below a configured acceptable level, said thresholds providing actionable alerts to infrastructure operators;
 - wherein said method reveals emergent failure modes invisible to infrastructure monitoring and AI evaluation benchmarks operating independently, by exposing causal chains from infrastructure faults through data availability degradation to agent behavioral failures that propagate through agent-to-agent dependency chains.
 
+**Claim 12.** A system for evaluating infrastructure resilience, the system comprising: at least one processor; a memory coupled to the at least one processor; and instructions stored in the memory that, when executed by the at least one processor, cause the system to perform the method of Claim 1.
+
 ### Dependent Claims
 
 **Claim 3.** The method of Claim 1, wherein the labeled transition system comprises eight transition rules: (1) fault injection establishing initial failure state, (2) cascade propagation through required dependencies with single replica causing dependent transition to DOWN, (3) cascade propagation through required dependencies with multiple replicas causing dependent transition to DEGRADED without further propagation due to remaining replicas absorbing load, (4) optional dependency degradation without further cascade, (5) asynchronous dependency degradation with delayed time delta reflecting queue buildup, (6) circuit breaker trip when accumulated latency exceeds dependent timeout causing cascade termination through that path, (7) timeout propagation when circuit breaker is disabled causing dependent transition to DOWN, and (8) termination when no further applicable rules exist.
@@ -775,8 +776,6 @@ In an alternative embodiment, the system performs multi-objective optimization t
 **Claim 10.** The method of Claim 1, further comprising simulating autoscaling response to failure conditions by modeling horizontal pod autoscaler (HPA) and event-driven autoscaler (KEDA) configurations, including minimum and maximum replica counts, scaling thresholds, scale-up and scale-down delays, and step size, and computing the time-dependent replica count during failure propagation to determine whether autoscaling can mitigate cascade effects before they propagate to dependent components.
 
 **Claim 11.** The method of Claim 1, further comprising performing what-if parameter sweep analysis by systematically varying component attributes including replica counts, MTBF values, timeout thresholds, and circuit breaker configurations across a defined parameter space, executing the failure simulation of step (b) and the availability computation of step (c) for each parameter combination, and identifying the parameter changes that produce the largest improvement in resilience score per unit of infrastructure cost.
-
-**Claim 12.** The method of Claim 1, embodied as a system comprising: at least one processor; a memory coupled to the at least one processor; and instructions stored in the memory that, when executed by the at least one processor, cause the system to perform the method of Claim 1.
 
 **Claim 13.** The method of Claim 2, wherein the hallucination probability H for an AI agent a is computed using the formula: for each unavailable data source d, h_d = h_0(a) + (1 - h_0(a)) * w(d), where h_0(a) is the base hallucination rate and w(d) is the dependency weight; and H = 1 - product(1 - h_d) for all unavailable data sources.
 
