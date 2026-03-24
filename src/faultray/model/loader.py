@@ -98,7 +98,7 @@ def load_yaml(path: Path | str) -> InfraGraph:
         if not comp_id:
             raise ValidationError(f"Component entry {idx} is missing 'id'")
 
-        comp_name = entry.get("name", comp_id)
+        comp_name: str = str(entry.get("name", comp_id))
 
         # Resolve component type (accept lowercase enum value)
         raw_type = entry.get("type", "custom")

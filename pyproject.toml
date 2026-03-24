@@ -83,6 +83,7 @@ dev = [
     "hypothesis>=6.0",
     "mypy>=1.0",
     "pytest-cov>=5.0",
+    "types-PyYAML>=6.0",
 ]
 
 [project.urls]

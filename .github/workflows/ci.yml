@@ -31,13 +31,11 @@ jobs:
 
       - name: Type check with mypy
         run: |
-          pip install mypy
+          pip install mypy types-PyYAML
           python -m mypy src/faultray/model/ --ignore-missing-imports
 
       - name: Run property-based tests
-        run: |
-          pip install hypothesis
-          pytest tests/test_property_based.py -v --tb=short
+        run: pytest tests/test_property_based.py -v --tb=short
 
       - name: Run tests
         run: |

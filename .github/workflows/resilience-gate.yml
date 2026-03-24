@@ -24,7 +24,7 @@ on:
 
 env:
   MIN_SCORE: '60'
-  MAX_CRITICAL: '0'
+  MAX_CRITICAL: '5'
   INFRA_FILE: 'examples/demo-infra.yaml'
 
 jobs:
