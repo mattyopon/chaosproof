@@ -73,7 +73,7 @@ all-clouds = [
     "kubernetes>=28.0",
 ]
 mcp = [
-    "mcp>=1.0",
+    "mcp>=1.0,<1.26",
 ]
 dev = [
     "pytest>=8.0",
