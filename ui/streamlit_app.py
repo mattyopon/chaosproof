@@ -47,7 +47,7 @@ st.set_page_config(
     page_title="FaultRay — インフラ障害シミュレーター",
     page_icon="\u26a1",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------------------------
@@ -1370,6 +1370,16 @@ def page_simulation() -> None:
         "サンプルトポロジーを選ぶか、YAML/JSONを直接入力してシミュレーションを実行できます。"
     )
 
+    # サンプル読み込み成功フィードバック (HIGH-1)
+    if st.session_state.get("sample_loaded"):
+        st.success(f"サンプル「{st.session_state.selected_sample}」を読み込みました")
+        st.session_state.sample_loaded = False
+
+    # YAML エラー永続表示 (MEDIUM-3)
+    if st.session_state.get("yaml_error"):
+        st.error(st.session_state.yaml_error)
+        st.session_state.yaml_error = None
+
     # エンジン状態
     if not FAULTRAY_AVAILABLE:
         st.info(
@@ -1398,6 +1408,7 @@ def page_simulation() -> None:
             if st.button("この構成を使う", key=f"sample_{idx}", use_container_width=True):
                 st.session_state.topology_yaml = sample["yaml"]
                 st.session_state.selected_sample = name
+                st.session_state.sample_loaded = True
                 st.rerun()
 
     # -- カスタム入力
@@ -1433,8 +1444,10 @@ def page_simulation() -> None:
                 topo = parse_topology(topology_text)
                 st.session_state.parsed_topology = topo
                 st.session_state.show_topology_preview = True
+                st.session_state.yaml_error = None
             except Exception as e:
-                st.error(f"パースエラー: {e}")
+                st.session_state.yaml_error = f"パースエラー: {e}"
+                st.rerun()
 
     with col_run:
         run_clicked = st.button(
@@ -1460,8 +1473,10 @@ def page_simulation() -> None:
     if run_clicked:
         try:
             topo = parse_topology(topology_text)
+            st.session_state.yaml_error = None
         except Exception as e:
-            st.error(f"トポロジーのパースに失敗しました: {e}")
+            st.session_state.yaml_error = f"トポロジーのパースに失敗しました: {e}"
+            st.rerun()
             return
 
         with st.spinner("シミュレーション実行中..."):
@@ -1486,8 +1501,17 @@ def page_simulation() -> None:
         # 履歴は最新20件に制限（メモリ膨張防止）
         if len(st.session_state.sim_history) > 20:
             st.session_state.sim_history = st.session_state.sim_history[-20:]
-        st.session_state.current_page = "page_results"
-        st.rerun()
+
+        # シミュレーション完了メッセージ + 明示的な遷移ボタン (MEDIUM-1)
+        st.success(
+            f"シミュレーション完了！ "
+            f"耐障害スコア: **{results['resilience_score']}** / "
+            f"シナリオ数: {results['total_scenarios']} "
+            f"(CRITICAL: {results['critical']}, WARNING: {results['warning']}, PASS: {results['passed']})"
+        )
+        if st.button("結果を見る", type="primary"):
+            st.session_state.current_page = "page_results"
+            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1569,8 +1593,15 @@ def page_results() -> None:
     if not scenarios_sorted:
         st.info("該当するシナリオがありません")
     else:
-        for scenario in scenarios_sorted:
+        # 最初の10件を表示、残りはexpanderにまとめる (MEDIUM-2)
+        _INITIAL_DISPLAY = 10
+        for scenario in scenarios_sorted[:_INITIAL_DISPLAY]:
             render_scenario_card(scenario)
+        if len(scenarios_sorted) > _INITIAL_DISPLAY:
+            _remaining = len(scenarios_sorted) - _INITIAL_DISPLAY
+            with st.expander(f"残り{_remaining}件のシナリオを表示"):
+                for scenario in scenarios_sorted[_INITIAL_DISPLAY:]:
+                    render_scenario_card(scenario)
 
     # -- JSON エクスポート
     st.markdown("---")
@@ -1810,7 +1841,7 @@ else:
     if FAULTRAY_AVAILABLE:
         st.sidebar.success("エンジン: 有効")
     else:
-        st.sidebar.warning("デモモード")
+        st.sidebar.warning("デモモード: サンプルデータで動作しています。実際のシミュレーションには `pip install faultray` が必要です。")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
