@@ -127,6 +127,12 @@ def _is_public(path: str) -> bool:
     # Allow OAuth login/callback paths
     if path.startswith("/auth/"):
         return True
+    # Allow v1 auth paths (OAuth2 login/callback)
+    if path.startswith("/api/v1/auth/"):
+        return True
+    # Allow Stripe webhook
+    if path == "/api/v1/billing/webhook":
+        return True
     return False
 
 
@@ -175,10 +181,29 @@ async def get_current_user(
         if credentials is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing API key. Provide Authorization: Bearer <api_key>",
+                detail="Missing API key or JWT. Provide Authorization: Bearer <token>",
             )
 
-        key_hash = hash_api_key(credentials.credentials)
+        token = credentials.credentials
+
+        # Try JWT token first (OAuth2 sessions)
+        try:
+            from faultray.api.oauth import decode_jwt
+
+            jwt_payload = decode_jwt(token)
+            if jwt_payload and "sub" in jwt_payload:
+                user_id = int(jwt_payload["sub"])
+                result = await session.execute(
+                    select(UserRow).where(UserRow.id == user_id)
+                )
+                user = result.scalar_one_or_none()
+                if user is not None:
+                    return user
+        except Exception:
+            pass
+
+        # Fall back to API key authentication
+        key_hash = hash_api_key(token)
         result = await session.execute(
             select(UserRow).where(UserRow.api_key_hash == key_hash)
         )
@@ -187,7 +212,7 @@ async def get_current_user(
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key.",
+                detail="Invalid API key or JWT token.",
             )
 
         return user

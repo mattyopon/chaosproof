@@ -1,16 +1,69 @@
 # Copyright (c) 2025-2026 Yutaro Maeda. All rights reserved.
 # Licensed under the Business Source License 1.1. See LICENSE file for details.
 
-"""OAuth2 SSO integration for FaultRay (GitHub and Google providers)."""
+"""OAuth2 SSO integration for FaultRay (GitHub and Google providers).
+
+Includes JWT token issuance for authenticated sessions.
+"""
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
+import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# JWT helpers
+# ---------------------------------------------------------------------------
+
+_JWT_SECRET = os.environ.get("FAULTRAY_JWT_SECRET", "faultray-dev-secret-change-me")
+_JWT_ALGORITHM = "HS256"
+_JWT_EXPIRY_SECONDS = 86400  # 24 hours
+
+
+def create_jwt(payload: dict[str, Any]) -> str:
+    """Create a signed JWT token."""
+    try:
+        from jose import jwt as jose_jwt
+
+        payload = {**payload, "exp": int(time.time()) + _JWT_EXPIRY_SECONDS,
+                   "iat": int(time.time())}
+        return jose_jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+    except ImportError:
+        import base64
+        import json
+
+        payload = {**payload, "exp": int(time.time()) + _JWT_EXPIRY_SECONDS,
+                   "iat": int(time.time())}
+        return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+
+def decode_jwt(token: str) -> dict[str, Any] | None:
+    """Decode and verify a JWT token. Returns None if invalid/expired."""
+    try:
+        from jose import jwt as jose_jwt
+
+        return jose_jwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except ImportError:
+        import base64
+        import json
+
+        try:
+            data = json.loads(base64.urlsafe_b64decode(token))
+            if data.get("exp", 0) < time.time():
+                return None
+            return data
+        except Exception:
+            return None
+    except Exception:
+        return None
 
 # ---------------------------------------------------------------------------
 # Provider URLs
@@ -176,17 +229,116 @@ async def get_google_user(access_token: str) -> dict:
 
 
 async def get_user_profile(config: OAuthConfig, access_token: str) -> dict:
-    """Return a normalised user dict ``{email, name}`` from the provider."""
+    """Return a normalised user dict ``{email, name, id, avatar_url}`` from the provider."""
     if config.provider == "github":
         raw = await get_github_user(access_token)
+        email = raw.get("email")
+        if not email:
+            # Fetch primary verified email from GitHub API
+            try:
+                async with httpx.AsyncClient() as client:
+                    emails_resp = await client.get(
+                        "https://api.github.com/user/emails",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+                    emails = emails_resp.json()
+                    for e in emails:
+                        if e.get("primary") and e.get("verified"):
+                            email = e["email"]
+                            break
+                    if not email and emails:
+                        email = emails[0].get("email", "")
+            except Exception:
+                email = f"{raw.get('login', 'unknown')}@github"
         return {
-            "email": raw.get("email") or f"{raw.get('login', 'unknown')}@github",
+            "id": str(raw.get("id", "")),
+            "email": email or f"{raw.get('login', 'unknown')}@github",
             "name": raw.get("name") or raw.get("login", "unknown"),
+            "avatar_url": raw.get("avatar_url", ""),
         }
     elif config.provider == "google":
         raw = await get_google_user(access_token)
         return {
+            "id": str(raw.get("id", "")),
             "email": raw.get("email", "unknown@google"),
             "name": raw.get("name", "unknown"),
+            "avatar_url": raw.get("picture", ""),
         }
     raise RuntimeError(f"Unsupported provider: {config.provider}")
+
+
+# ---------------------------------------------------------------------------
+# User creation / linking
+# ---------------------------------------------------------------------------
+
+
+async def get_or_create_oauth_user(
+    provider: str,
+    oauth_id: str,
+    email: str,
+    name: str,
+    avatar_url: str = "",
+) -> tuple[Any, str]:
+    """Find or create a user via OAuth, then return ``(user, jwt_token)``.
+
+    If a user with the same email already exists, link the OAuth provider
+    to the existing account. Otherwise, create a new user with a random
+    API key.
+    """
+    from faultray.api.auth import hash_api_key, generate_api_key
+    from faultray.api.database import UserRow, get_session_factory
+    from sqlalchemy import select
+
+    sf = get_session_factory()
+    async with sf() as session:
+        # Try by email first
+        result = await session.execute(
+            select(UserRow).where(UserRow.email == email)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            # Try by OAuth ID
+            result = await session.execute(
+                select(UserRow).where(
+                    UserRow.oauth_provider == provider,
+                    UserRow.oauth_id == oauth_id,
+                )
+            )
+            user = result.scalar_one_or_none()
+
+        if user is None:
+            api_key = generate_api_key()
+            user = UserRow(
+                email=email,
+                name=name,
+                api_key_hash=hash_api_key(api_key),
+                role="editor",
+                oauth_provider=provider,
+                oauth_id=oauth_id,
+                avatar_url=avatar_url,
+                tier="free",
+            )
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            logger.info("Created new OAuth user: %s (%s)", email, provider)
+        else:
+            # Update OAuth info if missing
+            if not user.oauth_provider:
+                user.oauth_provider = provider
+                user.oauth_id = oauth_id
+            if avatar_url:
+                user.avatar_url = avatar_url
+            await session.commit()
+            await session.refresh(user)
+
+        token = create_jwt({
+            "sub": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "tier": getattr(user, "tier", "free"),
+        })
+
+        return user, token

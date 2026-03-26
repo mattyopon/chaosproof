@@ -62,6 +62,11 @@ class UserRow(Base):
     api_key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="viewer")
     team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    # OAuth fields
+    oauth_provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    oauth_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    tier: Mapped[str] = mapped_column(String(20), nullable=False, server_default="free")
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False,
     )

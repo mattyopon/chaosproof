@@ -541,5 +541,8 @@ async def v1_compliance(framework: str, user=Depends(_require_permission("view_r
 # Must be included before _v1_router so typed routes take precedence
 # ---------------------------------------------------------------------------
 
+from faultray.api.v1.saas_routes import saas_router
+
 app.include_router(v1_router)
+app.include_router(saas_router)
 app.include_router(_v1_router)

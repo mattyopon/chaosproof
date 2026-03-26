@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class PricingTier(str, Enum):
     FREE = "free"
     PRO = "pro"
+    BUSINESS = "business"
     ENTERPRISE = "enterprise"
 
 
@@ -39,7 +40,7 @@ class UsageLimits:
 TIER_LIMITS: dict[PricingTier, UsageLimits] = {
     PricingTier.FREE: UsageLimits(
         max_components=5,
-        max_simulations_per_month=10,
+        max_simulations_per_month=5,
         compliance_reports=False,
         insurance_api=False,
         custom_sso=False,
@@ -47,11 +48,19 @@ TIER_LIMITS: dict[PricingTier, UsageLimits] = {
     ),
     PricingTier.PRO: UsageLimits(
         max_components=50,
-        max_simulations_per_month=-1,  # unlimited
+        max_simulations_per_month=100,
         compliance_reports=True,
         insurance_api=False,
         custom_sso=False,
         support_sla="email_24h",
+    ),
+    PricingTier.BUSINESS: UsageLimits(
+        max_components=-1,  # unlimited
+        max_simulations_per_month=-1,  # unlimited
+        compliance_reports=True,
+        insurance_api=True,
+        custom_sso=True,
+        support_sla="dedicated_1h",
     ),
     PricingTier.ENTERPRISE: UsageLimits(
         max_components=-1,  # unlimited
@@ -205,6 +214,7 @@ class UsageTracker:
 
 STRIPE_PRICE_MAP: dict[PricingTier, str] = {
     PricingTier.PRO: os.environ.get("STRIPE_PRICE_PRO", ""),
+    PricingTier.BUSINESS: os.environ.get("STRIPE_PRICE_BUSINESS", ""),
     PricingTier.ENTERPRISE: os.environ.get("STRIPE_PRICE_ENTERPRISE", ""),
 }
 
