@@ -108,6 +108,7 @@ _KNOWN_MODULES: list[str] = [
     "init_cmd",
     "agent_cmd",
     "governance_cmd",
+    "iac_cmd",
 ]
 
 
