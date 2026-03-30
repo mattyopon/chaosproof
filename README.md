@@ -187,6 +187,23 @@ faultray agent scenarios ai-workflow.yaml  # What could go wrong?
 
 Simulates AI-specific failures: hallucination cascades, context overflow, LLM rate limiting, token exhaustion, tool failures, agent loops, prompt injection.
 
+### Sensitivity Ratchet Simulation
+
+Measure how much damage the **sensitivity ratchet** prevents. The ratchet is a security mechanism where an agent's outbound permissions narrow irreversibly once it accesses data above a certain sensitivity threshold (PUBLIC < INTERNAL < CONFIDENTIAL < RESTRICTED < TOP_SECRET).
+
+```bash
+faultray agent ratchet                        # Run all built-in scenarios
+faultray agent ratchet --scenario exfiltration  # Single scenario
+faultray agent ratchet --json                 # Machine-readable output
+```
+
+Built-in scenarios:
+- **exfiltration** — Agent reads classified data then tries to send externally
+- **cross-agent** — Agent A passes classified data to Agent B who attempts external send
+- **escalation** — Agent gradually accesses higher-sensitivity data
+
+Each scenario runs twice (with and without the ratchet) and reports an **effectiveness score** showing how much data-leak damage the ratchet prevents.
+
 ### 5. Continuous Compliance Monitoring
 
 ```bash
