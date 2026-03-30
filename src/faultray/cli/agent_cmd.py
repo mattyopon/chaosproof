@@ -294,3 +294,134 @@ def agent_scenarios(
 
     console.print()
     console.print(sc_table)
+
+
+@agent_app.command("ratchet")
+def agent_ratchet(
+    topology: Path = typer.Argument(
+        None,
+        help="Topology YAML file (optional — built-in scenarios run without one)",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    scenario: str = typer.Option(
+        "all",
+        "--scenario",
+        "-s",
+        help="Scenario to run: exfiltration, cross-agent, escalation, or all",
+    ),
+) -> None:
+    """Simulate the Sensitivity Ratchet and measure its effectiveness.
+
+    Runs each scenario twice — once WITH and once WITHOUT the ratchet —
+    then reports how much data-leak damage the ratchet prevents.
+
+    Built-in scenarios:
+      - exfiltration:  Agent reads classified data then sends externally
+      - cross-agent:   Agent A passes classified data to Agent B who sends externally
+      - escalation:    Agent gradually accesses higher-sensitivity data
+
+    Examples:
+        faultray agent ratchet
+        faultray agent ratchet --scenario exfiltration
+        faultray agent ratchet --json
+    """
+    from faultray.simulator.ratchet_simulator import (
+        build_cross_agent_leak_scenario,
+        build_data_exfiltration_scenario,
+        build_gradual_escalation_scenario,
+        run_ratchet_simulation,
+    )
+
+    # Build scenario list
+    scenario_builders: dict[str, object] = {
+        "exfiltration": build_data_exfiltration_scenario,
+        "cross-agent": build_cross_agent_leak_scenario,
+        "escalation": build_gradual_escalation_scenario,
+    }
+
+    if scenario == "all":
+        to_run = list(scenario_builders.items())
+    elif scenario in scenario_builders:
+        to_run = [(scenario, scenario_builders[scenario])]
+    else:
+        console.print(f"[red]Unknown scenario: {scenario}[/]")
+        console.print(f"[dim]Available: {', '.join(scenario_builders.keys())}, all[/]")
+        raise typer.Exit(1)
+
+    results = []
+    for _key, builder in to_run:
+        name, profiles = builder()  # type: ignore[operator]
+        result = run_ratchet_simulation(name, profiles)
+        results.append(result)
+
+    if json_output:
+        data = [
+            {
+                "scenario_name": r.scenario_name,
+                "agents": r.agents,
+                "total_actions": r.total_actions,
+                "with_ratchet_leaks": r.with_ratchet_leaks,
+                "without_ratchet_leaks": r.without_ratchet_leaks,
+                "prevented_leaks": r.prevented_leaks,
+                "with_ratchet_damage": r.with_ratchet_damage,
+                "without_ratchet_damage": r.without_ratchet_damage,
+                "prevented_damage": r.prevented_damage,
+                "effectiveness_score": r.effectiveness_score,
+            }
+            for r in results
+        ]
+        console.print_json(data=data)
+        return
+
+    for r in results:
+        # Effectiveness color
+        if r.effectiveness_score >= 0.8:
+            eff_color = "green"
+        elif r.effectiveness_score >= 0.5:
+            eff_color = "yellow"
+        else:
+            eff_color = "red"
+
+        summary = (
+            f"[bold]Scenario:[/] {r.scenario_name}\n"
+            f"[bold]Agents:[/] {', '.join(r.agents)}  "
+            f"[bold]Actions:[/] {r.total_actions}\n\n"
+            f"[bold]WITHOUT Ratchet:[/] [red]{r.without_ratchet_leaks} leak(s)[/], "
+            f"damage = {r.without_ratchet_damage:.1f}\n"
+            f"[bold]WITH Ratchet:[/]    [green]{r.with_ratchet_leaks} leak(s)[/], "
+            f"damage = {r.with_ratchet_damage:.1f}\n"
+            f"[bold]Prevented:[/]       {r.prevented_leaks} leak(s), "
+            f"damage prevented = {r.prevented_damage:.1f}\n\n"
+            f"[bold]Effectiveness Score:[/] [{eff_color}]{r.effectiveness_score:.0%}[/]"
+        )
+        console.print()
+        console.print(Panel(summary, title="[bold]Sensitivity Ratchet Simulation[/]", border_style="cyan"))
+
+        # Show leak events
+        if r.leak_events:
+            ev_table = Table(title="Leak Events (with ratchet)", show_header=True)
+            ev_table.add_column("Step", width=6, justify="right")
+            ev_table.add_column("Agent", width=18)
+            ev_table.add_column("Action", width=16)
+            ev_table.add_column("Sensitivity", width=14)
+            ev_table.add_column("Result", width=12, justify="center")
+            ev_table.add_column("Detail", width=50)
+
+            for ev in r.leak_events:
+                if ev.leaked:
+                    result_str = "[red]LEAKED[/]"
+                else:
+                    result_str = "[green]BLOCKED[/]"
+                ev_table.add_row(
+                    str(ev.step),
+                    ev.agent_id,
+                    ev.action.action_type,
+                    ev.data_sensitivity.name,
+                    result_str,
+                    ev.detail[:50] + ("..." if len(ev.detail) > 50 else ""),
+                )
+
+            console.print()
+            console.print(ev_table)
+
+    console.print()
