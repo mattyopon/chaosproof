@@ -57,11 +57,14 @@ class TestVercelAPMEndpoints:
         data = resp.json()
         assert isinstance(data, list)
 
-    def test_get_agents_demo_data_not_empty(self) -> None:
+    def test_get_agents_returns_valid_structure(self) -> None:
         resp = httpx.get(f"{FAULTRAY_URL}/api/apm/agents", timeout=_TIMEOUT)
         assert resp.status_code == 200
         agents = resp.json()
-        assert len(agents) >= 1
+        # May be empty (Supabase connected but no agents) or demo data
+        assert isinstance(agents, list)
+        if agents:
+            assert "agent_id" in agents[0] or "hostname" in agents[0]
 
     def test_get_alerts_returns_200(self) -> None:
         resp = httpx.get(f"{FAULTRAY_URL}/api/apm/alerts", timeout=_TIMEOUT)
@@ -186,14 +189,15 @@ class TestVercelHealthEndpoint:
 class TestVercelRootEndpoint:
     """Tests for the root landing page."""
 
-    def test_root_returns_200(self) -> None:
-        resp = httpx.get(FAULTRAY_URL, timeout=_TIMEOUT)
-        assert resp.status_code == 200
+    def test_root_returns_200_or_redirect(self) -> None:
+        resp = httpx.get(FAULTRAY_URL, timeout=_TIMEOUT, follow_redirects=False)
+        # Root may redirect to /en or /ja (i18n proxy)
+        assert resp.status_code in (200, 301, 302, 307, 308)
 
-    def test_root_content_type_html_or_json(self) -> None:
-        resp = httpx.get(FAULTRAY_URL, timeout=_TIMEOUT)
+    def test_root_resolves_to_html(self) -> None:
+        resp = httpx.get(FAULTRAY_URL, timeout=_TIMEOUT, follow_redirects=True)
         ct = resp.headers.get("content-type", "")
-        assert "text/html" in ct or "application/json" in ct
+        assert "text/html" in ct
 
     def test_root_no_500_error(self) -> None:
         resp = httpx.get(FAULTRAY_URL, timeout=_TIMEOUT)
