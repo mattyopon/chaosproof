@@ -96,7 +96,7 @@ all-clouds = [
     "pynetbox>=7.0",
 ]
 mcp = [
-    "mcp>=1.0,<1.26",
+    "mcp>=1.0,<1.27",
 ]
 dev = [
     "pytest>=8.0",
