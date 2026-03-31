@@ -300,6 +300,11 @@ from faultray.api.leaderboard import leaderboard_router
 
 app.include_router(leaderboard_router)
 
+# APM Collector routes
+from faultray.apm.collector import apm_router
+
+app.include_router(apm_router)
+
 
 # ---------------------------------------------------------------------------
 # Stripe Billing routes (inline because they use module-level _stripe_mgr)

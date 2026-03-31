@@ -107,6 +107,7 @@ _KNOWN_MODULES: list[str] = [
     "financial_cmd",
     "init_cmd",
     "agent_cmd",
+    "apm_cmd",
     "governance_cmd",
     "iac_cmd",
     "start_cmd",
@@ -189,6 +190,8 @@ _HELP_PANELS: dict[str, str] = {
     "feed-list": "🔒 Security",
     "feed-sources": "🔒 Security",
     "feed-clear": "🔒 Security",
+    # --- APM ---
+    "apm": "📡 APM (Application Performance Monitoring)",
     # --- Operations & Monitoring ---
     "daemon": "📈 Operations & Monitoring",
     "history": "📈 Operations & Monitoring",
