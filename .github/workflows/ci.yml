@@ -42,14 +42,59 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -v --tb=short 2>&1 | tee test-output.txt
+          pytest -v --tb=short --junitxml=test-results.xml 2>&1 | tee test-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+
           echo ""
           echo "=========================================="
           echo "TEST SUMMARY"
           echo "=========================================="
-          grep -E "^(FAILED|PASSED|ERROR|=)" test-output.txt | tail -5
+          SUMMARY=$(grep -E "passed|failed|error" test-output.txt | tail -1)
+          echo "$SUMMARY"
           echo "=========================================="
-          exit ${PIPESTATUS[0]}
+
+          # ② Test proof: SHA-256 hash of results
+          PASSED=$(echo "$SUMMARY" | grep -oP '\d+ passed' | grep -oP '\d+' || echo "0")
+          FAILED=$(echo "$SUMMARY" | grep -oP '\d+ failed' | grep -oP '\d+' || echo "0")
+          TOTAL=$((PASSED + FAILED))
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          COMMIT=$(git rev-parse HEAD)
+          echo "$PASSED passed, $FAILED failed, total $TOTAL at $TIMESTAMP commit $COMMIT" > test-proof.txt
+          SHA256=$(sha256sum test-proof.txt | cut -d' ' -f1)
+          echo "SHA256: $SHA256" >> test-proof.txt
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "  TEST PROOF (SHA-256 signed)"
+          echo "═══════════════════════════════════════════"
+          cat test-proof.txt
+          echo "═══════════════════════════════════════════"
+
+          exit $EXIT_CODE
+
+      # ④ Test count regression guard
+      - name: Test count regression guard
+        if: matrix.python-version == '3.12'
+        run: |
+          CURRENT=$(grep -oP '\d+ passed' test-output.txt | grep -oP '\d+' || echo "0")
+          MIN_TESTS=31000
+          echo "Current: $CURRENT / Minimum: $MIN_TESTS"
+          if [ "$CURRENT" -lt "$MIN_TESTS" ]; then
+            echo "❌ TEST COUNT REGRESSION: $CURRENT < $MIN_TESTS"
+            exit 1
+          fi
+          echo "✅ Test count OK"
+
+      # ② Upload test proof artifacts
+      - name: Upload test proof
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-proof-${{ github.sha }}
+          path: |
+            test-proof.txt
+            test-output.txt
+            test-results.xml
+          retention-days: 90
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.12'
