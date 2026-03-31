@@ -9,6 +9,12 @@ Provides Japanese AI governance framework assessment based on:
 - AI推進法 (6 chapters, 15 requirements)
 
 Ported from JPGovAI project with cross-framework mapping support.
+
+Extended with:
+- AI System Registry (ai_registry)
+- Evidence Management with audit trail (evidence_manager)
+- Policy Template Generator (policy_generator)
+- Enhanced Gap Analysis with roadmap (gap_analyzer)
 """
 
 from faultray.governance.assessor import (
