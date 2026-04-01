@@ -42,12 +42,7 @@ jobs:
 
       - name: Run tests
         run: |
-          COV_ARGS=""
-          if [ "${{ matrix.python-version }}" = "3.12" ]; then
-            pip install pytest-cov
-            COV_ARGS="--cov=faultray --cov-report=xml --cov-report=term-missing"
-          fi
-          pytest -v --tb=short --junitxml=test-results.xml $COV_ARGS 2>&1 | tee test-output.txt
+          pytest -v --tb=short --junitxml=test-results.xml 2>&1 | tee test-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
 
           echo ""
@@ -101,12 +96,6 @@ jobs:
             test-results.xml
           retention-days: 90
 
-      - name: Upload coverage
-        if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v6
-        with:
-          file: ./coverage.xml
-        continue-on-error: true
 
   e2e:
     name: Real E2E Tests (no mocks)
@@ -179,6 +168,34 @@ jobs:
         # Threshold violations are reported but do NOT fail the build (continue-on-error)
         continue-on-error: true
         run: pytest tests/test_perf_benchmarks.py -v --tb=short
+
+  coverage:
+    runs-on: ubuntu-latest
+    # Run only on the weekly schedule trigger — too slow for every push
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pytest-cov
+
+      - name: Run tests with coverage
+        run: pytest --cov=faultray --cov-report=xml --cov-report=term-missing -q --tb=short
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v6
+        with:
+          file: ./coverage.xml
+        continue-on-error: true
 
   mutation:
     runs-on: ubuntu-latest
