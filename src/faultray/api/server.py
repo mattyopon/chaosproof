@@ -45,6 +45,22 @@ class RateLimiter:
         self.requests: dict[str, list[float]] = defaultdict(list)
         self._lock = threading.Lock()
 
+    def _cleanup(self) -> None:
+        """Remove expired entries; evict LRU entries when MAX_KEYS is exceeded."""
+        now = time.time()
+        cutoff = now - self.window
+        expired = [k for k, v in self.requests.items() if not v or v[-1] < cutoff]
+        for k in expired:
+            del self.requests[k]
+        # LRU eviction when still over the limit after expiry cleanup
+        if len(self.requests) > self.MAX_KEYS:
+            sorted_keys = sorted(
+                self.requests.keys(),
+                key=lambda k: self.requests[k][-1] if self.requests[k] else 0.0,
+            )
+            for k in sorted_keys[: len(self.requests) - self.MAX_KEYS]:
+                del self.requests[k]
+
     def is_allowed(self, client_id: str) -> bool:
         now = time.time()
         with self._lock:
@@ -54,11 +70,9 @@ class RateLimiter:
             if len(self.requests[client_id]) >= self.max_requests:
                 return False
             self.requests[client_id].append(now)
-            # Periodic cleanup: remove keys with empty timestamp lists
+            # Periodic cleanup to prevent unbounded memory growth
             if len(self.requests) > self.MAX_KEYS:
-                empty_keys = [k for k, v in self.requests.items() if not v]
-                for k in empty_keys:
-                    del self.requests[k]
+                self._cleanup()
             return True
 
 

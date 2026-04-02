@@ -326,15 +326,15 @@ class GovernanceAssessor:
 
         # ISO coverage
         iso_scores: list[float] = []
-        for req in all_iso_requirements():
-            mapped_scores = [meti_score_map.get(mid, 0.0) for mid in req.meti_mapping]
+        for iso_req in all_iso_requirements():
+            mapped_scores = [meti_score_map.get(mid, 0.0) for mid in iso_req.meti_mapping]
             if mapped_scores:
                 iso_scores.append(sum(mapped_scores) / len(mapped_scores))
 
         # Act coverage
         act_scores: list[float] = []
-        for req in all_act_requirements():
-            mapped_scores = [meti_score_map.get(mid, 0.0) for mid in req.meti_mapping]
+        for act_req in all_act_requirements():
+            mapped_scores = [meti_score_map.get(mid, 0.0) for mid in act_req.meti_mapping]
             if mapped_scores:
                 act_scores.append(sum(mapped_scores) / len(mapped_scores))
 

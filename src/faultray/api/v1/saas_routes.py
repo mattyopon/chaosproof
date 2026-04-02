@@ -99,6 +99,9 @@ async def auth_github_start():
 
     Returns the GitHub authorization URL to redirect the user to.
     """
+    import hashlib
+    import hmac as _hmac
+
     from faultray.api.oauth import OAuthConfig, generate_oauth_url
 
     config = OAuthConfig.from_env("github")
@@ -108,7 +111,13 @@ async def auth_github_start():
             detail="GitHub OAuth is not configured. Set FAULTRAY_OAUTH_GITHUB_CLIENT_ID and FAULTRAY_OAUTH_GITHUB_CLIENT_SECRET.",
         )
 
-    state = secrets.token_urlsafe(32)
+    # Generate HMAC-signed state token to enable CSRF validation in callback
+    nonce = secrets.token_urlsafe(32)
+    signature = _hmac.new(
+        config.client_secret.encode(), nonce.encode(), hashlib.sha256
+    ).hexdigest()
+    state = f"{nonce}.{signature}"
+
     # Override redirect_uri to point to our v1 callback
     config.redirect_uri = config.redirect_uri.replace(
         "/auth/callback", "/api/v1/auth/callback/github"
@@ -124,6 +133,9 @@ async def auth_google_start():
 
     Returns the Google authorization URL to redirect the user to.
     """
+    import hashlib
+    import hmac as _hmac
+
     from faultray.api.oauth import OAuthConfig, generate_oauth_url
 
     config = OAuthConfig.from_env("google")
@@ -133,7 +145,13 @@ async def auth_google_start():
             detail="Google OAuth is not configured. Set FAULTRAY_OAUTH_GOOGLE_CLIENT_ID and FAULTRAY_OAUTH_GOOGLE_CLIENT_SECRET.",
         )
 
-    state = secrets.token_urlsafe(32)
+    # Generate HMAC-signed state token to enable CSRF validation in callback
+    nonce = secrets.token_urlsafe(32)
+    signature = _hmac.new(
+        config.client_secret.encode(), nonce.encode(), hashlib.sha256
+    ).hexdigest()
+    state = f"{nonce}.{signature}"
+
     config.redirect_uri = config.redirect_uri.replace(
         "/auth/callback", "/api/v1/auth/callback/google"
     )
@@ -149,6 +167,9 @@ async def auth_callback(provider: str, code: str = "", state: str = ""):
     Exchanges the authorization code for an access token, creates or
     links the user account, and returns a JWT token.
     """
+    import hashlib
+    import hmac as _hmac
+
     if provider not in ("github", "google"):
         raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
 
@@ -168,6 +189,20 @@ async def auth_callback(provider: str, code: str = "", state: str = ""):
             status_code=503,
             detail=f"{provider.title()} OAuth is not configured.",
         )
+
+    # --- CSRF validation: verify HMAC signature embedded in state token ---
+    if not state:
+        raise HTTPException(status_code=400, detail="Missing OAuth state parameter")
+    parts = state.split(".", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Malformed OAuth state token")
+    nonce, signature = parts
+    expected_sig = _hmac.new(
+        config.client_secret.encode(), nonce.encode(), hashlib.sha256
+    ).hexdigest()
+    if not _hmac.compare_digest(signature, expected_sig):
+        logger.warning("OAuth CSRF check failed: HMAC signature mismatch for provider=%s", provider)
+        raise HTTPException(status_code=400, detail="Invalid OAuth state signature")
 
     # Override redirect_uri to match what we sent
     config.redirect_uri = config.redirect_uri.replace(
