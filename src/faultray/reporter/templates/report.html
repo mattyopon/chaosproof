@@ -350,6 +350,25 @@
     .stats-row { gap: 1rem; }
     .stat-card { min-width: 100px; padding: 0.8rem 1rem; }
   }
+  /* Print-friendly styles */
+  @media print {
+    :root {
+      --bg-primary: #fff;
+      --bg-secondary: #f8f9fa;
+      --bg-tertiary: #e9ecef;
+      --border: #dee2e6;
+      --text-primary: #212529;
+      --text-secondary: #495057;
+      --text-muted: #6c757d;
+    }
+    body { padding: 0; background: #fff; color: #212529; }
+    .container { max-width: 100%; box-shadow: none; border: none; }
+    .score-badge { border-width: 3px; }
+    .finding-card, .stat-card, table { break-inside: avoid; }
+    h2 { break-after: avoid; }
+    .dep-map { break-inside: avoid; }
+    .footer { margin-top: 2rem; }
+  }
 </style>
 </head>
 <body>
