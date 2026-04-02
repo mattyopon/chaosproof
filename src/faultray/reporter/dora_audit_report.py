@@ -219,6 +219,26 @@ class DORAuditReportGenerator:
         )
 
     # ------------------------------------------------------------------
+    # PDF rendering
+    # ------------------------------------------------------------------
+
+    def render_pdf(self, report: DORAuditReport, output_path: Path) -> Path:
+        """Render a regulator-ready PDF audit report to *output_path*.
+
+        Args:
+            report: A completed :class:`DORAuditReport`.
+            output_path: Destination ``.pdf`` file path.
+
+        Returns:
+            Resolved absolute path of the written PDF.
+        """
+        pdf_data = self.export_pdf_data(report)
+        from faultray.reporter.dora_pdf_report import DORAuditPDFRenderer
+
+        renderer = DORAuditPDFRenderer(pdf_data)
+        return renderer.render(output_path)
+
+    # ------------------------------------------------------------------
     # PDF data export
     # ------------------------------------------------------------------
 

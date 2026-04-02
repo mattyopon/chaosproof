@@ -95,6 +95,9 @@ all-clouds = [
     "oci>=2.0",
     "pynetbox>=7.0",
 ]
+pdf = [
+    "fpdf2>=2.8",
+]
 mcp = [
     "mcp>=1.0,<1.27",
 ]

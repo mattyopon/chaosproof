@@ -502,18 +502,22 @@ def dora_register(
 @dora_app.command("report")
 def dora_report(
     model: Annotated[Path, typer.Argument(help="Infrastructure model file (.yaml/.json)")],
-    output: Annotated[Path, typer.Option("--output", "-o", help="Output HTML report path")],
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output report path (HTML or PDF)")],
     signed: Annotated[bool, typer.Option("--signed", help="Include signed audit trail")] = False,
     simulate: Annotated[bool, typer.Option("--simulate", "-s", help="Run chaos simulation first")] = False,
     entity: Annotated[str, typer.Option("--entity", help="Reporting entity name")] = "Financial Institution",
+    pdf: Annotated[bool, typer.Option("--pdf", help="Generate PDF report instead of HTML")] = False,
 ) -> None:
-    """Generate a comprehensive HTML DORA compliance report.
+    """Generate a comprehensive DORA compliance report (HTML or PDF).
 
-    Produces a single-file HTML report with executive summary, article-level
+    Produces a single-file report with executive summary, article-level
     results, gap analysis, evidence tables, and remediation plan.
+
+    Use --pdf to generate an audit-quality PDF instead of HTML.
 
     Examples:
         faultray dora report infra.yaml --output dora-report.html
+        faultray dora report infra.yaml --output dora-report.pdf --pdf
         faultray dora report infra.yaml --output dora-report.html --signed
         faultray dora report infra.yaml --output dora-report.html --simulate
     """
@@ -789,25 +793,47 @@ def dora_report(
 </body>
 </html>"""
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(report_html, encoding="utf-8")
-
     compliance_rate_val = round(
         report.compliant_count / max(report.total_controls, 1) * 100, 1
     )
     status_color = _status_color(report.overall_status.value)
-    console.print(Panel(
-        f"[bold]Report:[/] {output}\n"
-        f"[bold]Entity:[/] {report.reporting_entity}\n"
-        f"[bold]Overall Status:[/] [{status_color}]{report.overall_status.value.upper()}[/]\n"
-        f"[bold]Compliance Rate:[/] {compliance_rate_val}%\n"
-        f"[bold]Controls:[/] {report.total_controls} | "
-        f"[green]{report.compliant_count} ✓[/] | "
-        f"[yellow]{report.partially_compliant_count} ~[/] | "
-        f"[red]{report.non_compliant_count} ✗[/]",
-        title="[bold]DORA HTML Report Generated[/]",
-        border_style="cyan",
-    ))
+
+    if pdf:
+        # PDF rendering path
+        try:
+            resolved = gen.render_pdf(report, output)
+        except ImportError as exc:
+            console.print(f"[bold red]Error:[/] {exc}")
+            raise typer.Exit(code=1) from exc
+        console.print(Panel(
+            f"[bold]Report:[/] {resolved}\n"
+            f"[bold]Format:[/] PDF (audit-quality)\n"
+            f"[bold]Entity:[/] {report.reporting_entity}\n"
+            f"[bold]Overall Status:[/] [{status_color}]{report.overall_status.value.upper()}[/]\n"
+            f"[bold]Compliance Rate:[/] {compliance_rate_val}%\n"
+            f"[bold]Controls:[/] {report.total_controls} | "
+            f"[green]{report.compliant_count} ✓[/] | "
+            f"[yellow]{report.partially_compliant_count} ~[/] | "
+            f"[red]{report.non_compliant_count} ✗[/]",
+            title="[bold]DORA PDF Report Generated[/]",
+            border_style="cyan",
+        ))
+    else:
+        # HTML rendering path (existing behaviour)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(report_html, encoding="utf-8")
+        console.print(Panel(
+            f"[bold]Report:[/] {output}\n"
+            f"[bold]Entity:[/] {report.reporting_entity}\n"
+            f"[bold]Overall Status:[/] [{status_color}]{report.overall_status.value.upper()}[/]\n"
+            f"[bold]Compliance Rate:[/] {compliance_rate_val}%\n"
+            f"[bold]Controls:[/] {report.total_controls} | "
+            f"[green]{report.compliant_count} ✓[/] | "
+            f"[yellow]{report.partially_compliant_count} ~[/] | "
+            f"[red]{report.non_compliant_count} ✗[/]",
+            title="[bold]DORA HTML Report Generated[/]",
+            border_style="cyan",
+        ))
 
 
 # ---------------------------------------------------------------------------
