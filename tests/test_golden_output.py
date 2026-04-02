@@ -290,10 +290,11 @@ class TestSimulateAdditional:
         if "total_scenarios" not in data:
             return
         total = data["total_scenarios"]
-        counted = data["critical"] + data["warning"] + data["passed"]
+        n_info = data.get("info", 0)
+        counted = data["critical"] + data["warning"] + n_info + data["passed"]
         assert counted == total, (
             f"critical({data['critical']}) + warning({data['warning']}) + "
-            f"passed({data['passed']}) = {counted} != total_scenarios({total})"
+            f"info({n_info}) + passed({data['passed']}) = {counted} != total_scenarios({total})"
         )
 
     def test_simulate_no_unexpected_keys_at_top_level(self):

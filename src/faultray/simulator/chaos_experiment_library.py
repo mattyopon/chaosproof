@@ -682,6 +682,22 @@ _COMPONENT_CATEGORY_RELEVANCE: dict[str, list[ExperimentCategory]] = {
         ExperimentCategory.CAPACITY,
         ExperimentCategory.CONFIGURATION,
     ],
+    ComponentType.AUTOMATION.value: [
+        ExperimentCategory.AVAILABILITY,
+        ExperimentCategory.LATENCY,
+        ExperimentCategory.CONFIGURATION,
+    ],
+    ComponentType.SERVERLESS.value: [
+        ExperimentCategory.AVAILABILITY,
+        ExperimentCategory.LATENCY,
+        ExperimentCategory.DEPENDENCY,
+        ExperimentCategory.CONFIGURATION,
+    ],
+    ComponentType.SCHEDULED_JOB.value: [
+        ExperimentCategory.AVAILABILITY,
+        ExperimentCategory.LATENCY,
+        ExperimentCategory.CONFIGURATION,
+    ],
 }
 
 

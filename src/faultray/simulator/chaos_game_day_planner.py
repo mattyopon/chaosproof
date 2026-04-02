@@ -275,6 +275,9 @@ _COMPONENT_INJECTION_MAP: dict[ComponentType, list[str]] = {
     ComponentType.LLM_ENDPOINT: ["rate_limit_hit", "model_degradation", "timeout"],
     ComponentType.TOOL_SERVICE: ["tool_timeout", "invalid_input", "resource_exhaustion"],
     ComponentType.AGENT_ORCHESTRATOR: ["workflow_deadlock", "agent_timeout", "state_corruption"],
+    ComponentType.AUTOMATION: ["trigger_failure", "execution_timeout", "resource_exhaustion"],
+    ComponentType.SERVERLESS: ["cold_start_latency", "timeout", "memory_exhaustion"],
+    ComponentType.SCHEDULED_JOB: ["job_skip", "execution_timeout", "resource_exhaustion"],
 }
 
 # ---------------------------------------------------------------------------

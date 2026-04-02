@@ -46,6 +46,9 @@ _BASE_MONTHLY_COST: dict[ComponentType, float] = {
     ComponentType.LLM_ENDPOINT: 800.0,
     ComponentType.TOOL_SERVICE: 150.0,
     ComponentType.AGENT_ORCHESTRATOR: 250.0,
+    ComponentType.AUTOMATION: 50.0,
+    ComponentType.SERVERLESS: 180.0,
+    ComponentType.SCHEDULED_JOB: 100.0,
 }
 
 # Tier classification for cost reporting.
@@ -64,6 +67,9 @@ _COMPONENT_TIER: dict[ComponentType, str] = {
     ComponentType.LLM_ENDPOINT: "compute",
     ComponentType.TOOL_SERVICE: "compute",
     ComponentType.AGENT_ORCHESTRATOR: "compute",
+    ComponentType.AUTOMATION: "compute",
+    ComponentType.SERVERLESS: "compute",
+    ComponentType.SCHEDULED_JOB: "compute",
 }
 
 # Minimum replicas threshold factor — replicas above this multiple of the

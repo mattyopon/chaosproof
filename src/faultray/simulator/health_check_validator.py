@@ -144,6 +144,9 @@ _RECOMMENDED_CHECK_TYPES: dict[ComponentType, HealthCheckType] = {
     ComponentType.LLM_ENDPOINT: HealthCheckType.HTTP,
     ComponentType.TOOL_SERVICE: HealthCheckType.HTTP,
     ComponentType.AGENT_ORCHESTRATOR: HealthCheckType.HTTP,
+    ComponentType.AUTOMATION: HealthCheckType.HTTP,
+    ComponentType.SERVERLESS: HealthCheckType.HTTP,
+    ComponentType.SCHEDULED_JOB: HealthCheckType.HTTP,
 }
 
 

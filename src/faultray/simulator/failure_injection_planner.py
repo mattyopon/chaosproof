@@ -162,6 +162,9 @@ _CRITICALITY_WEIGHTS: dict[ComponentType, float] = {
     ComponentType.LLM_ENDPOINT: 0.60,
     ComponentType.TOOL_SERVICE: 0.50,
     ComponentType.AGENT_ORCHESTRATOR: 0.80,
+    ComponentType.AUTOMATION: 0.60,
+    ComponentType.SERVERLESS: 0.65,
+    ComponentType.SCHEDULED_JOB: 0.55,
 }
 
 _SAFETY_CONCERN: dict[ComponentType, float] = {
@@ -179,6 +182,9 @@ _SAFETY_CONCERN: dict[ComponentType, float] = {
     ComponentType.LLM_ENDPOINT: 0.45,
     ComponentType.TOOL_SERVICE: 0.35,
     ComponentType.AGENT_ORCHESTRATOR: 0.70,
+    ComponentType.AUTOMATION: 0.40,
+    ComponentType.SERVERLESS: 0.45,
+    ComponentType.SCHEDULED_JOB: 0.35,
 }
 
 _METHOD_SUITABILITY: dict[ComponentType, list[InjectionType]] = {
@@ -274,6 +280,25 @@ _METHOD_SUITABILITY: dict[ComponentType, list[InjectionType]] = {
         InjectionType.MEMORY_PRESSURE,
         InjectionType.NETWORK_DELAY,
         InjectionType.DEPENDENCY_TIMEOUT,
+        InjectionType.CLOCK_SKEW,
+    ],
+    ComponentType.AUTOMATION: [
+        InjectionType.PROCESS_KILL,
+        InjectionType.CPU_STRESS,
+        InjectionType.NETWORK_DELAY,
+        InjectionType.CLOCK_SKEW,
+    ],
+    ComponentType.SERVERLESS: [
+        InjectionType.PROCESS_KILL,
+        InjectionType.CPU_STRESS,
+        InjectionType.MEMORY_PRESSURE,
+        InjectionType.NETWORK_DELAY,
+        InjectionType.DEPENDENCY_TIMEOUT,
+    ],
+    ComponentType.SCHEDULED_JOB: [
+        InjectionType.PROCESS_KILL,
+        InjectionType.CPU_STRESS,
+        InjectionType.MEMORY_PRESSURE,
         InjectionType.CLOCK_SKEW,
     ],
 }

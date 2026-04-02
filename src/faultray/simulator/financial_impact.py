@@ -78,6 +78,9 @@ DEFAULT_COST_PER_HOUR: dict[str, float] = {
     "llm_endpoint": 4_000.0,
     "tool_service": 2_000.0,
     "agent_orchestrator": 5_000.0,
+    "automation": 1_000.0,
+    "serverless": 4_000.0,
+    "scheduled_job": 2_000.0,
     "custom": 3_000.0,
 }
 
@@ -96,6 +99,9 @@ DEFAULT_FIX_COST_PER_YEAR: dict[str, float] = {
     "llm_endpoint": 6_000.0,
     "tool_service": 4_800.0,
     "agent_orchestrator": 12_000.0,
+    "automation": 2_400.0,
+    "serverless": 9_600.0,
+    "scheduled_job": 4_800.0,
     "custom": 6_000.0,
 }
 
