@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FaultRay - Compliance Evidence Report</title>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eaeef2;
+    --border: #d0d7de;
+    --text-primary: #24292f;
+    --text-secondary: #57606a;
+    --text-muted: #8c959f;
+    --accent-green: #1a7f37;
+    --accent-yellow: #9a6700;
+    --accent-red: #cf222e;
+    --accent-blue: #0969da;
+    --accent-purple: #8250df;
+    --pass-bg: #dafbe1;
+    --fail-bg: #ffebe9;
+    --partial-bg: #fff8c5;
+    --na-bg: #f6f8fa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    padding: 2rem;
+    font-size: 14px;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* Header */
+  .report-header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .report-header-left h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .report-header-left .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .report-header-right {
+    text-align: right;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+
+  .report-header-right .org-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .badge-pass { background: var(--pass-bg); color: var(--accent-green); }
+  .badge-fail { background: var(--fail-bg); color: var(--accent-red); }
+  .badge-partial { background: var(--partial-bg); color: var(--accent-yellow); }
+  .badge-na { background: var(--na-bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+  /* Section headings */
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  /* Executive summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .summary-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    background: var(--bg-secondary);
+  }
+
+  .summary-card .fw-name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .summary-card .compliance-pct {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pct-green { color: var(--accent-green); }
+  .pct-yellow { color: var(--accent-yellow); }
+  .pct-red { color: var(--accent-red); }
+
+  .summary-card .pct-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+
+  .summary-card .pct-detail {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+  }
+
+  /* Framework section */
+  .framework-section {
+    margin-bottom: 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    break-inside: avoid;
+  }
+
+  .framework-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .framework-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .framework-stats {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+
+  /* Check table */
+  .check-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .check-table th {
+    background: var(--bg-tertiary);
+    padding: 0.5rem 1rem;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .check-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+    vertical-align: top;
+    font-size: 0.85rem;
+  }
+
+  .check-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .check-table tr:hover td {
+    background: var(--bg-secondary);
+  }
+
+  .control-id {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--accent-blue);
+    white-space: nowrap;
+  }
+
+  .check-description { font-weight: 500; }
+
+  .evidence-text {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-family: "SFMono-Regular", Consolas, monospace;
+    word-break: break-word;
+  }
+
+  .recommendation-text {
+    font-size: 0.78rem;
+    color: var(--accent-yellow);
+    font-style: italic;
+  }
+
+  /* Infrastructure components */
+  .component-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .component-table th {
+    background: var(--bg-tertiary);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .component-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+
+  .component-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .type-pill {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  /* Footer */
+  .report-footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* @media print — white background, avoid page breaks inside sections */
+  @media print {
+    body {
+      padding: 1rem;
+      font-size: 12px;
+    }
+
+    .report-header {
+      page-break-after: avoid;
+    }
+
+    .framework-section {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .summary-grid {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .check-table tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* Force white background for print */
+    * {
+      background: #ffffff !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .badge-pass { color: var(--accent-green) !important; border: 1px solid var(--accent-green); }
+    .badge-fail { color: var(--accent-red) !important; border: 1px solid var(--accent-red); }
+    .badge-partial { color: var(--accent-yellow) !important; border: 1px solid var(--accent-yellow); }
+
+    .report-footer {
+      position: fixed;
+      bottom: 1rem;
+      left: 1rem;
+      right: 1rem;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="report-header">
+    <div class="report-header-left">
+      <h1>Compliance Evidence Report</h1>
+      <div class="subtitle">Infrastructure Compliance Assessment — Audit Ready</div>
+    </div>
+    <div class="report-header-right">
+      <div class="org-name">{{ org_name }}</div>
+      <div>Assessment Date: {{ assessment_date }}</div>
+      <div>Frameworks: {{ frameworks | join(", ") | upper }}</div>
+      <div>Components: {{ total_components }}</div>
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div class="section-title">Executive Summary</div>
+  <div class="summary-grid">
+    {% for fw_summary in framework_summaries %}
+    <div class="summary-card">
+      <div class="fw-name">{{ fw_summary.framework }}</div>
+      <div class="compliance-pct {{ fw_summary.pct_class }}">{{ fw_summary.compliance_pct }}%</div>
+      <div class="pct-label">Compliance Rate</div>
+      <div class="pct-detail">
+        {{ fw_summary.passed }} pass / {{ fw_summary.partial }} partial / {{ fw_summary.failed }} fail
+        ({{ fw_summary.total }} controls)
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Detailed Checks per Framework -->
+  <div class="section-title">Detailed Control Assessment</div>
+  {% for fw_detail in framework_details %}
+  <div class="framework-section">
+    <div class="framework-header">
+      <h3>{{ fw_detail.framework | upper }}</h3>
+      <div class="framework-stats">
+        Compliance: {{ fw_detail.compliance_pct }}% &nbsp;|&nbsp;
+        {{ fw_detail.passed }} pass &nbsp; {{ fw_detail.partial }} partial &nbsp; {{ fw_detail.failed }} fail
+      </div>
+    </div>
+    <table class="check-table">
+      <thead>
+        <tr>
+          <th style="width:8%">Control ID</th>
+          <th style="width:22%">Description</th>
+          <th style="width:10%">Status</th>
+          <th style="width:30%">Evidence</th>
+          <th style="width:30%">Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for chk in fw_detail.checks %}
+        <tr>
+          <td><span class="control-id">{{ chk.control_id }}</span></td>
+          <td class="check-description">{{ chk.description }}</td>
+          <td>
+            {% if chk.status == "pass" %}
+              <span class="badge badge-pass">Pass</span>
+            {% elif chk.status == "fail" %}
+              <span class="badge badge-fail">Fail</span>
+            {% elif chk.status == "partial" %}
+              <span class="badge badge-partial">Partial</span>
+            {% else %}
+              <span class="badge badge-na">N/A</span>
+            {% endif %}
+          </td>
+          <td><span class="evidence-text">{{ chk.evidence }}</span></td>
+          <td>
+            {% if chk.recommendation %}
+              <span class="recommendation-text">{{ chk.recommendation }}</span>
+            {% else %}
+              <span class="evidence-text" style="color:#8c959f">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  <!-- Infrastructure Overview -->
+  <div class="section-title">Infrastructure Overview</div>
+  <div class="framework-section">
+    <table class="component-table">
+      <thead>
+        <tr>
+          <th>Component ID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Replicas</th>
+          <th>Host</th>
+          <th>Port</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comp in components %}
+        <tr>
+          <td><span class="control-id">{{ comp.id }}</span></td>
+          <td>{{ comp.name }}</td>
+          <td><span class="type-pill">{{ comp.type }}</span></td>
+          <td>{{ comp.replicas }}</td>
+          <td>{{ comp.host or "—" }}</td>
+          <td>{{ comp.port or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="report-footer">
+    <div>Generated by FaultRay v{{ faultray_version }} — https://faultray.io</div>
+    <div>{{ assessment_date }}</div>
+  </div>
+
+</div>
+</body>
+</html>
