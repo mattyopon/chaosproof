@@ -1,7 +1,7 @@
 # Copyright (c) 2025-2026 Yutaro Maeda. All rights reserved.
 # Licensed under the Business Source License 1.1. See LICENSE file for details.
 
-"""CLI commands for managing FaultZero plugins."""
+"""CLI commands for managing FaultRay plugins."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ console = Console()
 
 plugin_app = typer.Typer(
     name="plugin",
-    help="Manage FaultZero plugins (discover, load, enable/disable, scaffold).",
+    help="Manage FaultRay plugins (discover, load, enable/disable, scaffold).",
     no_args_is_help=True,
 )
 app.add_typer(plugin_app, name="plugin")
@@ -44,7 +44,7 @@ def plugin_list() -> None:
         )
         return
 
-    table = Table(title="FaultZero Plugins", show_lines=True)
+    table = Table(title="FaultRay Plugins", show_lines=True)
     table.add_column("Name", style="cyan")
     table.add_column("Version")
     table.add_column("Type", style="magenta")

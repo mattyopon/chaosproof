@@ -809,7 +809,7 @@ class ChatEngine:
 
     def _handle_help(self, question: str, graph: InfraGraph) -> ChatResponse:
         text = textwrap.dedent("""\
-            **FaultZero Infrastructure Chat**
+            **FaultRay Infrastructure Chat**
 
             I can answer questions about your infrastructure. Here are some things you can ask:
 

@@ -3,7 +3,7 @@
 
 """Enhanced Plugin System with hot-reloading and marketplace integration.
 
-Plugins can extend FaultZero with:
+Plugins can extend FaultRay with:
 - Custom scenario generators
 - Custom analyzers
 - Custom report formats
@@ -282,7 +282,7 @@ class PluginInterface(Protocol):
 # ---------------------------------------------------------------------------
 
 class PluginManager:
-    """Discover, load, manage, and execute FaultZero plugins.
+    """Discover, load, manage, and execute FaultRay plugins.
 
     The manager maintains an internal registry of loaded plugins and their
     metadata.  Plugins can be discovered automatically from several sources
@@ -742,7 +742,7 @@ class PluginManager:
         execute_body = _EXECUTE_BODIES.get(ptype, _DEFAULT_EXECUTE_BODY)
 
         lines = [
-            f'"""FaultZero plugin: {name}.',
+            f'"""FaultRay plugin: {name}.',
             "",
             f"Auto-generated plugin template for type '{ptype.value}'.",
             '"""',
@@ -837,7 +837,7 @@ _EXECUTE_BODIES: dict[PluginType, str] = {
     PluginType.NOTIFICATION: textwrap.indent(
         textwrap.dedent("""\
             # Send notification (e.g. Slack, email, PagerDuty)
-            message = context.config.get("message", "FaultZero alert")
+            message = context.config.get("message", "FaultRay alert")
             print(f"[NOTIFICATION] {message}")
             return {"sent": True}"""),
         _INDENT,

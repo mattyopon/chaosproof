@@ -1,15 +1,15 @@
 # Copyright (c) 2025-2026 Yutaro Maeda. All rights reserved.
 # Licensed under the Business Source License 1.1. See LICENSE file for details.
 
-"""FaultZero Python SDK - Simple, developer-friendly API.
+"""FaultRay Python SDK - Simple, developer-friendly API.
 
-The SDK provides a clean, high-level interface for integrating FaultZero
+The SDK provides a clean, high-level interface for integrating FaultRay
 into existing tools, CI/CD pipelines, and custom applications.
 
 Example usage:
-    from faultray import FaultZero
+    from faultray import FaultRay
 
-    fz = FaultZero("infrastructure.yaml")
+    fz = FaultRay("infrastructure.yaml")
 
     # Quick resilience check
     score = fz.resilience_score
@@ -29,11 +29,11 @@ Example usage:
     print(f"Grade: {genome.resilience_grade}")
 
     # Compare environments
-    diff = FaultZero.compare("prod.yaml", "staging.yaml")
+    diff = FaultRay.compare("prod.yaml", "staging.yaml")
     print(f"Parity: {diff.parity_score}%")
 
     # Natural language
-    fz2 = FaultZero.from_text("3 web servers behind ALB with Aurora and Redis")
+    fz2 = FaultRay.from_text("3 web servers behind ALB with Aurora and Redis")
     print(fz2.resilience_score)
 """
 
@@ -58,8 +58,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FaultZero:
-    """Main SDK entry point for FaultZero infrastructure analysis.
+class FaultRay:
+    """Main SDK entry point for FaultRay infrastructure analysis.
 
     Provides a clean, high-level API wrapping the various analysis engines,
     reporters, and exporters in a single unified interface.
@@ -89,7 +89,7 @@ class FaultZero:
             self._graph = load_yaml(yaml_path)
         else:
             raise ValueError(
-                "FaultZero requires either a yaml_path or a graph argument."
+                "FaultRay requires either a yaml_path or a graph argument."
             )
 
         self._yaml_path = str(yaml_path) if yaml_path else None
@@ -99,8 +99,8 @@ class FaultZero:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_text(cls, description: str) -> "FaultZero":
-        """Create a FaultZero instance from a natural language description.
+    def from_text(cls, description: str) -> "FaultRay":
+        """Create a FaultRay instance from a natural language description.
 
         Uses rule-based NLP to parse component descriptions. Supports
         English and Japanese input without any external API dependency.
@@ -110,7 +110,7 @@ class FaultZero:
                 ``"3 web servers behind ALB with Aurora and Redis"``.
 
         Returns:
-            A new ``FaultZero`` instance backed by the parsed infrastructure.
+            A new ``FaultRay`` instance backed by the parsed infrastructure.
         """
         from faultray.ai.nl_to_infra import NLInfraParser
 
@@ -122,17 +122,17 @@ class FaultZero:
         return instance
 
     @classmethod
-    def from_dict(cls, data: dict) -> "FaultZero":
-        """Create a FaultZero instance from a dictionary.
+    def from_dict(cls, data: dict) -> "FaultRay":
+        """Create a FaultRay instance from a dictionary.
 
-        The dictionary should follow the standard FaultZero model format
+        The dictionary should follow the standard FaultRay model format
         with ``components`` and ``dependencies`` keys.
 
         Args:
-            data: Dictionary matching the FaultZero YAML/JSON schema.
+            data: Dictionary matching the FaultRay YAML/JSON schema.
 
         Returns:
-            A new ``FaultZero`` instance.
+            A new ``FaultRay`` instance.
         """
         from faultray.model.components import Component, Dependency
         from faultray.model.graph import InfraGraph
@@ -145,14 +145,14 @@ class FaultZero:
         return cls(graph=graph)
 
     @classmethod
-    def demo(cls) -> "FaultZero":
-        """Create a FaultZero instance with the built-in demo infrastructure.
+    def demo(cls) -> "FaultRay":
+        """Create a FaultRay instance with the built-in demo infrastructure.
 
         The demo stack includes nginx LB, two app servers, PostgreSQL,
         Redis cache, and RabbitMQ -- a realistic web application topology.
 
         Returns:
-            A new ``FaultZero`` instance with demo infrastructure loaded.
+            A new ``FaultRay`` instance with demo infrastructure loaded.
         """
         from faultray.model.demo import create_demo_graph
 
@@ -627,14 +627,14 @@ class FaultZero:
     def __repr__(self) -> str:
         source = self._yaml_path or "in-memory"
         return (
-            f"FaultZero(source={source!r}, "
+            f"FaultRay(source={source!r}, "
             f"components={self.component_count}, "
             f"score={self.resilience_score})"
         )
 
     def __str__(self) -> str:
         return (
-            f"FaultZero Infrastructure Analysis\n"
+            f"FaultRay Infrastructure Analysis\n"
             f"  Source: {self._yaml_path or 'in-memory'}\n"
             f"  Components: {self.component_count}\n"
             f"  Resilience Score: {self.resilience_score}/100\n"
@@ -713,5 +713,5 @@ def check_hallucination_risk(graph: "InfraGraph", component_id: str) -> list[tup
     Returns:
         List of ``(agent_component, risk_description)`` tuples.
     """
-    fz = FaultZero(graph=graph)
+    fz = FaultRay(graph=graph)
     return fz.check_hallucination_risk(component_id)

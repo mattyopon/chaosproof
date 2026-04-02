@@ -490,7 +490,7 @@ class ChaosCalendar:
         lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//FaultZero//ChaosCalendar//EN",
+            "PRODID:-//FaultRay//ChaosCalendar//EN",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
         ]
