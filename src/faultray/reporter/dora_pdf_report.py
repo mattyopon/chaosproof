@@ -27,6 +27,9 @@ try:
     _FPDF2_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _FPDF2_AVAILABLE = False
+    # Provide a stub base class so the subclass definition below
+    # does not raise NameError when fpdf2 is not installed.
+    FPDF = object  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
