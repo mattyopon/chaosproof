@@ -10,8 +10,10 @@ this module re-exports thin wrappers that proxy through to them.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import zlib
 from pathlib import Path
 
 from fastapi import HTTPException, Request
@@ -135,17 +137,41 @@ def _report_to_dict(report) -> dict:
     }
 
 
+def _compress_json(data: dict) -> str:
+    """Compress a dict to a base64-encoded zlib-compressed string."""
+    raw = json.dumps(data).encode()
+    return base64.b64encode(zlib.compress(raw)).decode()
+
+
+def _decompress_json(value: str) -> dict:
+    """Decompress a value produced by _compress_json, or fall back to plain JSON."""
+    try:
+        return json.loads(zlib.decompress(base64.b64decode(value)))
+    except Exception:
+        # Legacy uncompressed rows
+        return json.loads(value)
+
+
 async def _save_run(report_dict: dict, engine_type: str = "static") -> int | None:
     """Persist a simulation run to the database. Returns the row id or None."""
     try:
+        import datetime as _dt
+
         from faultray.api.database import SimulationRunRow, get_session_factory
+        from sqlalchemy import delete
 
         session_factory = get_session_factory()
         async with session_factory() as session:
+            # Purge records older than 30 days
+            cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=30)
+            await session.execute(
+                delete(SimulationRunRow).where(SimulationRunRow.created_at < cutoff)
+            )
+
             row = SimulationRunRow(
                 engine_type=engine_type,
                 config_json=None,
-                results_json=json.dumps(report_dict),
+                results_json=_compress_json(report_dict),
                 risk_score=report_dict.get("resilience_score"),
             )
             session.add(row)

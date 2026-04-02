@@ -164,15 +164,21 @@ class InfraGraph:
             if len(dependents) > 0 and not comp.failover.enabled:
                 score -= min(5, len(dependents) * 1.5)
 
-        # Penalize high utilization
+        # Penalize high utilization (per component, each metric independently)
         for comp in self._components.values():
-            util = comp.utilization()
-            if util > 90:
-                score -= 15
-            elif util > 80:
-                score -= 8
-            elif util > 70:
-                score -= 3
+            for metric_val in [
+                comp.metrics.cpu_percent,
+                comp.metrics.memory_percent,
+                comp.metrics.disk_percent,
+            ]:
+                if metric_val >= 95:
+                    score -= 10
+                elif metric_val >= 90:
+                    score -= 7
+                elif metric_val >= 80:
+                    score -= 4
+                elif metric_val >= 70:
+                    score -= 1
 
         # Penalize deep dependency chains
         critical_paths = self.get_critical_paths()

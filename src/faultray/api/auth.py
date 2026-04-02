@@ -121,6 +121,9 @@ def _is_public(path: str) -> bool:
     """Check whether *path* is a public (no-auth) endpoint."""
     if path in PUBLIC_PATHS:
         return True
+    # Allow setup paths (initial admin creation — always public)
+    if path == "/setup" or path.startswith("/setup/"):
+        return True
     # Allow static file sub-paths
     if path.startswith("/static/"):
         return True
@@ -144,13 +147,17 @@ async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> UserRow | None:
-    """Resolve the current user from the Authorization header.
+    """Resolve the current user from Bearer token OR session cookie.
 
     Behaviour:
     * Public paths -> returns ``None`` (no auth required).
     * If **no users** exist in the DB at all -> returns ``None``
       (backward-compatible mode, acts as if auth is disabled).
     * Protected paths without valid credentials -> 401.
+
+    Authentication order:
+    1. Bearer token (Authorization header) — existing API clients
+    2. Session cookie (set by OAuth callback) — Web UI browser sessions
     """
     # Public endpoints never require auth
     if _is_public(request.url.path):
@@ -176,6 +183,22 @@ async def get_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No users configured. Access /setup to create an admin user.",
             )
+
+        # --- Try session cookie first (Web UI OAuth flow) ---
+        session_user_id: int | None = None
+        try:
+            session_user_id = request.session.get("user_id")  # type: ignore[attr-defined]
+        except (AssertionError, AttributeError):
+            # SessionMiddleware not installed, or test environment with a fake request
+            pass
+
+        if session_user_id is not None:
+            result = await session.execute(
+                select(UserRow).where(UserRow.id == int(session_user_id))
+            )
+            session_user = result.scalar_one_or_none()
+            if session_user is not None:
+                return session_user
 
         # Users exist -> auth is required for /api/* paths
         if credentials is None:

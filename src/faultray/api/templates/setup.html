@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaultRay — Initial Setup</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background: #0d1117;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .setup-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .setup-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .setup-logo svg {
+            flex-shrink: 0;
+        }
+        .setup-logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #e6edf3;
+        }
+        .setup-logo-sub {
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+        h2 {
+            color: #e6edf3;
+            margin: 0 0 0.5rem;
+            font-size: 1.25rem;
+        }
+        p.desc {
+            color: #8b949e;
+            margin: 0 0 1.5rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        label {
+            display: block;
+            color: #c9d1d9;
+            font-size: 0.875rem;
+            margin-bottom: 0.4rem;
+            font-weight: 500;
+        }
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e6edf3;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            transition: border-color 0.15s;
+        }
+        input[type="text"]:focus,
+        input[type="email"]:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+        .btn-primary {
+            width: 100%;
+            background: #238636;
+            border: 1px solid #2ea043;
+            color: #fff;
+            padding: 0.7rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-primary:hover {
+            background: #2ea043;
+        }
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.25rem;
+            font-size: 0.875rem;
+        }
+        .alert-error {
+            background: rgba(248,81,73,0.15);
+            border: 1px solid rgba(248,81,73,0.4);
+            color: #ffa198;
+        }
+        .alert-success {
+            background: rgba(46,160,67,0.15);
+            border: 1px solid rgba(46,160,67,0.4);
+            color: #3fb950;
+        }
+        .api-key-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #58a6ff;
+            word-break: break-all;
+            margin-top: 0.5rem;
+        }
+        .copy-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        .copy-btn:hover {
+            background: #30363d;
+        }
+        .go-btn {
+            display: block;
+            text-align: center;
+            margin-top: 1.25rem;
+            background: #1f6feb;
+            border: 1px solid #388bfd;
+            color: #fff;
+            padding: 0.7rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .go-btn:hover {
+            background: #388bfd;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-card">
+        <div class="setup-logo">
+            <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+                <rect x="1" y="1" width="30" height="30" rx="6" fill="#0f3460" stroke="#e94560" stroke-width="1.5"/>
+                <circle cx="16" cy="10" r="3.5" fill="#e94560" opacity="0.9"/>
+                <circle cx="8" cy="22" r="3" fill="#0984e3" opacity="0.8"/>
+                <circle cx="24" cy="22" r="3" fill="#00b894" opacity="0.8"/>
+                <circle cx="16" cy="22" r="2.5" fill="#f0a500" opacity="0.7"/>
+                <line x1="16" y1="13.5" x2="8" y2="19" stroke="#4a5568" stroke-width="1.2"/>
+                <line x1="16" y1="13.5" x2="24" y2="19" stroke="#4a5568" stroke-width="1.2"/>
+                <line x1="16" y1="13.5" x2="16" y2="19.5" stroke="#4a5568" stroke-width="1.2"/>
+            </svg>
+            <div>
+                <div class="setup-logo-text">FaultRay</div>
+                <div class="setup-logo-sub">Chaos Engineering</div>
+            </div>
+        </div>
+
+        {% if success %}
+        <h2>Setup Complete</h2>
+        <div class="alert alert-success">Admin user created successfully.</div>
+        <p class="desc">Save your API key — it will not be shown again.</p>
+        <label>Your API Key</label>
+        <div class="api-key-box" id="apiKeyBox">{{ api_key }}</div>
+        <button class="copy-btn" onclick="copyKey()">Copy to clipboard</button>
+        <a href="/" class="go-btn">Go to Dashboard</a>
+        <script>
+        function copyKey() {
+            navigator.clipboard.writeText(document.getElementById('apiKeyBox').textContent.trim());
+        }
+        </script>
+        {% else %}
+        <h2>Initial Setup</h2>
+        <p class="desc">
+            No admin user exists yet. Create one to start using FaultRay.
+            Your API key will be generated automatically.
+        </p>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/setup">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Jane Smith"
+                    required
+                    value="{{ form_name | default('') }}"
+                />
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="admin@example.com"
+                    required
+                    value="{{ form_email | default('') }}"
+                />
+            </div>
+            <button class="btn-primary" type="submit">Create Admin User</button>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>

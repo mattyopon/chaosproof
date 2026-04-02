@@ -568,7 +568,7 @@ function runSim(e) {
         .then(r => r.json())
         .then(data => {
             if (data.error) {
-                alert(data.error);
+                alert(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                 btn.innerHTML = origHTML;
                 btn.style.pointerEvents = '';
                 return;

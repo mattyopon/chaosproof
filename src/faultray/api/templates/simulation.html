@@ -293,7 +293,7 @@ function runSimulation() {
         .then(r => r.json())
         .then(data => {
             if (data.error) {
-                alert(data.error);
+                alert(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                 btn.disabled = false;
                 btn.innerHTML = 'Run Simulation';
                 return;

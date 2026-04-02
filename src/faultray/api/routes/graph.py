@@ -34,7 +34,7 @@ async def graph_page(request: Request):
 
 
 @router.get("/api/graph-data", response_class=JSONResponse)
-async def api_graph_data(user=Depends(_require_permission("view_results"))):
+async def api_graph_data():
     """Return graph data as nodes + edges for D3.js."""
     graph = get_graph()
     data = graph.to_dict()
@@ -74,7 +74,7 @@ async def api_graph_data(user=Depends(_require_permission("view_results"))):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/topology", response_class=JSONResponse)
-async def get_topology(user=Depends(_require_permission("view_results"))):
+async def get_topology():
     """Return infrastructure topology as nodes/edges for D3.js blast radius visualizer."""
     graph = get_graph()
     if not graph.components:
@@ -158,7 +158,7 @@ async def heatmap_page(request: Request):
 
 
 @router.get("/api/risk-heatmap", response_class=JSONResponse)
-async def api_risk_heatmap(user=Depends(_require_permission("view_results"))):
+async def api_risk_heatmap():
     """Return risk heat map data as JSON."""
     graph = get_graph()
     if not graph.components:

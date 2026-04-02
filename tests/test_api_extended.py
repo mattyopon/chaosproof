@@ -788,15 +788,13 @@ class TestOAuthRoutes:
                     return_value={"email": "new@example.com", "name": "New User"},
                 ):
                     db_client.cookies.set("oauth_state", state)
+                    # C3 fix: OAuth callback now redirects to / instead of JSON
                     resp = db_client.get(
-                        f"/auth/callback?code=testcode&provider=github&state={state}"
+                        f"/auth/callback?code=testcode&provider=github&state={state}",
+                        follow_redirects=False,
                     )
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["message"] == "Login successful"
-                    assert data["user"]["email"] == "new@example.com"
-                    assert data["user"]["name"] == "New User"
-                    assert "api_key" in data
+                    assert resp.status_code == 302
+                    assert resp.headers["location"] == "/"
 
     def test_oauth_callback_existing_user(self, db_client):
         """Cover lines 868-874: existing user gets API key rotated."""
@@ -837,14 +835,13 @@ class TestOAuthRoutes:
                     },
                 ):
                     db_client.cookies.set("oauth_state", state)
+                    # C3 fix: OAuth callback now redirects to / instead of JSON
                     resp = db_client.get(
-                        f"/auth/callback?code=testcode&provider=github&state={state}"
+                        f"/auth/callback?code=testcode&provider=github&state={state}",
+                        follow_redirects=False,
                     )
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["user"]["email"] == "existing@example.com"
-                    assert data["user"]["name"] == "Updated Name"
-                    assert "api_key" in data
+                    assert resp.status_code == 302
+                    assert resp.headers["location"] == "/"
 
     def test_oauth_callback_db_failure(self, client):
         """Cover lines 881-883: user creation fails."""

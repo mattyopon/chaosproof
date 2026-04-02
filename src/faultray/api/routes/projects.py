@@ -11,7 +11,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from faultray.api.routes._shared import _optional_user, _require_permission
+from faultray.api.routes._shared import _decompress_json, _optional_user, _require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ async def get_run(run_id: int, user=Depends(_require_permission("view_results"))
                 "project_id": row.project_id,
                 "engine_type": row.engine_type,
                 "config_json": json.loads(row.config_json) if row.config_json else None,
-                "results_json": json.loads(row.results_json) if row.results_json else None,
+                "results_json": _decompress_json(row.results_json) if row.results_json else None,
                 "risk_score": row.risk_score,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
             })

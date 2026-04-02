@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from faultray.api.routes._shared import (
     get_graph,
@@ -59,6 +59,100 @@ async def settings_page(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Initial Setup — create the first admin user (C1 fix)
+# ---------------------------------------------------------------------------
+
+@router.get("/setup", response_class=HTMLResponse)
+async def setup_page(request: Request):
+    """Show initial setup form when no users exist; redirect to / otherwise."""
+    from faultray.api.database import UserRow, get_session_factory
+    from sqlalchemy import select
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        result = await session.execute(select(UserRow.id).limit(1))
+        has_users = result.scalar_one_or_none() is not None
+
+    if has_users:
+        return RedirectResponse(url="/", status_code=302)
+
+    return templates.TemplateResponse(request, "setup.html", {
+        "success": False,
+        "error": None,
+    })
+
+
+@router.post("/setup", response_class=HTMLResponse)
+async def setup_create_admin(request: Request):
+    """Create the first admin user; redirect to setup GET with error on failure."""
+    from faultray.api.auth import generate_api_key, hash_api_key
+    from faultray.api.database import UserRow, get_session_factory
+    from sqlalchemy import select
+
+    # Block if users already exist
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        result = await session.execute(select(UserRow.id).limit(1))
+        has_users = result.scalar_one_or_none() is not None
+
+    if has_users:
+        return RedirectResponse(url="/", status_code=302)
+
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    email = str(form.get("email", "")).strip()
+
+    if not name or not email:
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "success": False,
+                "error": "Name and email are required.",
+                "form_name": name,
+                "form_email": email,
+            },
+            status_code=422,
+        )
+
+    api_key = generate_api_key()
+    try:
+        async with session_factory() as session:
+            user = UserRow(
+                email=email,
+                name=name,
+                api_key_hash=hash_api_key(api_key),
+                role="admin",
+            )
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+
+        logger.info("Setup complete: admin user created (id=%s, email=%s)", user.id, email)
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "success": True,
+                "api_key": api_key,
+            },
+        )
+    except Exception as exc:
+        logger.warning("Setup failed: %s", exc)
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "success": False,
+                "error": f"Failed to create user: {exc}",
+                "form_name": name,
+                "form_email": email,
+            },
+            status_code=500,
+        )
+
+
+# ---------------------------------------------------------------------------
 # OAuth2 SSO
 # ---------------------------------------------------------------------------
 
@@ -87,7 +181,6 @@ async def oauth_login(provider: str):
     state = f"{nonce}.{signature}"
 
     url = generate_oauth_url(config, state=state)
-    from fastapi.responses import RedirectResponse
 
     response = RedirectResponse(url=url)
     response.set_cookie(
@@ -172,11 +265,14 @@ async def oauth_callback(request: Request, code: str = "", state: str = "", prov
             await session.commit()
             await session.refresh(user)
 
-            return JSONResponse({
-                "message": "Login successful",
-                "user": {"id": user.id, "email": user.email, "name": user.name},
-                "api_key": api_key,
-            })
+            # Establish session cookie for Web UI (C3 fix)
+            request.session["user_id"] = user.id  # type: ignore[index]
+            request.session["user_email"] = user.email  # type: ignore[index]
+
+            # Redirect to dashboard — browser will follow and carry the session cookie
+            from fastapi.responses import RedirectResponse as _RedirectResponse
+            response = _RedirectResponse(url="/", status_code=302)
+            return response
     except Exception as exc:
         logger.warning("OAuth user creation failed: %s", exc)
         return JSONResponse({"error": f"User creation failed: {exc}"}, status_code=500)

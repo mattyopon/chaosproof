@@ -142,11 +142,14 @@ infrastructure:
 #### Day 1–2: シミュレーション実行
 
 ```bash
-# YAMLから基本シミュレーションを実行
-faultray simulate --infra infra-sample.yaml --output week1-sim.json
+# YAMLから基本シミュレーションを実行（JSON出力）
+faultray simulate --model infra-sample.yaml --json
 
-# 結果を確認
-faultray report --input week1-sim.json --format html --output week1-report.html
+# HTMLレポートを生成
+faultray simulate --model infra-sample.yaml --html week1-report.html
+
+# エグゼクティブレポートを生成
+faultray report executive infra-sample.yaml --output week1-exec-report.html
 ```
 
 **確認ポイント**:
@@ -157,11 +160,11 @@ faultray report --input week1-sim.json --format html --output week1-report.html
 #### Day 3–4: DORA初期評価
 
 ```bash
-# DORA準拠の初期アセスメント
-faultray dora assess --infra infra-sample.yaml --output week1-dora.json
+# DORA準拠の初期アセスメント（JSON出力）
+faultray dora assess infra-sample.yaml --json
 
-# スコアサマリーを表示
-faultray dora assess --infra infra-sample.yaml --summary
+# スコアサマリーを画面に表示
+faultray dora assess infra-sample.yaml
 ```
 
 **確認ポイント**:
@@ -172,9 +175,11 @@ faultray dora assess --infra infra-sample.yaml --summary
 #### Day 5: レポート品質の確認
 
 ```bash
-# 複数フォーマットでレポート出力
-faultray report --input week1-dora.json --format pdf --output week1-dora-report.pdf
-faultray report --input week1-dora.json --format json --output week1-dora-report.json
+# DORAコンプライアンスレポートをHTMLで出力
+faultray dora report infra-sample.yaml --output week1-dora-report.html
+
+# PDFで出力
+faultray dora report infra-sample.yaml --output week1-dora-report.pdf --pdf
 ```
 
 **確認ポイント**:
@@ -190,21 +195,20 @@ faultray report --input week1-dora.json --format json --output week1-dora-report
 #### Day 8–10: 証跡自動生成
 
 ```bash
-# DORA Art.24/25 に対応する証跡を生成
-faultray dora evidence \
-  --infra infra-sample.yaml \
-  --article 24 \
-  --output week2-evidence-art24.json
+# DORA Art.24 に対応する証跡パッケージを生成
+faultray dora evidence infra-sample.yaml \
+  --output ./week2-evidence-art24/ \
+  --framework article-24
 
-faultray dora evidence \
-  --infra infra-sample.yaml \
-  --article 25 \
-  --output week2-evidence-art25.json
+# DORA Art.25 に対応する証跡パッケージを生成
+faultray dora evidence infra-sample.yaml \
+  --output ./week2-evidence-art25/ \
+  --framework article-25
 
-faultray dora evidence \
-  --infra infra-sample.yaml \
-  --article 28 \
-  --output week2-evidence-art28.json
+# DORA Art.28 に対応する証跡パッケージを生成
+faultray dora evidence infra-sample.yaml \
+  --output ./week2-evidence-art28/ \
+  --framework article-28
 ```
 
 **確認ポイント**:
@@ -215,14 +219,14 @@ faultray dora evidence \
 #### Day 11–12: RTSフォーマットエクスポート
 
 ```bash
-# DORA RTS（Regulatory Technical Standards）準拠フォーマットでエクスポート
-faultray dora rts-export \
-  --infra infra-sample.yaml \
-  --output week2-rts-export.xml \
-  --format eiopa-rts
+# DORA RTS（Regulatory Technical Standards）準拠フォーマットでエクスポート（JSON）
+faultray dora rts-export infra-sample.yaml \
+  --output ./week2-rts-export/
 
-# エクスポート内容の検証
-faultray dora rts-export --validate week2-rts-export.xml
+# CSV形式でエクスポート
+faultray dora rts-export infra-sample.yaml \
+  --output ./week2-rts-export-csv/ \
+  --format csv
 ```
 
 **確認ポイント**:
@@ -234,10 +238,7 @@ faultray dora rts-export --validate week2-rts-export.xml
 
 ```bash
 # 現状とDORA完全準拠のギャップを分析
-faultray dora gap-analysis \
-  --infra infra-sample.yaml \
-  --target full-compliance \
-  --output week2-gap.html
+faultray dora gap-analysis infra-sample.yaml --remediation
 ```
 
 **確認ポイント**:
@@ -253,18 +254,14 @@ faultray dora gap-analysis \
 #### Day 15–17: インシデントシミュレーション
 
 ```bash
-# 特定インシデントシナリオのシミュレーション
-faultray simulate \
-  --infra infra-sample.yaml \
-  --scenario database-failure \
-  --output week3-incident-db.json
+# インフラモデルを指定してシミュレーション実行
+faultray simulate --model infra-sample.yaml --json
 
-# 複合障害シナリオ（データセンター障害 + CDN障害）
-faultray simulate \
-  --infra infra-sample.yaml \
-  --scenario multi-failure \
-  --failure-points "dc-east,cdn-provider" \
-  --output week3-multi-failure.json
+# 動的タイムステップシミュレーション（障害連鎖の時間推移を確認）
+faultray simulate --model infra-sample.yaml --dynamic --json
+
+# HTMLレポートとして出力
+faultray simulate --model infra-sample.yaml --html week3-incident-report.html
 ```
 
 **確認ポイント**:
@@ -275,15 +272,11 @@ faultray simulate \
 #### Day 18–19: 集中リスク分析
 
 ```bash
-# 第三者・クラウド集中リスクの評価
-faultray analyze concentration-risk \
-  --infra infra-sample.yaml \
-  --output week3-concentration.html
+# 第三者・クラウド集中リスクの評価（DORA Art.29）
+faultray dora concentration-risk infra-sample.yaml
 
-# ベンダー依存度レポート
-faultray analyze vendor-dependency \
-  --infra infra-sample.yaml \
-  --output week3-vendor.json
+# JSON形式で出力
+faultray dora concentration-risk infra-sample.yaml --json
 ```
 
 **確認ポイント**:
@@ -294,10 +287,11 @@ faultray analyze vendor-dependency \
 #### Day 20–21: TLPT準備度評価
 
 ```bash
-# Threat-Led Penetration Testing 準備状況の評価
-faultray tlpt readiness \
-  --infra infra-sample.yaml \
-  --output week3-tlpt.html
+# Threat-Led Penetration Testing 準備状況の評価（DORA Art.26）
+faultray dora tlpt-readiness infra-sample.yaml
+
+# JSON形式で出力
+faultray dora tlpt-readiness infra-sample.yaml --json
 ```
 
 **確認ポイント**:
@@ -317,12 +311,14 @@ faultray tlpt readiness \
 # GitHub Actions / Jenkins等のCI/CDパイプラインへの組み込み
 # （サンプルワークフローは faultray docs ci-cd で参照）
 
-# CI/CDモードでの実行（非対話型）
-faultray simulate \
-  --infra infra-sample.yaml \
-  --ci-mode \
-  --fail-threshold 0.95 \
-  --exit-code
+# CI/CDモードでの実行（JSON出力で結果をパース可能）
+faultray simulate --model infra-sample.yaml --json
+
+# ベースラインを保存して回帰検知
+faultray simulate --model infra-sample.yaml --save-baseline baseline.json
+
+# 前回ベースラインと比較
+faultray simulate --model infra-sample.yaml --baseline baseline.json --json
 ```
 
 **確認ポイント**:
@@ -351,11 +347,14 @@ curl http://localhost:8080/api/v1/simulate \
 #### Day 27–29: エンドツーエンド レポート出力
 
 ```bash
-# 30日間評価の総合レポートを生成
-faultray report comprehensive \
-  --input-dir ./week1 ./week2 ./week3 \
-  --output final-evaluation-report.html \
-  --executive-summary
+# 総合DORAコンプライアンスレポートを生成
+faultray dora report infra-sample.yaml --output final-evaluation-report.html
+
+# シミュレーション結果を含む完全なレポートを生成
+faultray dora report infra-sample.yaml --output final-evaluation-report.html --simulate
+
+# PDFで出力（監査担当者・規制当局向け）
+faultray dora report infra-sample.yaml --output final-evaluation-report.pdf --pdf
 ```
 
 #### Day 30: 評価完了・フィードバック提出
