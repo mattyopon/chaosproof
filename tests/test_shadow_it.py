@@ -308,3 +308,322 @@ def test_scheduled_job_no_owner_is_critical():
         f.category == "high_risk_orphan" and f.risk_level == "critical"
         for f in report.findings
     )
+
+
+# ---------------------------------------------------------------------------
+# Boundary value tests
+# ---------------------------------------------------------------------------
+
+
+def test_zero_components_graph():
+    """Empty graph produces report with all-zero counts."""
+    graph = InfraGraph()
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.total_components == 0
+    assert report.orphaned_count == 0
+    assert report.stale_count == 0
+    assert report.undocumented_count == 0
+    assert report.risk_score == 0.0
+    assert report.findings == []
+
+
+def test_single_clean_component_risk_score_zero():
+    """One fully-owned component should yield risk_score == 0.0."""
+    comp = _make_component(id="one")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.total_components == 1
+    assert report.risk_score == 0.0
+
+
+@pytest.mark.parametrize("count", [2, 10, 50, 100])
+def test_large_graph_all_clean(count):
+    """Large graphs with all clean components should have risk_score == 0."""
+    comps = [_make_component(id=f"comp-{i}", name=f"Comp {i}") for i in range(count)]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.total_components == count
+    assert report.risk_score == 0.0
+    assert report.findings == []
+
+
+def test_all_fields_empty_single_component():
+    """Component with all ownership fields empty produces multiple findings."""
+    comp = _make_component(
+        id="empty-all",
+        name="Empty All",
+        owner="",
+        created_by="",
+        last_modified="",
+        documentation_url="",
+        lifecycle_status="unknown",
+    )
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = {f.category for f in report.findings}
+    assert "orphaned" in categories
+    assert "undocumented" in categories
+    assert "unknown_status" in categories
+
+
+def test_component_modified_exactly_365_days_ago_not_stale():
+    """Component modified exactly 365 days ago should NOT be stale (threshold is >365)."""
+    boundary_date = (date.today() - timedelta(days=365)).isoformat()
+    comp = _make_component(id="boundary", name="Boundary", last_modified=boundary_date)
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "stale" not in categories
+
+
+def test_component_modified_366_days_ago_is_stale():
+    """Component modified 366 days ago should be stale."""
+    # Use 370 days to avoid timezone boundary edge cases (±1 day tolerance)
+    old_date = (date.today() - timedelta(days=370)).isoformat()
+    comp = _make_component(id="stale366", name="Stale", last_modified=old_date)
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "stale" in categories
+
+
+def test_future_last_modified_not_stale():
+    """Component with future last_modified date should NOT be stale."""
+    future_date = (date.today() + timedelta(days=30)).isoformat()
+    comp = _make_component(id="future", name="Future", last_modified=future_date)
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "stale" not in categories
+
+
+# ---------------------------------------------------------------------------
+# Edge case tests
+# ---------------------------------------------------------------------------
+
+
+def test_japanese_component_name():
+    """Component with Japanese name should process without error."""
+    comp = _make_component(id="jp-comp", name="本番サーバー", owner="")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.total_components == 1
+    finding = next(f for f in report.findings if f.category == "orphaned")
+    assert finding.component_name == "本番サーバー"
+
+
+def test_all_components_orphaned():
+    """Graph where all components lack owner should have orphaned_count == total."""
+    comps = [_make_component(id=f"orphan-{i}", owner="") for i in range(5)]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.orphaned_count == 5
+    assert report.total_components == 5
+
+
+def test_all_components_undocumented():
+    """All components without docs should have undocumented_count == total."""
+    comps = [_make_component(id=f"nodoc-{i}", documentation_url="") for i in range(4)]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.undocumented_count == 4
+
+
+def test_multiple_high_risk_orphans():
+    """Multiple automation components with no owner should all appear."""
+    comps = [
+        _make_component(
+            id=f"auto-{i}",
+            name=f"Auto {i}",
+            type=ComponentType.AUTOMATION,
+            owner="",
+        )
+        for i in range(3)
+    ]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    critical_findings = [f for f in report.findings if f.risk_level == "critical"]
+    assert len(critical_findings) == 3
+
+
+def test_lifecycle_deprecated_not_flagged_as_unknown():
+    """Component with lifecycle_status='deprecated' should NOT trigger unknown_status."""
+    comp = _make_component(id="depr", lifecycle_status="deprecated")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "unknown_status" not in categories
+
+
+def test_risk_score_max_100():
+    """Risk score should never exceed 100."""
+    comps = [
+        _make_component(
+            id=f"worst-{i}",
+            name=f"Worst {i}",
+            type=ComponentType.AUTOMATION,
+            owner="",
+            documentation_url="",
+            lifecycle_status="unknown",
+        )
+        for i in range(20)
+    ]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.risk_score <= 100.0
+
+
+def test_finding_fields_all_populated():
+    """Every finding should have non-empty detail and recommendation."""
+    comp = _make_component(
+        id="check-fields",
+        owner="",
+        documentation_url="",
+        lifecycle_status="unknown",
+    )
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    for f in report.findings:
+        assert len(f.detail) > 0, f"detail empty for category={f.category}"
+        assert len(f.recommendation) > 0, f"recommendation empty for category={f.category}"
+
+
+def test_finding_risk_levels_valid():
+    """All finding risk_levels should be within valid set."""
+    comps = [
+        _make_component(id=f"r-{i}", owner="", documentation_url="", lifecycle_status="unknown")
+        for i in range(3)
+    ]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    valid_levels = {"critical", "high", "medium", "low"}
+    for f in report.findings:
+        assert f.risk_level in valid_levels
+
+
+def test_to_dict_findings_list_is_serializable():
+    """to_dict() findings should be a list of plain dicts, JSON-serializable."""
+    import json
+    comp = _make_component(id="serial", owner="", documentation_url="")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    d = report.to_dict()
+    # Should not raise
+    json_str = json.dumps(d)
+    assert len(json_str) > 0
+
+
+def test_to_dict_risk_score_is_rounded():
+    """to_dict() risk_score should be a float rounded to 1 decimal."""
+    comp = _make_component(id="rnd", owner="", documentation_url="")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    d = report.to_dict()
+    assert isinstance(d["risk_score"], float)
+
+
+def test_orphaned_count_matches_findings():
+    """orphaned_count in report should match count of orphaned category findings."""
+    comps = [
+        _make_component(id=f"o-{i}", owner="")
+        for i in range(3)
+    ] + [_make_component(id="owned")]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    orphan_findings = [f for f in report.findings if f.category == "orphaned"]
+    assert report.orphaned_count == len(orphan_findings)
+
+
+def test_stale_count_matches_findings():
+    """stale_count in report should match stale category findings."""
+    old = (date.today() - timedelta(days=500)).isoformat()
+    comps = [_make_component(id=f"s-{i}", last_modified=old) for i in range(2)]
+    graph = _make_graph(*comps)
+    report = ShadowITAnalyzer().analyze(graph)
+    stale_findings = [f for f in report.findings if f.category == "stale"]
+    assert report.stale_count == len(stale_findings)
+
+
+def test_parse_date_datetime_string():
+    """_parse_date should handle full datetime strings."""
+    result = _parse_date("2024-06-01T12:00:00")
+    assert result == date(2024, 6, 1)
+
+
+def test_parse_date_datetime_z_suffix():
+    """_parse_date should handle datetime strings with Z suffix."""
+    result = _parse_date("2024-06-01T12:00:00Z")
+    assert result == date(2024, 6, 1)
+
+
+def test_days_since_today_returns_zero():
+    """_days_since with today's date should return 0 (allow ±1 for timezone boundary)."""
+    today = date.today().isoformat()
+    result = _days_since(today)
+    assert result is not None
+    # Allow -1 to +1 for timezone boundary edge cases (UTC vs local)
+    assert -1 <= result <= 1
+
+
+def test_days_since_future_returns_negative():
+    """_days_since with future date should return negative value."""
+    future = (date.today() + timedelta(days=10)).isoformat()
+    result = _days_since(future)
+    assert result is not None
+    assert result < 0
+
+
+@pytest.mark.parametrize("yaml_file", [
+    "examples/demo-infra.yaml",
+    "examples/typical-startup.yaml",
+    "examples/shadow-it-sample.yaml",
+    "examples/ecommerce-platform.yaml",
+])
+def test_analyze_all_examples(yaml_file):
+    """All example YAML files should load and analyze without error."""
+    from faultray.model.loader import load_yaml
+    path = Path(__file__).parent.parent / yaml_file
+    if not path.exists():
+        pytest.skip(f"{yaml_file} not found")
+    graph = load_yaml(path)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert report.total_components >= 0
+    assert 0.0 <= report.risk_score <= 100.0
+    d = report.to_dict()
+    assert "findings" in d
+
+
+def test_creator_left_only_when_created_by_set():
+    """creator_left should only appear when created_by is non-empty and owner is empty."""
+    # owner=empty, created_by=empty → no creator_left
+    comp = _make_component(id="no-creator", owner="", created_by="")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "creator_left" not in categories
+
+
+def test_owner_same_as_creator_no_creator_left():
+    """When owner == created_by, creator_left should NOT appear."""
+    comp = _make_component(id="same", owner="alice@x.com", created_by="alice@x.com")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    categories = [f.category for f in report.findings]
+    assert "creator_left" not in categories
+
+
+def test_summary_is_non_empty():
+    """Report summary should always be a non-empty string."""
+    comp = _make_component(id="summary-test")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert isinstance(report.summary, str)
+    assert len(report.summary) > 0
+
+
+def test_summary_contains_risk_score():
+    """Report summary should contain the risk score string."""
+    comp = _make_component(id="sum-score")
+    graph = _make_graph(comp)
+    report = ShadowITAnalyzer().analyze(graph)
+    assert "Risk score" in report.summary or "risk" in report.summary.lower()

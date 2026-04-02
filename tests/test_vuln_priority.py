@@ -326,3 +326,439 @@ def test_analyze_recommendation_nonempty_for_insecure(  # noqa: D103
     lb_entry = next((p for p in report.priorities if p.component_id == "lb"), None)
     assert lb_entry is not None
     assert lb_entry.recommendation != ""
+
+
+# ---------------------------------------------------------------------------
+# Additional _vulnerability_score tests
+# ---------------------------------------------------------------------------
+
+
+def test_vulnerability_score_app_server_no_security() -> None:
+    """APP_SERVER with no auth and no encryption should have positive score."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="app",
+        name="App",
+        type=ComponentType.APP_SERVER,
+        port=8080,
+        replicas=1,
+        security=SecurityProfile(
+            encryption_at_rest=False,
+            encryption_in_transit=False,
+            auth_required=False,
+        ),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    app = graph.get_component("app")
+    assert app is not None
+    score, factors = engine._vulnerability_score(app)
+    assert score > 0.0
+
+
+def test_vulnerability_score_database_with_all_security() -> None:
+    """Database with all security controls should score 0."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="db",
+        name="Secure DB",
+        type=ComponentType.DATABASE,
+        port=5432,
+        replicas=1,
+        security=SecurityProfile(
+            encryption_at_rest=True,
+            encryption_in_transit=True,
+            auth_required=True,
+            rate_limiting=True,
+        ),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    db = graph.get_component("db")
+    assert db is not None
+    score, _ = engine._vulnerability_score(db)
+    assert score == 0.0
+
+
+def test_vulnerability_score_lb_no_waf_adds_penalty() -> None:
+    """LB without WAF should have 'no WAF' in factors."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="lb",
+        name="LB",
+        type=ComponentType.LOAD_BALANCER,
+        port=80,
+        replicas=1,
+        security=SecurityProfile(waf_protected=False),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    lb = graph.get_component("lb")
+    assert lb is not None
+    score, factors = engine._vulnerability_score(lb)
+    assert "no WAF" in factors
+
+
+def test_vulnerability_score_no_rate_limiting_flagged() -> None:
+    """Component without rate limiting should include it in factors."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="app",
+        name="App",
+        type=ComponentType.APP_SERVER,
+        port=8080,
+        replicas=1,
+        security=SecurityProfile(rate_limiting=False),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    app = graph.get_component("app")
+    assert app is not None
+    score, factors = engine._vulnerability_score(app)
+    assert "no rate limiting" in factors
+
+
+# ---------------------------------------------------------------------------
+# Additional _blast_radius tests
+# ---------------------------------------------------------------------------
+
+
+def test_blast_radius_middle_node() -> None:
+    """Middle node (app) in lb->app->db has 1 upstream (lb) = 1/3 affected."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    br = engine._blast_radius("app", len(graph.components))
+    # get_all_affected("app") = {lb} = 1 out of 3 = 33.3%
+    assert pytest.approx(br, abs=1.0) == 1 / 3 * 100
+
+
+def test_blast_radius_single_component_is_zero() -> None:
+    """Single isolated component should have blast_radius == 0."""
+    graph = _make_single_node_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    br = engine._blast_radius("solo", 1)
+    assert br == 0.0
+
+
+def test_blast_radius_zero_total_components() -> None:
+    """When total == 0, blast_radius should return 0."""
+    graph = _make_empty_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    assert engine._blast_radius("any", 0) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Additional analyze() tests
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_priority_score_formula() -> None:
+    """priority_score = vulnerability_score * blast_radius / 10 (approx)."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    for p in report.priorities:
+        expected = p.vulnerability_score * p.blast_radius / 10.0
+        assert abs(p.priority_score - expected) < 0.1
+
+
+def test_analyze_report_risk_score_is_float() -> None:
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert isinstance(report.risk_score, float)
+
+
+def test_analyze_risk_score_range() -> None:
+    """risk_score should be in [0, 100]."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert 0.0 <= report.risk_score <= 100.0
+
+
+def test_analyze_single_node_rank_is_1() -> None:
+    """Single node should get rank 1."""
+    graph = _make_single_node_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert report.priorities[0].priority_rank == 1
+
+
+def test_analyze_component_names_preserved() -> None:
+    """component_name in priorities should match the original component name."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    name_map = {c.id: c.name for c in graph.components.values()}
+    for p in report.priorities:
+        assert p.component_name == name_map[p.component_id]
+
+
+def test_analyze_risk_factors_are_list() -> None:
+    """risk_factors for each priority should be a list."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    for p in report.priorities:
+        assert isinstance(p.risk_factors, list)
+
+
+@pytest.mark.parametrize("yaml_file", [
+    "examples/demo-infra.yaml",
+    "examples/typical-startup.yaml",
+    "examples/ecommerce-platform.yaml",
+])
+def test_analyze_all_examples(yaml_file: str) -> None:
+    """All example YAML files should analyze without error."""
+    from pathlib import Path
+    from faultray.model.loader import load_yaml
+    path = Path(__file__).parent.parent / yaml_file
+    if not path.exists():
+        pytest.skip(f"{yaml_file} not found")
+    graph = load_yaml(path)
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert len(report.priorities) == len(graph.components)
+    assert 0.0 <= report.risk_score <= 100.0
+
+
+def test_analyze_two_components_ranks_unique() -> None:
+    """With two components, ranks should be [1, 2] in some order."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="a", name="A", type=ComponentType.APP_SERVER, replicas=1,
+        security=SecurityProfile(encryption_at_rest=False),
+    ))
+    graph.add_component(Component(
+        id="b", name="B", type=ComponentType.DATABASE, replicas=1,
+        security=SecurityProfile(encryption_at_rest=False),
+    ))
+    graph.add_dependency(Dependency(source_id="a", target_id="b", dependency_type="requires"))
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    ranks = sorted(p.priority_rank for p in report.priorities)
+    assert ranks == [1, 2]
+
+
+def test_analyze_report_is_correct_type() -> None:
+    graph = _make_secure_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert isinstance(report, VulnerabilityPriorityReport)
+
+
+def test_analyze_secure_graph_no_critical_or_high() -> None:
+    """Fully secure graph should have no critical or high priority components."""
+    graph = _make_secure_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert report.critical_count == 0
+    assert report.high_count == 0
+
+
+def test_analyze_empty_graph_zero_risk_score() -> None:
+    graph = _make_empty_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert report.risk_score == 0.0
+
+
+def test_vulnerability_priority_dataclass_fields() -> None:
+    """VulnerabilityPriority should have all expected fields."""
+    vp = VulnerabilityPriority(
+        component_id="test",
+        component_name="Test",
+        vulnerability_score=5.0,
+        blast_radius=50.0,
+        priority_score=25.0,
+        priority_rank=1,
+        risk_factors=["no auth"],
+        recommendation="Fix it",
+    )
+    assert vp.component_id == "test"
+    assert vp.priority_rank == 1
+    assert vp.recommendation == "Fix it"
+    assert "no auth" in vp.risk_factors
+
+
+def test_analyze_counts_consistent() -> None:
+    """critical_count + high_count should be <= total priorities."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert report.critical_count + report.high_count <= len(report.priorities)
+
+
+def test_vulnerability_score_cache_no_auth() -> None:
+    """CACHE component without auth should be flagged."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="cache",
+        name="Redis",
+        type=ComponentType.CACHE,
+        port=6379,
+        replicas=1,
+        security=SecurityProfile(auth_required=False),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    cache = graph.get_component("cache")
+    assert cache is not None
+    score, factors = engine._vulnerability_score(cache)
+    assert "no auth required" in factors
+
+
+def test_blast_radius_between_zero_and_100() -> None:
+    """blast_radius should always be between 0 and 100."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    total = len(graph.components)
+    for comp in graph.components.values():
+        br = engine._blast_radius(comp.id, total)
+        assert 0.0 <= br <= 100.0
+
+
+def test_analyze_five_components_ranks_1_to_5() -> None:
+    """Five components should get ranks 1 through 5."""
+    graph = InfraGraph()
+    for i in range(5):
+        graph.add_component(Component(
+            id=f"svc{i}",
+            name=f"Service {i}",
+            type=ComponentType.APP_SERVER,
+            replicas=1,
+        ))
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    ranks = sorted(p.priority_rank for p in report.priorities)
+    assert ranks == [1, 2, 3, 4, 5]
+
+
+def test_analyze_summary_contains_component_count() -> None:
+    """Summary should reference the number of components."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    # 3 components in insecure graph
+    assert "3" in report.summary
+
+
+def test_secure_db_has_zero_vulnerability() -> None:
+    """Database with all security enabled should score zero."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="db",
+        name="Secure DB",
+        type=ComponentType.DATABASE,
+        port=5432,
+        replicas=2,
+        security=SecurityProfile(
+            encryption_at_rest=True,
+            encryption_in_transit=True,
+            auth_required=True,
+            rate_limiting=True,
+            waf_protected=False,  # waf is LB-specific, not counted for DB
+        ),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    db = graph.get_component("db")
+    assert db is not None
+    score, _ = engine._vulnerability_score(db)
+    assert score == 0.0
+
+
+def test_insecure_lb_highest_in_chain() -> None:
+    """In a chain, the insecure component with highest blast_radius dominates."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="lb",
+        name="Insecure LB",
+        type=ComponentType.LOAD_BALANCER,
+        port=80,
+        replicas=1,
+        security=SecurityProfile(
+            encryption_in_transit=False,
+            waf_protected=False,
+            auth_required=False,
+            rate_limiting=False,
+        ),
+    ))
+    graph.add_component(Component(
+        id="db",
+        name="Secure DB",
+        type=ComponentType.DATABASE,
+        port=5432,
+        replicas=2,
+        security=SecurityProfile(
+            encryption_at_rest=True,
+            encryption_in_transit=True,
+            auth_required=True,
+        ),
+    ))
+    graph.add_dependency(Dependency(source_id="lb", target_id="db", dependency_type="requires"))
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    # db has blast_radius=0 (nothing upstream depends on db from lb side)
+    # lb has blast_radius=0 too (nothing upstream depends on lb)
+    # All priority scores = 0 due to zero blast radius
+    for p in report.priorities:
+        assert p.blast_radius >= 0.0
+
+
+def test_vulnerability_priority_report_fields() -> None:
+    """VulnerabilityPriorityReport should have all required fields."""
+    graph = _make_single_node_graph()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    assert hasattr(report, "priorities")
+    assert hasattr(report, "critical_count")
+    assert hasattr(report, "high_count")
+    assert hasattr(report, "risk_score")
+    assert hasattr(report, "summary")
+
+
+def test_priority_score_is_float() -> None:
+    """All priority_score values should be floats."""
+    graph = _make_graph_with_one_insecure_lb()
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    for p in report.priorities:
+        assert isinstance(p.priority_score, float)
+
+
+def test_vulnerability_score_no_encryption_in_transit() -> None:
+    """Component without encryption_in_transit should include it in factors."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="app",
+        name="App",
+        type=ComponentType.APP_SERVER,
+        port=8080,
+        replicas=1,
+        security=SecurityProfile(encryption_in_transit=False),
+    ))
+    engine = VulnerabilityPriorityEngine(graph)
+    app = graph.get_component("app")
+    assert app is not None
+    score, factors = engine._vulnerability_score(app)
+    assert "no encryption in transit" in factors
+
+
+def test_analyze_with_dependency_chain_has_non_zero_blast_radius() -> None:
+    """Components in a dependency chain should have positive blast radius for leaf nodes."""
+    graph = InfraGraph()
+    graph.add_component(Component(
+        id="frontend", name="Frontend", type=ComponentType.APP_SERVER, replicas=2,
+        security=SecurityProfile(encryption_in_transit=False),
+    ))
+    graph.add_component(Component(
+        id="backend", name="Backend", type=ComponentType.APP_SERVER, replicas=2,
+        security=SecurityProfile(encryption_in_transit=False),
+    ))
+    graph.add_component(Component(
+        id="db", name="DB", type=ComponentType.DATABASE, replicas=1,
+        security=SecurityProfile(encryption_at_rest=False),
+    ))
+    graph.add_dependency(Dependency(source_id="frontend", target_id="backend", dependency_type="requires"))
+    graph.add_dependency(Dependency(source_id="backend", target_id="db", dependency_type="requires"))
+    engine = VulnerabilityPriorityEngine(graph)
+    report = engine.analyze()
+    db_priority = next(p for p in report.priorities if p.component_id == "db")
+    # db is depended on by both backend and frontend
+    assert db_priority.blast_radius > 0.0

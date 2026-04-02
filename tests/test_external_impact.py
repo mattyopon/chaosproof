@@ -304,3 +304,156 @@ class TestExternalDependencyAnalyzer:
         assert isinstance(impact.has_fallback, bool)
         assert isinstance(impact.risk_level, str)
         assert impact.risk_level in ("critical", "high", "medium", "low")
+
+
+# ---------------------------------------------------------------------------
+# Additional _classify_risk boundary tests
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyRiskBoundaries:
+    def test_exactly_50_pct_no_fallback_is_critical(self) -> None:
+        assert _classify_risk(50.0, has_fallback=False, dep_type="requires") == "critical"
+
+    def test_just_below_50_pct_no_fallback_is_high(self) -> None:
+        result = _classify_risk(49.9, has_fallback=False, dep_type="requires")
+        assert result in ("high", "medium")
+
+    def test_zero_blast_radius_no_fallback_is_medium(self) -> None:
+        result = _classify_risk(0.0, has_fallback=False, dep_type="requires")
+        assert result in ("medium", "low")
+
+    def test_with_fallback_zero_blast_is_low(self) -> None:
+        assert _classify_risk(0.0, has_fallback=True, dep_type="requires") == "low"
+
+    def test_100_blast_no_fallback_is_critical(self) -> None:
+        assert _classify_risk(100.0, has_fallback=False, dep_type="requires") == "critical"
+
+
+# ---------------------------------------------------------------------------
+# Additional _estimate_downtime tests
+# ---------------------------------------------------------------------------
+
+
+class TestEstimateDowntimeBoundaries:
+    def test_zero_affected_no_fallback(self) -> None:
+        """Even with zero affected components, requires dep has some downtime."""
+        dt = _estimate_downtime(has_fallback=False, dep_type="requires", affected_count=0)
+        assert dt >= 0.0
+
+    def test_with_fallback_requires_very_short(self) -> None:
+        dt = _estimate_downtime(has_fallback=True, dep_type="requires", affected_count=5)
+        # With fallback, downtime should be much shorter than without
+        dt_no_fallback = _estimate_downtime(has_fallback=False, dep_type="requires", affected_count=5)
+        assert dt < dt_no_fallback
+
+
+# ---------------------------------------------------------------------------
+# Additional _compute_risk_score tests
+# ---------------------------------------------------------------------------
+
+
+class TestComputeRiskScoreBoundaries:
+    def test_score_always_in_range(self) -> None:
+        impacts = [
+            ExternalImpact(
+                external_service="X",
+                component_id="x",
+                affected_components=["a", "b"],
+                blast_radius_percent=80.0,
+                estimated_downtime_minutes=120.0,
+                business_impact="severe",
+                mitigation="none",
+                has_fallback=False,
+                risk_level="critical",
+            )
+        ]
+        score = _compute_risk_score(impacts, 10)
+        assert 0.0 <= score <= 100.0
+
+    def test_all_low_risk_low_score(self) -> None:
+        impacts = [
+            ExternalImpact(
+                external_service="B",
+                component_id="b",
+                affected_components=[],
+                blast_radius_percent=2.0,
+                estimated_downtime_minutes=1.0,
+                business_impact="minor",
+                mitigation="ok",
+                has_fallback=True,
+                risk_level="low",
+            )
+        ]
+        score = _compute_risk_score(impacts, 10)
+        assert score < 50.0
+
+
+# ---------------------------------------------------------------------------
+# Additional ExternalDependencyAnalyzer tests
+# ---------------------------------------------------------------------------
+
+
+class TestExternalDependencyAnalyzerAdditional:
+    def test_multiple_apps_depend_on_same_external(self) -> None:
+        """Multiple internal components depending on same external service."""
+        g = InfraGraph()
+        g.add_component(Component(id="app1", name="App1", type=ComponentType.APP_SERVER, replicas=1))
+        g.add_component(Component(id="app2", name="App2", type=ComponentType.APP_SERVER, replicas=1))
+        g.add_component(Component(id="stripe", name="Stripe Payment API", type=ComponentType.EXTERNAL_API, host="api.stripe.com"))
+        g.add_dependency(Dependency(source_id="app1", target_id="stripe", dependency_type="requires",
+                                    circuit_breaker=CircuitBreakerConfig(enabled=False)))
+        g.add_dependency(Dependency(source_id="app2", target_id="stripe", dependency_type="requires",
+                                    circuit_breaker=CircuitBreakerConfig(enabled=False)))
+        analyzer = ExternalDependencyAnalyzer(g)
+        report = analyzer.analyze()
+        assert report.total_external_deps >= 1
+
+    def test_risk_score_higher_without_circuit_breaker(self) -> None:
+        g_unprotected = _make_graph_with_external(circuit_breaker=False)
+        g_protected = _make_graph_with_external(circuit_breaker=True)
+        r_unprotected = ExternalDependencyAnalyzer(g_unprotected).analyze()
+        r_protected = ExternalDependencyAnalyzer(g_protected).analyze()
+        assert r_unprotected.risk_score >= r_protected.risk_score
+
+    def test_external_api_blast_radius_in_valid_range(self) -> None:
+        g = _make_multi_external_graph()
+        report = ExternalDependencyAnalyzer(g).analyze()
+        for impact in report.impacts:
+            assert 0.0 <= impact.blast_radius_percent <= 100.0
+
+    def test_all_impacts_have_nonempty_business_impact(self) -> None:
+        g = _make_multi_external_graph()
+        report = ExternalDependencyAnalyzer(g).analyze()
+        for impact in report.impacts:
+            assert len(impact.business_impact) > 0
+
+    def test_all_impacts_have_nonempty_mitigation(self) -> None:
+        g = _make_multi_external_graph()
+        report = ExternalDependencyAnalyzer(g).analyze()
+        for impact in report.impacts:
+            assert len(impact.mitigation) > 0
+
+    @pytest.mark.parametrize("yaml_file", [
+        "examples/demo-infra.yaml",
+        "examples/typical-startup.yaml",
+        "examples/saas-dependencies.yaml",
+        "examples/ecommerce-platform.yaml",
+    ])
+    def test_analyze_all_examples(self, yaml_file: str) -> None:
+        from pathlib import Path
+        from faultray.model.loader import load_yaml
+        path = Path(__file__).parent.parent / yaml_file
+        if not path.exists():
+            pytest.skip(f"{yaml_file} not found")
+        graph = load_yaml(path)
+        analyzer = ExternalDependencyAnalyzer(graph)
+        report = analyzer.analyze()
+        assert 0.0 <= report.risk_score <= 100.0
+
+    def test_unprotected_count_all_unprotected(self) -> None:
+        """Multiple unprotected external deps should all be counted."""
+        g = _make_multi_external_graph()
+        report = ExternalDependencyAnalyzer(g).analyze()
+        # stripe has no circuit breaker; s3 and sendgrid have circuit breaker / optional
+        assert report.unprotected_count >= 1

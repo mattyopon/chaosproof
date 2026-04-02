@@ -297,3 +297,182 @@ class TestUIFeatures:
         assert "marker-end" in html
         # The template uses JS template literals: arrow-${d} and arrow-${d.type}
         assert "arrow-" in html
+
+
+# ---------------------------------------------------------------------------
+# Additional boundary / edge case tests
+# ---------------------------------------------------------------------------
+
+
+class TestBoundaryValues:
+    def test_single_component_graph(self) -> None:
+        """Graph with only one component should generate valid HTML."""
+        g = InfraGraph()
+        g.add_component(Component(id="solo", name="Solo App", type=ComponentType.APP_SERVER, replicas=1))
+        html = _generate_and_read(g)
+        assert "<!DOCTYPE html>" in html
+        assert "1 components" in html
+
+    def test_many_components_graph(self) -> None:
+        """Graph with 50 components should not crash or produce empty output."""
+        g = InfraGraph()
+        for i in range(50):
+            g.add_component(Component(id=f"svc-{i}", name=f"Service {i}", type=ComponentType.APP_SERVER, replicas=1))
+        html = _generate_and_read(g)
+        assert "<!DOCTYPE html>" in html
+        assert "50 components" in html
+
+    def test_replicas_999999(self) -> None:
+        """Component with replicas=999999 should serialize into HTML without overflow."""
+        g = InfraGraph()
+        g.add_component(Component(id="massive", name="Massive", type=ComponentType.APP_SERVER, replicas=999999))
+        html = _generate_and_read(g)
+        assert "999999" in html
+
+    def test_replicas_minimum_one_validation(self) -> None:
+        """Component replicas must be >= 1; replicas=0 raises ValidationError."""
+        import pydantic
+        with pytest.raises(pydantic.ValidationError):
+            Component(id="zero", name="Zero Replicas", type=ComponentType.APP_SERVER, replicas=0)
+
+    def test_japanese_component_name(self) -> None:
+        """Japanese component names should appear in the HTML."""
+        g = InfraGraph()
+        g.add_component(Component(id="jp", name="本番サーバー", type=ComponentType.APP_SERVER, replicas=2))
+        html = _generate_and_read(g)
+        assert "本番サーバー" in html
+
+    def test_all_component_types_render(self) -> None:
+        """All ComponentType values should render without error."""
+        g = InfraGraph()
+        for i, ctype in enumerate([
+            ComponentType.APP_SERVER,
+            ComponentType.DATABASE,
+            ComponentType.CACHE,
+            ComponentType.QUEUE,
+            ComponentType.LOAD_BALANCER,
+            ComponentType.EXTERNAL_API,
+        ]):
+            g.add_component(Component(id=f"c{i}", name=f"Comp {i}", type=ctype, replicas=1))
+        html = _generate_and_read(g)
+        assert "<!DOCTYPE html>" in html
+
+    def test_no_dependencies_graph(self) -> None:
+        """Graph with components but no dependencies should have 0 edges."""
+        g = InfraGraph()
+        g.add_component(Component(id="a", name="A", type=ComponentType.APP_SERVER, replicas=1))
+        g.add_component(Component(id="b", name="B", type=ComponentType.DATABASE, replicas=1))
+        html = _generate_and_read(g)
+        assert "0 edges" in html
+
+
+class TestNodeDataAdditional:
+    def _extract_nodes(self, graph: InfraGraph) -> list[dict]:
+        html = _generate_and_read(graph)
+        start = html.index("const NODES = ") + len("const NODES = ")
+        end = html.index(";\n    const EDGES", start)
+        return json.loads(html[start:end])
+
+    def test_node_owner_field_present(self) -> None:
+        g = _make_diverse_graph()
+        nodes = self._extract_nodes(g)
+        for node in nodes:
+            assert "owner" in node
+
+    def test_node_health_color_is_hex(self) -> None:
+        g = _make_simple_graph()
+        nodes = self._extract_nodes(g)
+        for node in nodes:
+            assert "health_color" in node
+            assert node["health_color"].startswith("#")
+
+    def test_node_with_owner_reflects_owner(self) -> None:
+        """Component with owner should have that owner in node data."""
+        g = _make_diverse_graph()
+        nodes = self._extract_nodes(g)
+        lb_node = next(n for n in nodes if n["id"] == "lb")
+        assert lb_node["owner"] == "infra-team"
+
+    def test_empty_graph_nodes_list_empty(self) -> None:
+        g = InfraGraph()
+        html = _generate_and_read(g)
+        start = html.index("const NODES = ") + len("const NODES = ")
+        end = html.index(";\n    const EDGES", start)
+        nodes = json.loads(html[start:end])
+        assert nodes == []
+
+
+class TestEdgeDataAdditional:
+    def _extract_edges(self, graph: InfraGraph) -> list[dict]:
+        html = _generate_and_read(graph)
+        start = html.index("const EDGES = ") + len("const EDGES = ")
+        end = html.index(";\n    const LEGEND", start)
+        return json.loads(html[start:end])
+
+    def test_empty_graph_edges_list_empty(self) -> None:
+        g = InfraGraph()
+        html = _generate_and_read(g)
+        start = html.index("const EDGES = ") + len("const EDGES = ")
+        end = html.index(";\n    const LEGEND", start)
+        edges = json.loads(html[start:end])
+        assert edges == []
+
+    def test_edge_weight_is_float(self) -> None:
+        g = _make_simple_graph()
+        edges = self._extract_edges(g)
+        for edge in edges:
+            assert isinstance(edge["weight"], (int, float))
+
+    def test_edge_source_and_target_are_known_ids(self) -> None:
+        g = _make_simple_graph()
+        component_ids = {c.id for c in g.components.values()}
+        edges = self._extract_edges(g)
+        for edge in edges:
+            assert edge["source"] in component_ids
+            assert edge["target"] in component_ids
+
+    def test_circuit_breaker_dep_has_type(self) -> None:
+        """Dependency with circuit_breaker enabled should still have a type field."""
+        g = InfraGraph()
+        g.add_component(Component(id="a", name="A", type=ComponentType.APP_SERVER, replicas=1))
+        g.add_component(Component(id="b", name="B", type=ComponentType.DATABASE, replicas=1))
+        g.add_dependency(Dependency(
+            source_id="a", target_id="b", dependency_type="requires",
+            circuit_breaker=CircuitBreakerConfig(enabled=True)
+        ))
+        edges = self._extract_edges(g)
+        assert len(edges) == 1
+        assert "type" in edges[0]
+
+
+@pytest.mark.parametrize("yaml_file", [
+    "examples/demo-infra.yaml",
+    "examples/typical-startup.yaml",
+    "examples/ecommerce-platform.yaml",
+])
+def test_generate_topology_all_examples(yaml_file: str) -> None:
+    """All example YAML files should produce valid topology HTML."""
+    from faultray.model.loader import load_yaml
+    path = Path(__file__).parent.parent / yaml_file
+    if not path.exists():
+        pytest.skip(f"{yaml_file} not found")
+    graph = load_yaml(path)
+    html = _generate_and_read(graph)
+    assert "<!DOCTYPE html>" in html
+    assert "FaultRay" in html
+
+
+def test_generate_topology_json_valid() -> None:
+    """NODES and EDGES in the generated HTML should be valid JSON."""
+    g = _make_diverse_graph()
+    html = _generate_and_read(g)
+    # Extract and parse NODES
+    node_start = html.index("const NODES = ") + len("const NODES = ")
+    node_end = html.index(";\n    const EDGES", node_start)
+    nodes = json.loads(html[node_start:node_end])
+    # Extract and parse EDGES
+    edge_start = html.index("const EDGES = ") + len("const EDGES = ")
+    edge_end = html.index(";\n    const LEGEND", edge_start)
+    edges = json.loads(html[edge_start:edge_end])
+    assert isinstance(nodes, list)
+    assert isinstance(edges, list)
