@@ -7,6 +7,7 @@ supply chain, OAuth, billing, and miscellaneous endpoints."""
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -182,6 +183,7 @@ async def oauth_login(provider: str):
 
     url = generate_oauth_url(config, state=state)
 
+    _is_https = os.environ.get("FAULTRAY_HTTPS", "").lower() in ("1", "true", "yes")
     response = RedirectResponse(url=url)
     response.set_cookie(
         key="oauth_state",
@@ -189,7 +191,7 @@ async def oauth_login(provider: str):
         httponly=True,
         samesite="lax",
         max_age=600,  # 10 minutes
-        secure=True,
+        secure=_is_https,
     )
     return response
 

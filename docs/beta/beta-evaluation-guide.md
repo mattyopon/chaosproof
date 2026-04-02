@@ -129,7 +129,7 @@ infrastructure:
       criticality: high
 ```
 
-詳細なYAML仕様は `faultray docs infra-schema` で参照できます。
+詳細なYAML仕様は https://faultray.com/docs/infra-schema で参照できます。
 
 ---
 
@@ -309,7 +309,7 @@ faultray dora tlpt-readiness infra-sample.yaml --json
 
 ```bash
 # GitHub Actions / Jenkins等のCI/CDパイプラインへの組み込み
-# （サンプルワークフローは faultray docs ci-cd で参照）
+# （サンプルワークフローは https://faultray.com/docs/ci-cd で参照）
 
 # CI/CDモードでの実行（JSON出力で結果をパース可能）
 faultray simulate --model infra-sample.yaml --json
@@ -612,10 +612,10 @@ faultray --help
 faultray simulate --help
 faultray dora --help
 
-# 組み込みドキュメントの参照
-faultray docs
-faultray docs dora
-faultray docs infra-schema
+# Webドキュメントの参照
+# https://faultray.com/docs
+# または以下で各コマンドのヘルプを参照:
+# faultray --help
 ```
 
 ### 7.4 フィードバック提出期限

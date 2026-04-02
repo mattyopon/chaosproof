@@ -234,9 +234,18 @@ app.add_middleware(
 
 # Session middleware — used by Web UI OAuth flow (HTTP-only cookie session)
 # Bearer token auth is unaffected by this middleware.
+_session_secret = (
+    os.environ.get("FAULTRAY_SESSION_SECRET")
+    or os.environ.get("JWT_SECRET_KEY")
+    or "faultray-dev-session-key"
+)
+if _session_secret == "faultray-dev-session-key":
+    logger.warning(
+        "Using default session secret — set FAULTRAY_SESSION_SECRET or JWT_SECRET_KEY for production"
+    )
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("FAULTRAY_SESSION_SECRET", "faultray-dev-session-key"),
+    secret_key=_session_secret,
     https_only=False,  # Allow HTTP in development; set True in production
     same_site="lax",
 )
@@ -246,14 +255,30 @@ app.add_middleware(
 # Rate-limiting middleware for /api/* routes
 # ---------------------------------------------------------------------------
 
+# Trusted proxy IPs whose X-Forwarded-For header will be honored.
+# Set FAULTRAY_TRUSTED_PROXIES to a comma-separated list of IPs (e.g. "127.0.0.1,10.0.0.1").
+# If empty, X-Forwarded-For is never trusted.
+_trusted_proxies: set[str] = {
+    ip.strip()
+    for ip in os.environ.get("FAULTRAY_TRUSTED_PROXIES", "").split(",")
+    if ip.strip()
+}
+
+
+def _get_client_ip(request: Request) -> str:
+    """Return the real client IP, respecting X-Forwarded-For only from trusted proxies."""
+    direct_ip = request.client.host if request.client else "unknown"
+    if _trusted_proxies and direct_ip in _trusted_proxies:
+        forwarded = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    return direct_ip
+
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Enforce rate limiting on all endpoints."""
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        client_ip = forwarded_for.split(",")[0].strip()
-    else:
-        client_ip = request.client.host if request.client else "unknown"
+    client_ip = _get_client_ip(request)
     if not _rate_limiter.is_allowed(client_ip):
         return JSONResponse(
             status_code=429,

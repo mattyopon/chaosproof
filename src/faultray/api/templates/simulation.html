@@ -284,6 +284,16 @@ function filterResults() {
     });
 }
 
+function _showErrorBanner(msg) {
+    const existing = document.getElementById('_fr-error-banner');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.id = '_fr-error-banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px 20px;background:#dc3545;color:#fff;z-index:9999;text-align:center;font-size:14px;cursor:pointer;';
+    el.onclick = () => el.remove();
+    el.textContent = msg;
+    document.body.prepend(el);
+}
 function runSimulation() {
     const btn = document.getElementById('runSimBtn');
     btn.disabled = true;
@@ -293,7 +303,7 @@ function runSimulation() {
         .then(r => r.json())
         .then(data => {
             if (data.error) {
-                alert(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+                _showErrorBanner(typeof data.error === 'string' ? data.error : (data.error?.message || JSON.stringify(data.error)));
                 btn.disabled = false;
                 btn.innerHTML = 'Run Simulation';
                 return;
@@ -301,7 +311,7 @@ function runSimulation() {
             window.location.reload();
         })
         .catch(err => {
-            alert('Simulation failed: ' + err);
+            _showErrorBanner('Simulation failed: ' + err);
             btn.disabled = false;
             btn.innerHTML = 'Run Simulation';
         });

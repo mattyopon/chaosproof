@@ -665,9 +665,9 @@ function billingApp() {
                 });
                 const d = await r.json();
                 if (d.checkout_url) window.location.href = d.checkout_url;
-                else alert(d.error || 'Could not start checkout');
+                else _showErrorBanner(d.error || 'Could not start checkout');
             } catch (e) {
-                alert('Checkout error: ' + e.message);
+                _showErrorBanner('Checkout error: ' + e.message);
             }
         },
 
@@ -676,9 +676,9 @@ function billingApp() {
                 const r = await fetch('/api/billing/portal?team_id=' + encodeURIComponent(this.teamId));
                 const d = await r.json();
                 if (d.portal_url) window.location.href = d.portal_url;
-                else alert(d.error || 'Could not open billing portal');
+                else _showErrorBanner(d.error || 'Could not open billing portal');
             } catch (e) {
-                alert('Portal error: ' + e.message);
+                _showErrorBanner('Portal error: ' + e.message);
             }
         },
 
@@ -687,6 +687,17 @@ function billingApp() {
             this.openPortal();
         },
     };
+}
+
+function _showErrorBanner(msg) {
+    const existing = document.getElementById('_fr-error-banner');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.id = '_fr-error-banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px 20px;background:#dc3545;color:#fff;z-index:9999;text-align:center;font-size:14px;cursor:pointer;';
+    el.onclick = () => el.remove();
+    el.textContent = msg;
+    document.body.prepend(el);
 }
 </script>
 {% endblock %}

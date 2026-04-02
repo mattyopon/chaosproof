@@ -558,6 +558,16 @@
 </div><!-- /.dashboard-v2 -->
 
 <script>
+function _showErrorBanner(msg) {
+    const existing = document.getElementById('_fr-error-banner');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.id = '_fr-error-banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px 20px;background:#dc3545;color:#fff;z-index:9999;text-align:center;font-size:14px;cursor:pointer;';
+    el.onclick = () => el.remove();
+    el.textContent = msg;
+    document.body.prepend(el);
+}
 function runSim(e) {
     e.preventDefault();
     const btn = e.target.closest('button') || e.target;
@@ -568,7 +578,7 @@ function runSim(e) {
         .then(r => r.json())
         .then(data => {
             if (data.error) {
-                alert(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+                _showErrorBanner(typeof data.error === 'string' ? data.error : (data.error?.message || JSON.stringify(data.error)));
                 btn.innerHTML = origHTML;
                 btn.style.pointerEvents = '';
                 return;
@@ -576,7 +586,7 @@ function runSim(e) {
             window.location.reload();
         })
         .catch(err => {
-            alert('Simulation failed: ' + err);
+            _showErrorBanner('Simulation failed: ' + err);
             btn.innerHTML = origHTML;
             btn.style.pointerEvents = '';
         });

@@ -260,6 +260,8 @@ def create_coupon(
         raise ValueError(
             f"Invalid tier '{tier}'. Must be one of: {', '.join(_VALID_TIERS)}"
         )
+    if days < 1:
+        raise ValueError("days must be at least 1")
 
     now = datetime.now(tz=timezone.utc)
     expires = now + timedelta(days=days)

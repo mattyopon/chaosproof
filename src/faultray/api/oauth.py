@@ -23,7 +23,15 @@ logger = logging.getLogger(__name__)
 # JWT helpers
 # ---------------------------------------------------------------------------
 
-_JWT_SECRET = os.environ.get("FAULTRAY_JWT_SECRET", "faultray-dev-secret-change-me")
+_JWT_SECRET = (
+    os.environ.get("FAULTRAY_JWT_SECRET")
+    or os.environ.get("JWT_SECRET_KEY")
+    or "faultray-dev-secret-change-me"
+)
+if _JWT_SECRET == "faultray-dev-secret-change-me":
+    logger.warning(
+        "Using default JWT secret — set FAULTRAY_JWT_SECRET or JWT_SECRET_KEY for production"
+    )
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_SECONDS = 86400  # 24 hours
 
