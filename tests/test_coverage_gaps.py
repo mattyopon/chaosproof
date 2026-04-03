@@ -1848,15 +1848,21 @@ class TestTerraformCoverageGaps:
 
     def test_load_tf_plan_cmd_success(self):
         """Lines 187-201: load_tf_plan_cmd with successful terraform show."""
+        import tempfile
         from faultray.discovery.terraform import load_tf_plan_cmd
 
         plan = {"resource_changes": []}
-        with patch("faultray.discovery.terraform.subprocess.run") as mock_run:
-            mock_run.return_value.returncode = 0
-            mock_run.return_value.stdout = json.dumps(plan)
-            result = load_tf_plan_cmd(plan_file=Path("/tmp/plan.out"))
-            assert isinstance(result, dict)
-            assert "changes" in result
+        with tempfile.NamedTemporaryFile(suffix=".out", delete=False) as tmp:
+            plan_path = Path(tmp.name)
+        try:
+            with patch("faultray.discovery.terraform.subprocess.run") as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = json.dumps(plan)
+                result = load_tf_plan_cmd(plan_file=plan_path)
+                assert isinstance(result, dict)
+                assert "changes" in result
+        finally:
+            plan_path.unlink(missing_ok=True)
 
     def test_load_tf_plan_cmd_failure(self):
         """Lines 197-198: terraform plan show fails."""
