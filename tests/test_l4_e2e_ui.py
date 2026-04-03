@@ -177,11 +177,10 @@ class TestComputerUseReadiness:
             assert "steps" in s
             assert len(s["steps"]) >= 2
 
-    def test_streamlit_app_url_configured(self):
-        """Streamlit CloudのURLが設定されている."""
-        # faultray.streamlit.app or localhost
+    def test_demo_url_configured(self):
+        """デモURLがLPに設定されている."""
         expected_urls = [
-            "faultray.streamlit.app",
+            "faultray.com/demo",
             "localhost:8501",
         ]
         # LPにリンクがあるか確認
@@ -189,4 +188,4 @@ class TestComputerUseReadiness:
         if lp_path.exists():
             content = lp_path.read_text(encoding="utf-8")
             has_link = any(url in content for url in expected_urls)
-            assert has_link, "LPにStreamlitアプリへのリンクがありません"
+            assert has_link, "LPにデモへのリンクがありません"

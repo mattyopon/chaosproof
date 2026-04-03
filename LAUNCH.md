@@ -43,7 +43,7 @@ v11.0 adds AI agent resilience via MCP: plug FaultRay directly into your AI agen
 
 It's completely free and open source (BSL 1.1). I'd love your feedback!
 
-- Live demo: https://faultray-demo.fly.dev/ (URL may change)
+- Live demo: https://faultray.com/demo
 - PyPI: pip install faultray
 - GitHub: https://github.com/mattyopon/faultray
 
@@ -82,7 +82,7 @@ pip install faultray
 faultray demo --web
 ```
 
-Live demo: https://faultray-demo.fly.dev/ (URL may change)
+Live demo: https://faultray.com/demo
 GitHub: https://github.com/mattyopon/faultray
 
 ---
@@ -105,7 +105,7 @@ You describe your infra in YAML or import from Terraform, and it runs 2,000+ fai
 
 - Free & open source (BSL 1.1, converts to Apache 2.0 in 2030)
 - `pip install faultray`
-- Live demo: https://faultray-demo.fly.dev/ (URL may change)
+- Live demo: https://faultray.com/demo
 - GitHub: https://github.com/mattyopon/faultray
 
 Would love feedback from fellow SREs!
