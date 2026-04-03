@@ -105,7 +105,7 @@ def _safe_getattr(obj: Any, name: str, *args: Any) -> Any:
     return getattr(obj, name, *args)
 
 
-def _make_safe_exception_proxy(real_exc: type) -> type:
+def _make_safe_exception_proxy(real_exc: type, *extra_bases: type) -> type:
     """Return a proxy of *real_exc* whose ``__subclasses__`` is disabled.
 
     Direct attribute access (``BaseException.__subclasses__()``) bypasses
@@ -114,6 +114,11 @@ def _make_safe_exception_proxy(real_exc: type) -> type:
     exception classes in ``_PLUGIN_SAFE_BUILTINS`` with thin proxies that
     inherit from the real class (so ``isinstance`` / ``except`` still work)
     but override ``__subclasses__`` with a non-callable sentinel.
+
+    *extra_bases* allows concrete exceptions to also inherit from the
+    sandbox-safe proxy of their parent class (e.g. _SafeException), so that
+    ``except Exception:`` inside the sandbox correctly catches _SafeValueError
+    etc. via the C-level PyErr_GivenExceptionMatches MRO walk.
     """
 
     class _blocked_subclasses:  # noqa: N801 — intentionally lowercase to match descriptor protocol
@@ -129,9 +134,10 @@ def _make_safe_exception_proxy(real_exc: type) -> type:
                 "Plugin sandbox: '__subclasses__' access is not permitted"
             )
 
+    bases: tuple[type, ...] = (real_exc,) + extra_bases
     proxy = type(
         f"_Safe{real_exc.__name__}",
-        (real_exc,),
+        bases,
         {"__subclasses__": _blocked_subclasses()},
     )
     return proxy
@@ -140,8 +146,23 @@ def _make_safe_exception_proxy(real_exc: type) -> type:
 # Sandbox-safe proxies for exception base classes.
 # These inherit from the real classes so isinstance/except work correctly,
 # but expose no __subclasses__() method that could be used for sandbox escape.
-_SafeException: type = _make_safe_exception_proxy(Exception)
 _SafeBaseException: type = _make_safe_exception_proxy(BaseException)
+_SafeException: type = _make_safe_exception_proxy(Exception, _SafeBaseException)
+
+# Sandbox-safe proxies for concrete exception classes.
+# Direct `ValueError.__subclasses__()` bypasses _safe_getattr (C-level resolution),
+# so every exception exposed in the sandbox must be wrapped.
+# Each proxy also inherits from _SafeException / _SafeBaseException so that
+# `except Exception:` inside the sandbox correctly catches these proxied types.
+_SafeValueError: type = _make_safe_exception_proxy(ValueError, _SafeException)
+_SafeTypeError: type = _make_safe_exception_proxy(TypeError, _SafeException)
+_SafeKeyError: type = _make_safe_exception_proxy(KeyError, _SafeException)
+_SafeIndexError: type = _make_safe_exception_proxy(IndexError, _SafeException)
+_SafeAttributeError: type = _make_safe_exception_proxy(AttributeError, _SafeException)
+_SafeRuntimeError: type = _make_safe_exception_proxy(RuntimeError, _SafeException)
+_SafeNotImplementedError: type = _make_safe_exception_proxy(NotImplementedError, _SafeException)
+_SafeStopIteration: type = _make_safe_exception_proxy(StopIteration, _SafeBaseException)
+_SafeImportError: type = _make_safe_exception_proxy(ImportError, _SafeException)
 
 
 def _build_plugin_builtins() -> dict[str, Any]:
@@ -210,16 +231,19 @@ def _build_plugin_builtins() -> dict[str, Any]:
         "oct": oct,
         "bin": bin,
         "format": format,
-        # Common exceptions
-        "ValueError": ValueError,
-        "TypeError": TypeError,
-        "KeyError": KeyError,
-        "IndexError": IndexError,
-        "AttributeError": AttributeError,
-        "RuntimeError": RuntimeError,
-        "NotImplementedError": NotImplementedError,
-        "StopIteration": StopIteration,
-        "ImportError": ImportError,
+        # Common exceptions — all wrapped in sandbox-safe proxies so that
+        # direct attribute access (e.g. ValueError.__subclasses__()) is blocked.
+        # The C-level type.__getattribute__ resolves '.' without going through
+        # _safe_getattr, so raw exception classes must not appear here.
+        "ValueError": _SafeValueError,
+        "TypeError": _SafeTypeError,
+        "KeyError": _SafeKeyError,
+        "IndexError": _SafeIndexError,
+        "AttributeError": _SafeAttributeError,
+        "RuntimeError": _SafeRuntimeError,
+        "NotImplementedError": _SafeNotImplementedError,
+        "StopIteration": _SafeStopIteration,
+        "ImportError": _SafeImportError,
         # Exception base classes: use sandbox-safe proxies that block
         # __subclasses__() to prevent the classic Python sandbox escape:
         #   BaseException.__subclasses__() → os._wrap_close →

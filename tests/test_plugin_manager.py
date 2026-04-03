@@ -607,3 +607,60 @@ except RuntimeError:
         code = "subs = BaseException.__subclasses__()"
         with pytest.raises((AttributeError, TypeError)):
             exec(code, {"__builtins__": _PLUGIN_SAFE_BUILTINS})
+
+    @pytest.mark.parametrize("exc_name", [
+        "ValueError",
+        "TypeError",
+        "KeyError",
+        "IndexError",
+        "AttributeError",
+        "RuntimeError",
+        "NotImplementedError",
+        "StopIteration",
+        "ImportError",
+    ])
+    def test_concrete_exception_subclasses_blocked(self, exc_name: str):
+        """__subclasses__() on concrete exception classes must be blocked.
+
+        SEC-01: Concrete exception classes (ValueError etc.) previously exposed
+        __subclasses__() because only Exception/BaseException were proxied.
+        The attack path: ValueError.__subclasses__() can enumerate live subclasses
+        and eventually reach __globals__ containing 'os'.
+        """
+        from faultray.plugins.plugin_manager import _PLUGIN_SAFE_BUILTINS
+
+        code = f"result = {exc_name}.__subclasses__()"
+        with pytest.raises((AttributeError, TypeError)):
+            exec(code, {"__builtins__": _PLUGIN_SAFE_BUILTINS})
+
+    def test_concrete_exception_catchable_by_base_class(self):
+        """Concrete proxied exceptions must still be catchable by base class.
+
+        SEC-01 regression: after wrapping concrete exceptions, 'except Exception:'
+        must still catch _SafeKeyError etc. (MRO must include _SafeException).
+        """
+        from faultray.plugins.plugin_manager import _PLUGIN_SAFE_BUILTINS
+
+        code = """
+try:
+    raise KeyError("missing")
+except Exception:
+    caught = True
+"""
+        ns: dict = {}
+        exec(code, {"__builtins__": _PLUGIN_SAFE_BUILTINS}, ns)
+        assert ns.get("caught") is True
+
+    def test_stop_iteration_catchable_by_base_exception(self):
+        """StopIteration must be catchable by BaseException in the sandbox."""
+        from faultray.plugins.plugin_manager import _PLUGIN_SAFE_BUILTINS
+
+        code = """
+try:
+    raise StopIteration
+except BaseException:
+    caught = True
+"""
+        ns: dict = {}
+        exec(code, {"__builtins__": _PLUGIN_SAFE_BUILTINS}, ns)
+        assert ns.get("caught") is True
