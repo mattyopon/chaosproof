@@ -31,4 +31,4 @@ Any amount is welcome. Every contribution helps fund development and keeps Fault
 
 ---
 
-**Enterprise customers:** contact [ymaeda.it@gmail.com](mailto:ymaeda.it@gmail.com) for custom licensing, SLA agreements, and on-premise deployment options.
+**Enterprise customers:** contact [contact@faultray.com](mailto:contact@faultray.com) for custom licensing, SLA agreements, and on-premise deployment options.

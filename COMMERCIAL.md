@@ -17,7 +17,7 @@ Non-production use such as development, testing, evaluation, and academic resear
 For commercial licensing inquiries, please reach out to:
 
 **Yutaro Maeda**
-Email: [ymaeda.it@gmail.com](mailto:ymaeda.it@gmail.com)
+Email: [contact@faultray.com](mailto:contact@faultray.com)
 
 ## FAQ
 
