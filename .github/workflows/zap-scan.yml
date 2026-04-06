@@ -1,0 +1,28 @@
+name: OWASP ZAP Baseline Scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  zap-baseline:
+    name: ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: "https://mattyopon.github.io/faultray/"
+          fail_action: false
+          artifact_name: zap-report
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-report-${{ github.sha }}
+          path: report_html.html
+          retention-days: 30
