@@ -73,7 +73,11 @@ _HALLUCINATION_PATTERNS: list[tuple[str, str, float]] = [
     (r"#\s*(?:TODO|FIXME|HACK|XXX)", "stale_dependency", 0.05),
 ]
 
-# Base hallucination rates by author type
+# Base hallucination rates by author type.
+# DISCLAIMER: These are estimated rates based on informal benchmarks and
+# industry observations, NOT peer-reviewed measurements. They serve as
+# relative priors for risk ranking (Claude < GPT < Copilot), not as
+# absolute probabilities. Adjust via config if you have project-specific data.
 _BASE_HALLUCINATION_RATES: dict[AuthorType, float] = {
     AuthorType.HUMAN: 0.01,
     AuthorType.AI_CLAUDE: 0.03,
@@ -189,16 +193,25 @@ class CodeRiskEngine:
 
         report = CodeRiskReport()
 
-        for file_path, added_lines, removed_lines, added_content in file_diffs:
+        # Get base ref file contents for cost_before calculation
+        base_file_contents = self._get_base_file_contents(base_ref, [f[0] for f in file_diffs])
+
+        for file_path, added_lines, removed_lines, added_content, removed_content in file_diffs:
             language = self._detect_language(file_path)
             if language == CodeLanguage.UNKNOWN:
                 continue  # Skip non-code files
 
             author_type = self._detect_ai_author(file_path, commit_authors)
 
-            # Analyze the added code
-            complexity = self._estimate_complexity(added_content)
-            cost = self._estimate_runtime_cost(added_content, language, complexity)
+            # Analyze the added code (new state)
+            complexity_after = self._estimate_complexity(added_content)
+            cost_after = self._estimate_runtime_cost(added_content, language, complexity_after)
+
+            # Analyze the removed code + base file (old state)
+            base_content = base_file_contents.get(file_path, "")
+            complexity_before = self._estimate_complexity(base_content) if base_content else ComplexityClass.UNKNOWN
+            cost_before = self._estimate_runtime_cost(base_content, language, complexity_before) if base_content else RuntimeCostProfile()
+
             hallucination = self._assess_hallucination_risk(
                 added_content, author_type, file_path
             )
@@ -208,9 +221,10 @@ class CodeRiskEngine:
                 language=language,
                 lines_added=added_lines,
                 lines_removed=removed_lines,
-                complexity_before=ComplexityClass.UNKNOWN,
-                complexity_after=complexity,
-                cost_after=cost,
+                complexity_before=complexity_before,
+                complexity_after=complexity_after,
+                cost_before=cost_before,
+                cost_after=cost_after,
                 hallucination_risk=hallucination,
             )
 
@@ -278,6 +292,24 @@ class CodeRiskEngine:
         except (subprocess.SubprocessError, FileNotFoundError):
             return ""
 
+    def _get_base_file_contents(self, base_ref: str, file_paths: list[str]) -> dict[str, str]:
+        """Get file contents at the base ref for cost_before calculation."""
+        contents: dict[str, str] = {}
+        for fp in file_paths:
+            try:
+                result = subprocess.run(
+                    ["git", "show", f"{base_ref}:{fp}"],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.repo_path,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    contents[fp] = result.stdout
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass  # New file — no base content
+        return contents
+
     def _get_commit_authors(self, base_ref: str, head_ref: str) -> dict[str, list[str]]:
         """Get commit messages for author detection.
 
@@ -325,32 +357,50 @@ class CodeRiskEngine:
     # Diff parsing
     # ------------------------------------------------------------------
 
-    def _parse_diff(self, diff_text: str) -> list[tuple[str, int, int, str]]:
-        """Parse unified diff into (file_path, lines_added, lines_removed, added_content)."""
-        files: list[tuple[str, int, int, str]] = []
+    def _parse_diff(self, diff_text: str) -> list[tuple[str, int, int, str, str]]:
+        """Parse unified diff into (file_path, lines_added, lines_removed, added_content, removed_content).
+
+        Handles:
+        - Binary files (skipped — 0 lines)
+        - Renamed files (uses new path)
+        - File paths with spaces
+        """
+        files: list[tuple[str, int, int, str, str]] = []
         current_file = ""
+        is_binary = False
         added = 0
         removed = 0
         added_lines: list[str] = []
+        removed_lines: list[str] = []
 
         for line in diff_text.split("\n"):
             if line.startswith("diff --git"):
-                if current_file:
-                    files.append((current_file, added, removed, "\n".join(added_lines)))
+                if current_file and not is_binary:
+                    files.append((current_file, added, removed, "\n".join(added_lines), "\n".join(removed_lines)))
                 # Extract file path: diff --git a/path b/path
-                parts = line.split(" b/")
+                # Handle paths with spaces by splitting on " b/"
+                parts = line.split(" b/", 1)
                 current_file = parts[-1] if len(parts) > 1 else ""
+                is_binary = False
                 added = 0
                 removed = 0
                 added_lines = []
-            elif line.startswith("+") and not line.startswith("+++"):
-                added += 1
-                added_lines.append(line[1:])
-            elif line.startswith("-") and not line.startswith("---"):
-                removed += 1
+                removed_lines = []
+            elif line.startswith("Binary files"):
+                is_binary = True
+            elif line.startswith("rename to "):
+                # Handle renames: use the new path
+                current_file = line[len("rename to "):]
+            elif not is_binary:
+                if line.startswith("+") and not line.startswith("+++"):
+                    added += 1
+                    added_lines.append(line[1:])
+                elif line.startswith("-") and not line.startswith("---"):
+                    removed += 1
+                    removed_lines.append(line[1:])
 
-        if current_file:
-            files.append((current_file, added, removed, "\n".join(added_lines)))
+        if current_file and not is_binary:
+            files.append((current_file, added, removed, "\n".join(added_lines), "\n".join(removed_lines)))
 
         return files
 

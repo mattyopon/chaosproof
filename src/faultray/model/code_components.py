@@ -55,8 +55,11 @@ class AuthorType(str, Enum):
 class RuntimeCostProfile(BaseModel):
     """Estimated runtime resource cost for a code component.
 
-    These are predictions, not measurements. Used to estimate
-    the impact of code changes on infrastructure load.
+    **DISCLAIMER**: These are heuristic predictions based on static analysis,
+    NOT actual measurements. Values are rough order-of-magnitude estimates
+    useful for relative comparison (is change A riskier than change B?),
+    not absolute performance numbers. For accurate profiling, use runtime
+    tools (py-spy, perf, Datadog Profiler, etc.).
     """
 
     # CPU cost model
