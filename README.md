@@ -12,6 +12,7 @@
   <a href="https://github.com/mattyopon/faultray/actions/workflows/ci.yml"><img src="https://github.com/mattyopon/faultray/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://faultray.com/demo"><img src="https://img.shields.io/badge/demo-live-brightgreen" alt="Live Demo"></a>
   <a href="https://github.com/mattyopon/faultray"><img src="https://img.shields.io/badge/resilience-72%2F100-green" alt="Resilience Score"></a>
+  <a href="https://github.com/mattyopon/faultray/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/tests-31%2C000%2B%20passed-brightgreen" alt="Tests"></a>
 </p>
 
 <p align="center">
@@ -21,6 +22,22 @@
 ---
 
 FaultRay simulates **hundreds to thousands of failure scenarios** entirely in memory — mathematically proving your availability ceiling before anything breaks. Built for financial institutions that need to prove DORA compliance without risking production systems.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard" width="400"><br><sub>Resilience Dashboard</sub></td>
+    <td><img src="docs/screenshots/heatmap.png" alt="Heatmap" width="400"><br><sub>Failure Heatmap</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/topology.png" alt="Topology" width="400"><br><sub>Dependency Topology</sub></td>
+    <td><img src="docs/screenshots/cost-analysis.png" alt="Cost Analysis" width="400"><br><sub>Financial Impact Analysis</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/compliance.png" alt="Compliance" width="400"><br><sub>DORA Compliance Dashboard</sub></td>
+  </tr>
+</table>
 
 ## Demo
 
