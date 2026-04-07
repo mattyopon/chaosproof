@@ -251,10 +251,10 @@ def test_self_loop_edge() -> None:
     g = InfraGraph()
     g.add_component(_comp("a"))
     g.add_dependency(_dep("a", "a"))
-    # a depends on itself; get_all_affected("a") should not include "a"
-    # (the BFS only enqueues NEW affected nodes)
+    # a depends on itself, so 'a' is its own dependent and is included once.
+    # The visited set prevents the BFS from re-enqueueing it forever.
     affected = g.get_all_affected("a")
-    assert affected == {"a"}  # self-loop makes 'a' a dependent of itself
+    assert affected == {"a"}
 
 
 def test_dependency_edge_to_missing_component() -> None:
@@ -419,15 +419,38 @@ def test_resilience_score_missing_edge_metadata_fallback() -> None:
 
 
 def test_resilience_score_clamped_zero_minimum() -> None:
-    """Heavily-stressed graph should clamp to 0, not go negative."""
+    """Heavily-stressed graph must clamp to exactly 0, not go negative.
+
+    Drive every penalty bucket in resilience_score() to its cap:
+        SPOF (30) + same-host-replica (20) + failover-missing (15)
+        + utilization (25) + depth (10) = 100
+    which exceeds the 100-point base, so the clamp must produce 0.0.
+    """
     g = InfraGraph()
-    # Many SPOFs and high utilization
+    # 20 SPOF DBs (replicas=1, no failover) each with a dedicated dependent.
+    # Drives both the SPOF cap (30) and failover-missing cap (15).
     for i in range(20):
         g.add_component(_comp(f"db{i}", cpu=99, mem=99, disk=99))
         g.add_component(_comp(f"api{i}", cpu=99, mem=99, disk=99))
-        g.add_dependency(_dep(f"api{i}", f"db{i}"))
+        g.add_dependency(_dep(f"api{i}", f"db{i}", dep_type="requires"))
+    # 10 components with replicas>=2 on a single host → false-redundancy
+    # penalty (capped at 20). Each needs a dependent to be counted.
+    for i in range(10):
+        g.add_component(
+            _comp(f"hr{i}", cpu=99, mem=99, disk=99, replicas=3, host="host1")
+        )
+        g.add_component(_comp(f"hrclient{i}", cpu=99, mem=99, disk=99))
+        g.add_dependency(
+            _dep(f"hrclient{i}", f"hr{i}", dep_type="requires")
+        )
+    # A long chain → max_depth > 5 → depth penalty caps at 10
+    chain_ids = [f"chain{i}" for i in range(10)]
+    for cid in chain_ids:
+        g.add_component(_comp(cid, cpu=99, mem=99, disk=99))
+    for a, b in zip(chain_ids, chain_ids[1:]):
+        g.add_dependency(_dep(a, b, dep_type="requires"))
     score = g.resilience_score()
-    assert 0.0 <= score <= 100.0
+    assert score == 0.0
 
 
 # ----------------------------- resilience_score_v2 -------------------------
@@ -580,8 +603,9 @@ def test_resilience_score_v2_recommendations_deduplicated() -> None:
     g.add_component(_comp("a"))
     g.add_component(_comp("b"))
     out = g.resilience_score_v2()
-    # both 'a' and 'b' lack redundancy → 2 distinct recs (different IDs)
+    # both 'a' and 'b' lack redundancy → exactly 2 distinct recs (one per ID)
     redundancy_recs = [r for r in _recs(out) if "no redundancy" in r]
+    assert len(redundancy_recs) == 2
     assert len(redundancy_recs) == len(set(redundancy_recs))
 
 
