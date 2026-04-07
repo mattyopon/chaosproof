@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import defusedxml.ElementTree as ET
 from dataclasses import dataclass, field
+from xml.etree.ElementTree import Element as _XMLElement
 
 import httpx
 
@@ -40,7 +41,7 @@ def _strip_ns(tag: str) -> str:
     return tag
 
 
-def _text(elem: ET.Element | None) -> str:
+def _text(elem: _XMLElement | None) -> str:
     """Safely extract text from an XML element."""
     if elem is None:
         return ""
