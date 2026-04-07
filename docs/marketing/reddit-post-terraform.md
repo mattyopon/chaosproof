@@ -82,7 +82,7 @@ faultray demo    # try it against a sample infrastructure
 
 GitHub: https://github.com/mattyopon/faultray
 
-Open source, free. BSL 1.1 (converts to Apache 2.0 in 2030 — basically MIT with a 4-year delay on commercial embedding).
+Open source, free. Apache 2.0 (converts to Apache 2.0 in 2030 — basically MIT with a 4-year delay on commercial embedding).
 
 ---
 

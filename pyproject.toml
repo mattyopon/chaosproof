@@ -7,7 +7,7 @@ name = "faultray"
 version = "11.1.0"
 description = "FaultRay — Zero-risk infrastructure and AI agent chaos engineering. Simulate agent resilience failures and prove your availability ceiling mathematically."
 readme = "README.md"
-license = {text = "BSL-1.1"}
+license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
 authors = [
     {name = "Yutaro Maeda", email = "mattyopon@gmail.com"},
@@ -16,7 +16,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

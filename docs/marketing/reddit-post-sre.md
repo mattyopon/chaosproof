@@ -95,7 +95,7 @@ faultray demo
 GitHub: https://github.com/mattyopon/faultray
 PyPI: https://pypi.org/project/faultray/
 
-Free and open source (BSL 1.1, converts to Apache 2.0 in 2030).
+Free and open source (Apache 2.0, converts to Apache 2.0 in 2030).
 
 ---
 

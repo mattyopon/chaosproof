@@ -41,7 +41,7 @@ The most unique feature is the 3-Layer Availability Limit Model — it mathemati
 
 v11.0 adds AI agent resilience via MCP: plug FaultRay directly into your AI agents and CI pipelines. Also introducing Terraform Safety Net — predict blast radius before `terraform apply` ever runs.
 
-It's completely free and open source (BSL 1.1). I'd love your feedback!
+It's completely free and open source (Apache 2.0). I'd love your feedback!
 
 - Live demo: https://faultray.com/demo
 - PyPI: pip install faultray
@@ -103,7 +103,7 @@ You describe your infra in YAML or import from Terraform, and it runs 2,000+ fai
 
 **v11.0 highlights**: AI agent resilience via MCP (12-tool server for AI agent/CI integration), and Terraform Safety Net — blast radius prediction before `terraform apply`.
 
-- Free & open source (BSL 1.1, converts to Apache 2.0 in 2030)
+- Free & open source (Apache 2.0 (relicensed 2026-04-08))
 - `pip install faultray`
 - Live demo: https://faultray.com/demo
 - GitHub: https://github.com/mattyopon/faultray

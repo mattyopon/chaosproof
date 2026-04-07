@@ -20,7 +20,7 @@ LABEL org.opencontainers.image.title="FaultRay" \
       org.opencontainers.image.url="https://faultray.com" \
       org.opencontainers.image.source="https://github.com/mattyopon/faultray" \
       org.opencontainers.image.version="11.0.0" \
-      org.opencontainers.image.licenses="BSL-1.1" \
+      org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.vendor="Yutaro Maeda"
 
 # Create non-root user

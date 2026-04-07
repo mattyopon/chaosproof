@@ -109,7 +109,7 @@ faultray simulate -m model.json
 
 **Stack and license**
 
-Python 3.11+, NetworkX for the dependency graph, FastAPI for the web dashboard, Typer for the CLI. BSL 1.1 (converts to Apache 2.0 in 2030).
+Python 3.11+, NetworkX for the dependency graph, FastAPI for the web dashboard, Typer for the CLI. Apache 2.0 (converts to Apache 2.0 in 2030).
 
 GitHub: https://github.com/mattyopon/faultray
 PyPI: https://pypi.org/project/faultray/

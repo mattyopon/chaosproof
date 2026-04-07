@@ -201,7 +201,7 @@ FaultRay provides chaos engineering through **pure mathematical simulation**:
 ## 8. About Us / 会社概要
 
 - **Product**: FaultRay v11.0
-- **License**: BSL 1.1 (Business Source License)
+- **License**: Apache License 2.0
 - **Patent**: USPTO provisional patent filed (March 2026)
 - **Creator**: Yutaro Maeda
 - **Contact**: hello@faultray.dev

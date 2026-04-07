@@ -1,13 +1,14 @@
 <p align="center">
   <h1 align="center">FaultRay</h1>
-  <p align="center"><strong>DORA-Compliant Resilience Testing — Without Touching Production</strong></p>
+  <p align="center"><strong>DORA-aligned Resilience Research Prototype — Without Touching Production</strong></p>
+  <p align="center"><sub>⚠ Research prototype. NOT validated for DORA, FISC, or any regulatory audit. Do not rely on FaultRay outputs for compliance decisions without independent legal and technical review.</sub></p>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/faultray/"><img src="https://img.shields.io/pypi/v/faultray" alt="PyPI"></a>
   <a href="https://pypi.org/project/faultray/"><img src="https://img.shields.io/pypi/dm/faultray" alt="Downloads"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSL%201.1-orange.svg" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://doi.org/10.5281/zenodo.19139911"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.19139911.svg" alt="DOI"></a>
   <a href="https://github.com/mattyopon/faultray/actions/workflows/ci.yml"><img src="https://github.com/mattyopon/faultray/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://faultray.com/demo"><img src="https://img.shields.io/badge/demo-live-brightgreen" alt="Live Demo"></a>
@@ -21,7 +22,7 @@
 
 ---
 
-FaultRay simulates **hundreds to thousands of failure scenarios** entirely in memory — mathematically proving your availability ceiling before anything breaks. Built for financial institutions that need to prove DORA compliance without risking production systems.
+FaultRay simulates **hundreds to thousands of failure scenarios** entirely in memory to compute availability ceiling estimates from a dependency graph. Built as a research prototype for exploring DORA-aligned resilience analysis without touching production systems. **This is not a certified compliance tool and its outputs must not be used as audit evidence without independent legal and technical review.**
 
 ## Screenshots
 
@@ -35,7 +36,7 @@ FaultRay simulates **hundreds to thousands of failure scenarios** entirely in me
     <td><img src="docs/screenshots/cost-analysis.png" alt="Cost Analysis" width="400"><br><sub>Financial Impact Analysis</sub></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="docs/screenshots/compliance.png" alt="Compliance" width="400"><br><sub>DORA Compliance Dashboard</sub></td>
+    <td colspan="2"><img src="docs/screenshots/compliance.png" alt="Compliance" width="400"><br><sub>DORA Research Dashboard (Prototype)</sub></td>
   </tr>
 </table>
 
@@ -69,7 +70,7 @@ Running chaos simulation...
 
 ## Why Financial Institutions Choose FaultRay
 
-Traditional chaos engineering tools (Gremlin, Steadybit, AWS FIS) inject real failures into production. For banks, insurers, and payment processors operating under DORA, that approach creates unacceptable risk.
+Traditional chaos engineering tools (Gremlin, Steadybit, AWS FIS) inject real failures into production. For banks, insurers, and payment processors operating under DORA, that approach creates unacceptable risk. FaultRay explores an in-memory simulation alternative as a research prototype — its outputs are not certified audit evidence.
 
 FaultRay takes a fundamentally different approach: **mathematical simulation**. Your trading systems stay online. Your payment rails keep running. You still get the evidence regulators need.
 
@@ -78,19 +79,19 @@ FaultRay takes a fundamentally different approach: **mathematical simulation**. 
 | Approach | Fault injection | Fault injection (with safety) | Fault injection | **Math simulation** |
 | Production risk | Medium-High | Low-Medium (blast radius controls) | Medium | **Zero** |
 | Setup | Agent per host | Agent per host | AWS only | **`pip install`** |
-| DORA evidence | Reporting available | Reporting available | CloudWatch logs | **Audit-ready reports** |
+| DORA evidence | Reporting available | Reporting available | CloudWatch logs | **Research-draft evidence exports (prototype, not audit-certified)** |
 | AI agent testing | No | No | No | **Yes** |
 | Cost | $$$$ | $$$ | $$ | **Free tier / Enterprise** |
 
-## DORA Compliance — All 5 Pillars
+## DORA-aligned Research — All 5 Pillars
 
-FaultRay maps directly to the EU Digital Operational Resilience Act (Regulation EU 2022/2554), fully effective since January 17, 2025. Non-compliance carries fines up to **2% of global annual turnover**.
+FaultRay provides a research-prototype mapping to the EU Digital Operational Resilience Act (Regulation EU 2022/2554), fully effective since January 17, 2025. Non-compliance with DORA carries fines up to **2% of global annual turnover**, which is precisely why regulated entities must use certified tooling and independent legal review — **FaultRay is neither**.
 
 ### Full DORA Command Suite
 
 ```bash
 # Pillar 1: ICT Risk Management (Articles 5-16)
-faultray dora assess model.json              # 52-control compliance check
+faultray dora assess model.json              # 52-control research mapping (not certified audit)
 faultray dora risk-assessment model.json     # Comprehensive risk evaluation
 faultray dora gap-analysis model.json        # Control gaps + remediation
 
@@ -110,7 +111,7 @@ faultray dora register model.json            # RTS 2024/1774 register
 # Integrated threat intelligence from CVE/CISA advisories
 
 # Evidence & Reporting
-faultray dora evidence model.json            # Audit-ready evidence package
+faultray dora evidence model.json            # Research-draft evidence package (not audit-certified)
 faultray dora report model.json              # HTML report for regulators
 faultray dora rts-export model.json --format csv  # Machine-readable export
 ```
@@ -239,7 +240,7 @@ Built-in scenarios:
 
 Each scenario runs twice (with and without the ratchet) and reports an **effectiveness score** showing how much data-leak damage the ratchet prevents.
 
-### 5. Continuous Compliance Monitoring
+### 5. Continuous Compliance Research Monitoring (Prototype)
 
 ```bash
 faultray compliance-monitor model.json --framework dora  # DORA
@@ -247,7 +248,7 @@ faultray compliance-monitor model.json --framework soc2  # SOC 2
 faultray compliance-monitor model.json --framework pci   # PCI DSS
 ```
 
-Tracks compliance trends over 90 days with automated drift detection.
+Research-prototype tracker of compliance-mapping trends over 90 days with automated drift detection. Not audit-certified.
 
 ## APM — Application Performance Monitoring
 
@@ -345,13 +346,13 @@ faultray badge infra.yaml --url
 |---|---|
 | **5-Layer Availability Model** | Mathematical proof of your uptime ceiling — "your 99.99% SLA is physically impossible given this topology" |
 | **5 Simulation Engines** | Cascade, Dynamic, Ops, What-If, Capacity |
-| **DORA Compliance Suite** | 52 controls, 5 pillars, audit-ready evidence packages |
+| **DORA Research Suite** | 52 controls, 5 pillars, research-draft evidence packages (not audit-certified) |
 | **Cascade Failure Analysis** | Graph-based blast radius mapping with containment scoring |
 | **SPOF Detection** | Automatic identification of single points of failure |
 | **AI Agent Testing** | 7 agent-specific fault types (hallucination, loops, etc.) |
 | **Terraform Integration** | Pre-apply impact analysis as a CI/CD gate |
 | **Third-Party Risk** | ICT concentration risk analysis (Herfindahl-Hirschman Index) |
-| **Multi-Framework Compliance** | SOC 2, ISO 27001, PCI DSS 4.0, NIST CSF, DORA, HIPAA, GDPR |
+| **Multi-Framework Research Mapping (prototype)** | SOC 2, ISO 27001, PCI DSS 4.0, NIST CSF, DORA, HIPAA, GDPR — research-prototype mappings, not audit-certified |
 | **APM Agent** | Install once, monitor forever — real-time metrics, anomaly detection, topology auto-discovery |
 | **100+ CLI Commands** | From `faultray demo` to `faultray war-room` |
 
@@ -406,4 +407,4 @@ ruff check src/ tests/
 
 ## License
 
-BSL 1.1 — see [LICENSE](LICENSE). Converts to Apache 2.0 on 2030-03-17.
+Apache License 2.0 — see [LICENSE](LICENSE). Relicensed from BSL 1.1 on 2026-04-08 to open OSS adoption paths for individual developers and small teams.
