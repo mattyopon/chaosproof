@@ -56,9 +56,18 @@ def test_cors_specific_origins_credentials():
 
 
 def test_cors_methods_explicit():
-    """allow_methods must NOT contain '*'."""
+    """allow_methods must be an explicit list (no wildcard)."""
     server = _reload_server({})
     assert "*" not in server._cors_methods
+    expected_methods = {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"}
+    assert set(server._cors_methods) == expected_methods
+
+
+def test_cors_headers_include_authorization():
+    """allow_headers must include Authorization explicitly (MDN spec requirement)."""
+    server = _reload_server({})
+    assert "Authorization" in server._cors_headers
+    assert "*" not in server._cors_headers
 
 
 # ---------------------------------------------------------------------------
