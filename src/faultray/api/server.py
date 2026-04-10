@@ -238,29 +238,41 @@ if _cors_origins == ["*"]:
 
 _allow_credentials = bool(_cors_origins) and _cors_origins != ["*"]
 
+_cors_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"]
+_cors_headers: list[str] = ["Authorization", "Content-Type", "X-Requested-With", "Accept"]
+
+if _allow_credentials:
+    assert "*" not in _cors_origins, "allow_origins must not contain '*' when credentials are enabled"
+    assert "*" not in _cors_methods, "allow_methods must not contain '*' when credentials are enabled"
+    assert "*" not in _cors_headers, "allow_headers must not contain '*' when credentials are enabled"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=_allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=_cors_methods,
+    allow_headers=_cors_headers,
 )
 
 # Session middleware — used by Web UI OAuth flow (HTTP-only cookie session)
 # Bearer token auth is unaffected by this middleware.
+_is_production = os.environ.get("FAULTRAY_ENV", "development") == "production"
 _session_secret = (
     os.environ.get("FAULTRAY_SESSION_SECRET")
     or os.environ.get("JWT_SECRET_KEY")
-    or "faultray-dev-session-key"
+    or ""
 )
-if _session_secret == "faultray-dev-session-key":
+if not _session_secret:
+    if _is_production:
+        raise RuntimeError("FAULTRAY_SESSION_SECRET must be set in production")
+    _session_secret = "faultray-dev-session-key"  # default dev-only value
     logger.warning(
         "Using default session secret — set FAULTRAY_SESSION_SECRET or JWT_SECRET_KEY for production"
     )
 app.add_middleware(
     SessionMiddleware,
     secret_key=_session_secret,
-    https_only=False,  # Allow HTTP in development; set True in production
+    https_only=_is_production,
     same_site="lax",
 )
 
