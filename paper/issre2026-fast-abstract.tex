@@ -1,0 +1,192 @@
+% ISSRE 2026 Fast Abstract
+% Track: Fast Abstract & Project Highlights
+% Deadline: June 15, 2026
+% Format: IEEE Computer Society, 2 pages max
+% Compile: pdflatex issre2026-fast-abstract.tex && bibtex issre2026-fast-abstract && pdflatex issre2026-fast-abstract.tex && pdflatex issre2026-fast-abstract.tex
+
+\documentclass[conference,10pt]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{enumitem}
+
+\title{FaultRay: In-Memory Cascade Simulation\\with Formal LTS Semantics and\\Multi-Layer Availability Limits}
+
+\author{
+  \IEEEauthorblockN{Yutaro Maeda}
+  \IEEEauthorblockA{Independent Researcher\\
+    Chigasaki, Japan\\
+    contact@faultray.com}
+}
+
+\begin{document}
+\maketitle
+
+%% ---- ABSTRACT ----
+\begin{abstract}
+Production chaos engineering tools inject real faults into running
+systems, creating risk for regulated operators. Classical reliability
+analysis (FTA, RBD) assumes component independence, which does not hold
+for cloud infrastructure where a single incident can simultaneously
+degrade multiple layers. We present \textsc{FaultRay}, a research
+prototype contributing: (1)~a cascade propagation engine formalized as
+a Labeled Transition System (LTS) over a dependency graph, with proven
+termination and $O(|V|{+}|E|)$ complexity; and (2)~an $N$-layer
+availability limit model composing categorical ceilings via
+$\min$ rather than the classical series-product. An illustrative
+backtest on 54~real-world cloud incidents reproduces known cascade
+paths. \textsc{FaultRay} is open source (Apache~2.0, PyPI).
+\end{abstract}
+
+%% ---- 1. PROBLEM ----
+\section{Problem and Motivation}
+
+Modern cloud infrastructure cascading failures---the 2021 Meta BGP
+outage, the 2017 AWS S3 incident, the 2022 Cloudflare BGP
+leak---demonstrate how a single fault propagates across dozens of
+dependent services within minutes. Two gaps remain in current
+approaches:
+
+\textbf{Gap 1: Production risk.} Chaos engineering tools (Gremlin,
+Steadybit, AWS FIS, LitmusChaos) inject \emph{real} faults. For
+regulated financial institutions under DORA (EU~2022/2554), touching
+production to discover weaknesses is often unacceptable.
+
+\textbf{Gap 2: Independence assumption.} Classical Reliability Block
+Diagrams compose availabilities via series-product
+$A = \prod_i A_i$~\cite{trivedi2001}, assuming independent failures.
+Cloud infrastructure violates this: a region outage simultaneously
+degrades compute, network, and storage layers.
+
+Concurrent work by Krasnovsky~\cite{krasnovsky2026} (ICSE-NIER~2026)
+proposes in-memory Monte-Carlo simulation on service-dependency
+graphs. \textsc{FaultRay} addresses the same positioning with a
+different technical approach: formal LTS semantics with proven
+properties and multi-layer availability decomposition.
+
+%% ---- 2. APPROACH ----
+\section{Approach}
+
+\subsection{Cascade Engine (LTS Formalization)}
+
+\textsc{FaultRay} models cascade propagation as a Labeled Transition
+System $\mathcal{M} = (S, s_0, \mathit{Act}, {\longrightarrow}, F)$
+over an infrastructure dependency graph $G = (C, E, \mathit{dep},
+w, \tau, \mathit{cb})$. Each state is a 4-tuple $(H, L, T, V)$:
+health map, latency map, elapsed time, and visited set.
+
+Eight transition rules govern fault injection, propagation through
+typed dependencies (\texttt{requires}/\texttt{optional}/\texttt{async}),
+circuit breaker trips, timeout cascades, and termination. Proven
+properties include:
+\begin{itemize}[nosep,leftmargin=*]
+  \item \textbf{Termination}: the visited set $V$ grows monotonically
+    and is bounded by $|C|$.
+  \item \textbf{$O(|V|{+}|E|)$ complexity}: each component is visited
+    at most once; each edge is examined once.
+  \item \textbf{Monotonicity}: health can only worsen during a run.
+  \item \textbf{Bounded blast radius}: affected components are bounded
+    by the reverse-reachable set from the fault origin.
+\end{itemize}
+
+\subsection{$N$-Layer Availability Limit Model}
+
+Rather than a single $A = \text{MTBF}/(\text{MTBF}+\text{MTTR})$,
+\textsc{FaultRay} decomposes availability into five categorical layers:
+\begin{equation}
+  A_{\text{sys}} = \min(A_{\text{L1}}, A_{\text{L2}}, A_{\text{L3}},
+  A_{\text{L4}}, A_{\text{L5}})
+\end{equation}
+where L1=software (deploy, drift), L2=hardware (MTBF/MTTR, redundancy),
+L3=theoretical (packet loss, GC), L4=operational (incident response),
+L5=external SLA ($\prod a_i$). The $\min$ operator replaces the
+series-product because cloud layers exhibit \emph{correlated} failure
+modes, making the weakest-link composition more appropriate than
+independent-product composition.
+
+%% ---- 3. PRELIMINARY RESULTS ----
+\section{Preliminary Results}
+
+\textbf{Backtest.} We performed a post-hoc backtest against
+54~real-world cloud incidents (2017--2024: AWS, GCP, Azure, Meta,
+Cloudflare, GitHub, and 16 others). For each, a topology graph was
+constructed from the public post-mortem and the documented root
+cause was injected. The cascade engine achieved $F_1 = 0.87$ (precision $= 1.00$,
+recall $= 0.81$, severity accuracy $= 0.58$). We stress this is
+\emph{illustrative}, not predictive: topologies were constructed
+with knowledge of the outcome.
+
+\textbf{Scale.} The engine processes a 50-component topology
+in ${<}10$\,ms on commodity hardware (Apple M1). The implementation
+comprises 512~source files and 33,841~tests.
+
+\textbf{Positioning.} Table~\ref{tab:pos} summarizes key differences
+from representative tools and concurrent work.
+
+\begin{table}[t]
+\centering
+\caption{Positioning of \textsc{FaultRay}.}
+\label{tab:pos}
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+& \textbf{FaultRay} & \textbf{Krasnovsky} & \textbf{Chaos tools} \\
+\midrule
+In-memory       & \checkmark & \checkmark & \texttimes \\
+Formal proofs   & \checkmark & \texttimes & \texttimes \\
+$N$-layer avail.& \checkmark & \texttimes & \texttimes \\
+Monte-Carlo     & \texttimes & \checkmark & \texttimes \\
+Real injection  & \texttimes & \texttimes & \checkmark \\
+Open source     & \checkmark & \checkmark & partial \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ---- 4. STATUS AND FUTURE ----
+\section{Status and Future Work}
+
+\textsc{FaultRay} is released as open source under Apache~2.0
+on GitHub\footnote{\url{https://github.com/mattyopon/faultray}}
+and PyPI. A US provisional patent has been filed
+(No.~64/010,200, 2026-03-19). A Zenodo preprint is available
+(DOI:~10.5281/zenodo.19139911).
+
+Future work includes: (1)~prospective validation on live
+infrastructure with blinded topologies; (2)~integration with
+DeathStarBench~\cite{gan2019} for quantitative comparison with
+Krasnovsky's Monte-Carlo approach; (3)~extending the $N$-layer
+model to capture temporal correlation between layers.
+
+\textbf{Disclaimer.} \textsc{FaultRay} is a research prototype,
+not a certified compliance tool.
+
+%% ---- REFERENCES ----
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{9}
+
+\bibitem{trivedi2001}
+K.~S.~Trivedi,
+\textit{Probability and Statistics with Reliability, Queuing, and
+Computer Science Applications}, 2nd~ed.
+Wiley, 2001.
+
+\bibitem{krasnovsky2026}
+A.~A.~Krasnovsky,
+``Model Discovery and Graph Simulation: A Lightweight Gateway to
+Chaos Engineering,''
+in \textit{Proc.\ ICSE-NIER}, 2026.
+arXiv:2506.11176.
+
+\bibitem{gan2019}
+Y.~Gan \textit{et al.},
+``An Open-Source Benchmark Suite for Microservices and Their
+Hardware-Software Implications for Cloud \& Edge Systems,''
+in \textit{Proc.\ ASPLOS}, 2019.
+
+\end{thebibliography}
+
+\end{document}
