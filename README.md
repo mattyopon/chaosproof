@@ -1,13 +1,13 @@
 <p align="center">
   <h1 align="center">FaultRay</h1>
-  <p align="center"><strong>DORA-Compliant Resilience Testing — Without Touching Production</strong></p>
+  <p align="center"><strong>DORA-aligned Resilience Research Prototype — Without Touching Production</strong></p>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/faultray/"><img src="https://img.shields.io/pypi/v/faultray" alt="PyPI"></a>
   <a href="https://pypi.org/project/faultray/"><img src="https://img.shields.io/pypi/dm/faultray" alt="Downloads"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSL%201.1-orange.svg" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://doi.org/10.5281/zenodo.19139911"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.19139911.svg" alt="DOI"></a>
   <a href="https://github.com/mattyopon/faultray/actions/workflows/ci.yml"><img src="https://github.com/mattyopon/faultray/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://faultray.com/demo"><img src="https://img.shields.io/badge/demo-live-brightgreen" alt="Live Demo"></a>
@@ -406,4 +406,8 @@ ruff check src/ tests/
 
 ## License
 
-BSL 1.1 — see [LICENSE](LICENSE). Converts to Apache 2.0 on 2030-03-17.
+Apache License 2.0 — see [LICENSE](LICENSE).
+
+> **License Transition (2026-04-11):** FaultRay was relicensed from BSL 1.1 to Apache 2.0.
+> - v11.1.0 and earlier: BSL 1.1 (yanked on PyPI)
+> - v11.2.0 and later: Apache 2.0 (recommended)
