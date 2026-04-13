@@ -22,11 +22,9 @@ from faultray.model.demo import create_demo_graph
 from faultray.model.graph import InfraGraph
 from faultray.simulator.anomaly_detector import AnomalyDetector, AnomalyReport
 from faultray.simulator.bayesian_model import BayesianEngine
-from faultray.simulator.blast_radius_calculator import BlastRadiusCalculator
 from faultray.simulator.chaos_monkey import ChaosMonkey
 from faultray.simulator.compliance_engine import ComplianceEngine
 from faultray.simulator.cost_impact import CostImpactEngine
-from faultray.simulator.deployment_strategy import DeploymentStrategyAdvisor
 from faultray.simulator.digital_twin import DigitalTwin, DigitalTwinReport
 from faultray.simulator.engine import SimulationEngine, SimulationReport
 from faultray.simulator.gameday_engine import (
@@ -40,7 +38,6 @@ from faultray.simulator.gameday_engine import (
 from faultray.simulator.incident_replay import IncidentReplayEngine
 from faultray.simulator.markov_model import MarkovResult, compute_markov_availability
 from faultray.simulator.monte_carlo import run_monte_carlo
-from faultray.simulator.predictive_failure import PredictiveFailureEngine, PredictiveReport
 from faultray.simulator.sre_maturity import MaturityReport, SREMaturityEngine
 from faultray.simulator.whatif_engine import WhatIfEngine, WhatIfResult
 
@@ -411,85 +408,6 @@ class TestComplianceEngine:
 
 
 # ---------------------------------------------------------------------------
-# BlastRadiusCalculator テスト
-# ---------------------------------------------------------------------------
-
-
-class TestBlastRadiusCalculator:
-    """BlastRadiusCalculator の実行テスト。"""
-
-    def test_generate_full_report(self, custom_graph: InfraGraph) -> None:
-        """generate_full_report() が結果を返すことを確認する。"""
-        calc = BlastRadiusCalculator(custom_graph)
-        report = calc.generate_full_report()
-        assert report is not None
-
-    def test_calculate_impact_score_db(self, custom_graph: InfraGraph) -> None:
-        """calculate_impact_score('db') が ComponentImpactScore を返すことを確認する。"""
-        calc = BlastRadiusCalculator(custom_graph)
-        score = calc.calculate_impact_score("db")
-        assert score is not None
-        assert hasattr(score, "total_impact_score")
-
-    def test_impact_score_is_positive(self, custom_graph: InfraGraph) -> None:
-        """db の影響スコアが正の値であることを確認する。"""
-        calc = BlastRadiusCalculator(custom_graph)
-        score = calc.calculate_impact_score("db")
-        assert score.total_impact_score > 0.0
-
-    def test_calculate_all_impact_scores(self, custom_graph: InfraGraph) -> None:
-        """calculate_all_impact_scores() が全コンポーネントのスコアを返すことを確認する。"""
-        calc = BlastRadiusCalculator(custom_graph)
-        scores = calc.calculate_all_impact_scores()
-        assert isinstance(scores, (dict, list))
-
-    def test_blast_radius_demo_graph(self, demo_graph: InfraGraph) -> None:
-        """デモグラフでも BlastRadiusCalculator が動作することを確認する。"""
-        calc = BlastRadiusCalculator(demo_graph)
-        report = calc.generate_full_report()
-        assert report is not None
-
-
-# ---------------------------------------------------------------------------
-# PredictiveFailureEngine テスト
-# ---------------------------------------------------------------------------
-
-
-class TestPredictiveFailureEngine:
-    """PredictiveFailureEngine の実行テスト。"""
-
-    def test_predict_returns_report(self, custom_graph: InfraGraph) -> None:
-        """predict() が PredictiveReport を返すことを確認する。"""
-        engine = PredictiveFailureEngine(custom_graph)
-        report = engine.predict()
-        assert isinstance(report, PredictiveReport)
-
-    def test_report_has_predictions(self, custom_graph: InfraGraph) -> None:
-        """PredictiveReport が predictions 属性を持つことを確認する。"""
-        engine = PredictiveFailureEngine(custom_graph)
-        report = engine.predict()
-        assert hasattr(report, "predictions")
-
-    def test_report_has_overall_risk_score(self, custom_graph: InfraGraph) -> None:
-        """PredictiveReport が overall_risk_score を持つことを確認する。"""
-        engine = PredictiveFailureEngine(custom_graph)
-        report = engine.predict()
-        assert hasattr(report, "overall_risk_score")
-
-    def test_report_has_top_risks(self, custom_graph: InfraGraph) -> None:
-        """PredictiveReport が top_risks を持つことを確認する。"""
-        engine = PredictiveFailureEngine(custom_graph)
-        report = engine.predict()
-        assert hasattr(report, "top_risks")
-
-    def test_predictive_failure_demo_graph(self, demo_graph: InfraGraph) -> None:
-        """デモグラフでも PredictiveFailureEngine が動作することを確認する。"""
-        engine = PredictiveFailureEngine(demo_graph)
-        report = engine.predict()
-        assert isinstance(report, PredictiveReport)
-
-
-# ---------------------------------------------------------------------------
 # SREMaturityEngine テスト
 # ---------------------------------------------------------------------------
 
@@ -845,46 +763,6 @@ class TestIncidentReplayEngine:
 
 
 # ---------------------------------------------------------------------------
-# DeploymentStrategyAdvisor テスト
-# ---------------------------------------------------------------------------
-
-
-class TestDeploymentStrategyAdvisor:
-    """DeploymentStrategyAdvisor の実行テスト。"""
-
-    def test_recommend_returns_recommendation(self, custom_graph: InfraGraph) -> None:
-        """recommend() が DeploymentRecommendation を返すことを確認する。"""
-        advisor = DeploymentStrategyAdvisor(custom_graph)
-        rec = advisor.recommend(custom_graph, "app")
-        assert rec is not None
-
-    def test_recommend_db_component(self, custom_graph: InfraGraph) -> None:
-        """DB コンポーネントへの推奨が返されることを確認する。"""
-        advisor = DeploymentStrategyAdvisor(custom_graph)
-        rec = advisor.recommend(custom_graph, "db")
-        assert rec is not None
-
-    def test_recommend_lb_component(self, custom_graph: InfraGraph) -> None:
-        """ロードバランサーコンポーネントへの推奨が返されることを確認する。"""
-        advisor = DeploymentStrategyAdvisor(custom_graph)
-        rec = advisor.recommend(custom_graph, "lb")
-        assert rec is not None
-
-    def test_plan_method_exists(self, custom_graph: InfraGraph) -> None:
-        """plan() メソッドが存在することを確認する。"""
-        advisor = DeploymentStrategyAdvisor(custom_graph)
-        assert hasattr(advisor, "plan")
-
-    def test_recommend_demo_graph(self, demo_graph: InfraGraph) -> None:
-        """デモグラフでも DeploymentStrategyAdvisor が動作することを確認する。"""
-        advisor = DeploymentStrategyAdvisor(demo_graph)
-        component_ids = list(demo_graph.components.keys())
-        if component_ids:
-            rec = advisor.recommend(demo_graph, component_ids[0])
-            assert rec is not None
-
-
-# ---------------------------------------------------------------------------
 # AnomalyDetector テスト
 # ---------------------------------------------------------------------------
 
@@ -970,10 +848,6 @@ class TestAllEnginesWithDemoGraph:
         anomaly = AnomalyDetector().detect(demo_graph)
         assert isinstance(anomaly, AnomalyReport)
 
-        # PredictiveFailure
-        predict = PredictiveFailureEngine(demo_graph).predict()
-        assert isinstance(predict, PredictiveReport)
-
         # DigitalTwin
         twin_report = DigitalTwin(demo_graph).report()
         assert isinstance(twin_report, DigitalTwinReport)
@@ -985,9 +859,6 @@ class TestAllEnginesWithDemoGraph:
 
         mc = run_monte_carlo(custom_graph, n_trials=500, seed=7)
         assert mc.n_trials == 500
-
-        brc_report = BlastRadiusCalculator(custom_graph).generate_full_report()
-        assert brc_report is not None
 
         compliance = ComplianceEngine(custom_graph).check_all()
         assert "soc2" in compliance

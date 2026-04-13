@@ -55,7 +55,7 @@ class TestCLIVersion:
     def test_version_prints(self) -> None:
         r = _run(["--version"])
         assert r.returncode == 0
-        assert "11.1.0" in r.stdout
+        assert "11.2.0" in r.stdout
 
     def test_version_format(self) -> None:
         r = _run(["--version"])

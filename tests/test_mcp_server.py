@@ -516,7 +516,7 @@ class TestResources:
     def test_resource_version_contains_version(self):
         result = srv.resource_version()
         assert "FaultRay" in result
-        assert "11.1.0" in result
+        assert "11.2.0" in result
 
     def test_resource_tools_lists_tools(self):
         result = srv.resource_tools()
