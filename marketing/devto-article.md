@@ -62,7 +62,7 @@ FaultRay models what your infrastructure looks like *before* and *after* the pla
     faultray tf-check plan.json --fail-on-regression --min-score 60
 ```
 
-`--fail-on-regression` fails the job if the resilience score drops at all. `--min-score 60` fails if the resulting score is below your threshold. The job blocks the merge. The 2am page never happens.
+`--fail-on-regression` fails the job if the resilience score drops at all. `--min-score 60` fails if the resulting score is below your threshold. The job blocks the merge. That class of 2am page — the one caused by a structural regression your CI should have caught — stops happening.
 
 ## The math behind the score
 
@@ -196,4 +196,4 @@ faultray demo
 - **Paper (DOI):** [doi.org/10.5281/zenodo.19139911](https://doi.org/10.5281/zenodo.19139911)
 - **PyPI:** [pypi.org/project/faultray](https://pypi.org/project/faultray/)
 
-FaultRay is licensed under BSL 1.1, converting to Apache 2.0 in 2030. Contributions and feedback are welcome.
+FaultRay (v11.2.0+) is licensed under Apache 2.0. (Earlier releases were BSL 1.1 and are yanked from PyPI.) Contributions and feedback are welcome.

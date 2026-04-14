@@ -20,7 +20,7 @@ The key insight: traditional chaos engineering (Gremlin, AWS FIS) injects real f
 
 Technical details: the core uses NetworkX for dependency graph modeling. The 5-Layer Availability Limit Model computes a mathematical ceiling for your system's uptime by combining hardware MTBF, software failure rates, operational response times, and external SLA products. The Terraform integration is where most users start -- run `faultray tf-check plan.json` in CI to catch resilience regressions before `terraform apply`. It scores before/after states and flags the delta.
 
-Honest limitations: the simulation is only as good as the model you feed it. If your YAML doesn't capture a dependency, FaultRay won't find it. The AI agent hallucination model is based on published failure mode taxonomies, not trained on production incident data. Auto-discovery from Prometheus helps but won't catch everything. The project is BSL-1.1 (converts to Apache 2.0 in 2030).
+Honest limitations: the simulation is only as good as the model you feed it. If your YAML doesn't capture a dependency, FaultRay won't find it. The AI agent hallucination model is based on published failure mode taxonomies, not trained on production incident data. Auto-discovery from Prometheus helps but won't catch everything. The project is Apache 2.0 (current releases v11.2.0+; earlier BSL-1.1 releases are yanked).
 
 - GitHub: https://github.com/mattyopon/faultray
 - Paper (DOI): https://doi.org/10.5281/zenodo.19139911
@@ -43,9 +43,9 @@ Staging environments are perpetually out of sync with production. They usually h
 
 The simulation models structural resilience: dependency chains, single points of failure, cascade paths, redundancy coverage. It does not model application-level bugs, network latency distributions, or kernel panics. If your infrastructure YAML accurately describes your dependencies and redundancy, the cascade analysis is reliable for identifying structural weaknesses. The 5-Layer Availability Limit Model gives an upper bound, not a guarantee -- real availability will always be lower due to factors the model cannot capture. We are transparent about this: the tool tells you "your architecture cannot exceed X nines" which is a provably correct ceiling, not a prediction of actual uptime.
 
-### "Why BSL-1.1 and not open source?"
+### "What's the license history?"
 
-BSL-1.1 is source-available. You can read, modify, and use FaultRay for any purpose except offering it as a competing managed service. It automatically converts to Apache 2.0 on 2030-03-17, so it becomes fully open source by that date. The reasoning: building and maintaining a tool with five simulation engines, Terraform integration, compliance reporting, and AI agent modeling requires sustained investment. BSL lets us keep the code open and readable while maintaining a path to commercial sustainability. For most users -- running it internally, in CI/CD, on your own infrastructure -- the license has zero practical restrictions.
+Earlier releases (≤ v11.1.0) were BSL-1.1 with a scheduled conversion to Apache 2.0 in 2030. v11.2.0 and later are already Apache 2.0 — the relicense happened ahead of schedule. For current users this means FaultRay is plain open source: use it, fork it, run it internally or in CI/CD, no practical restrictions.
 
 ### "Is the AI agent hallucination model validated?"
 
