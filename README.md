@@ -21,7 +21,9 @@
 
 ---
 
-FaultRay simulates **hundreds to thousands of failure scenarios** entirely in memory — mathematically proving your availability ceiling before anything breaks. Built for financial institutions that need to prove DORA compliance without risking production systems.
+FaultRay simulates **hundreds to thousands of failure scenarios** entirely in memory to estimate structural resilience limits from dependency models — before deployment. Built as a **research prototype** to support DORA-aligned pre-audit preparation for financial institutions, without touching production systems.
+
+> ⚠️ **Scope note:** FaultRay is a research prototype. Outputs are intended for internal pre-audit review, design-time analysis, and CI/CD gating. They are **not** validated substitutes for formal regulatory audit evidence or independent legal/technical review. Validation to date is retrospective; forward-looking predictive accuracy is still under evaluation.
 
 ## Screenshots
 
@@ -69,18 +71,19 @@ Running chaos simulation...
 
 ## Why Financial Institutions Choose FaultRay
 
-Traditional chaos engineering tools (Gremlin, Steadybit, AWS FIS) inject real failures into production. For banks, insurers, and payment processors operating under DORA, that approach creates unacceptable risk.
-
-FaultRay takes a fundamentally different approach: **mathematical simulation**. Your trading systems stay online. Your payment rails keep running. You still get the evidence regulators need.
+Traditional chaos engineering tools (Gremlin, Steadybit, AWS FIS) inject real failures into running systems. FaultRay **complements** — not replaces — those runtime tools by moving structural resilience checks earlier into design and CI/CD. Your trading systems stay online. Your payment rails keep running. You get structured evidence packages for internal review and pre-audit preparation.
 
 | | Gremlin | Steadybit | AWS FIS | **FaultRay** |
 |---|---|---|---|---|
-| Approach | Fault injection | Fault injection (with safety) | Fault injection | **Math simulation** |
-| Production risk | Medium-High | Low-Medium (blast radius controls) | Medium | **Zero** |
-| Setup | Agent per host | Agent per host | AWS only | **`pip install`** |
-| DORA evidence | Reporting available | Reporting available | CloudWatch logs | **Audit-ready reports** |
-| AI agent testing | No | No | No | **Yes** |
+| Approach | Fault injection | Fault injection (with safety) | Fault injection | **Model-based simulation** |
+| Positioning | Runtime validation | Runtime validation | Runtime validation | **Pre-deployment / design-time** |
+| Production fault injection | Yes (controlled) | Yes (controlled) | Yes (controlled) | **None (simulation only)** |
+| Setup (simulation) | Agent per host | Agent per host | AWS only | **`pip install`** (CLI only; APM agent optional) |
+| DORA support | Reporting available | Reporting available | CloudWatch logs | **Pre-audit evidence drafts (research prototype)** |
+| AI agent testing | No | No | No | **Yes (modeled)** |
 | Cost | $$$$ | $$$ | $$ | **Free tier / Enterprise** |
+
+> Use FaultRay **before** deployment for structural analysis; use runtime chaos engineering **where** live operational validation is required.
 
 ## DORA Compliance — All 5 Pillars
 
@@ -343,9 +346,9 @@ faultray badge infra.yaml --url
 
 | Feature | Description |
 |---|---|
-| **5-Layer Availability Model** | Mathematical proof of your uptime ceiling — "your 99.99% SLA is physically impossible given this topology" |
+| **5-Layer Availability Model** | Model-based estimate of your structural uptime ceiling from declared topology — e.g., "your 99.99% SLA looks structurally infeasible given this dependency graph" |
 | **5 Simulation Engines** | Cascade, Dynamic, Ops, What-If, Capacity |
-| **DORA Compliance Suite** | 52 controls, 5 pillars, audit-ready evidence packages |
+| **DORA Compliance Suite (Research Prototype)** | 52 controls, 5 pillars — generates draft evidence packages for internal pre-audit review (not a substitute for formal audit evidence) |
 | **Cascade Failure Analysis** | Graph-based blast radius mapping with containment scoring |
 | **SPOF Detection** | Automatic identification of single points of failure |
 | **AI Agent Testing** | 7 agent-specific fault types (hallucination, loops, etc.) |
@@ -357,7 +360,7 @@ faultray badge infra.yaml --url
 
 ## The 5-Layer Availability Model
 
-Most SLA claims are aspirational. FaultRay proves what's actually achievable:
+Most SLA claims are aspirational. FaultRay **estimates** what's structurally achievable from declared topology — result quality depends on how completely your dependencies are defined:
 
 | Layer | What It Measures | Financial Impact |
 |---|---|---|
@@ -367,7 +370,21 @@ Most SLA claims are aspirational. FaultRay proves what's actually achievable:
 | L4: Operational | Incident rate × response time, on-call coverage | Team capacity constraints |
 | L5: External SLA | ∏(third-party SLAs) | Vendor dependency floor |
 
-**Result**: A mathematically provable availability ceiling. If your infrastructure graph says 99.95% max but you're promising 99.99%, FaultRay catches it — before the regulator does.
+**Result**: A model-based availability ceiling estimate. If your declared infrastructure graph implies 99.95% max but you're promising 99.99%, FaultRay surfaces the gap early — as a directional signal for engineering review, not a regulatory verdict.
+
+## Who It's For
+
+**Best for**
+- Teams with Terraform or YAML-defined infrastructure
+- Regulated environments (finance, healthcare) needing pre-deployment resilience review
+- Engineering teams adding resilience gates to CI/CD
+- AI agent platforms modeling LLM / tool / orchestrator dependencies
+
+**Not ideal for**
+- Environments with undocumented or drifting dependencies (results depend on model fidelity)
+- Teams expecting runtime behavior replay from live production traffic
+- Audit teams seeking stand-alone formal compliance evidence
+- Operators needing minute-level outage duration precision (downtime outputs are directional, not operationally precise)
 
 ## Research & Patent
 
