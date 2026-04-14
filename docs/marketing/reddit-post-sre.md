@@ -4,7 +4,7 @@
 
 ## Title Options
 
-1. **Tool for proving availability ceilings mathematically before architecture changes — complement to chaos injection, not replacement**
+1. **Research-prototype tool for estimating availability ceilings from declared topology before architecture changes — complement to chaos injection, not replacement**
 
 2. **Pre-change resilience analysis: can you actually hit your SLO target with your current architecture?**
 
@@ -59,7 +59,7 @@ The way I use it:
 
 1. **Pre-change analysis**: Before making an infrastructure change, run FaultRay to see if the change introduces new failure modes. Much cheaper than running a full chaos experiment for every PR.
 
-2. **Architecture review**: Before building, prove whether the proposed architecture can even reach the target SLO. Catch "this topology cannot hit 99.99%" before six months of engineering.
+2. **Architecture review**: Before building, get a model-based estimate of whether the proposed architecture can plausibly reach the target SLO. Catch "this topology looks structurally unable to hit 99.99%" before six months of engineering — treat it as a design-review signal, not a compliance verdict.
 
 3. **Hypothesis generation for real experiments**: FaultRay's cascade analysis tells you which components are highest-risk. Use that to prioritize what you actually inject faults into with your real chaos tooling.
 

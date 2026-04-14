@@ -90,6 +90,6 @@ Open source, free. BSL 1.1 (converts to Apache 2.0 in 2030 — basically MIT wit
 
 1. Is this the right place in the workflow to catch this? Or do you catch these things somewhere else?
 2. What terraform resource types do you most commonly have resilience surprises with? (I want to improve the parser coverage)
-3. Does the "availability ceiling" concept (mathematically proving your architecture's max uptime) seem useful or confusing?
+3. Does the "availability ceiling" concept (giving a model-based estimate of your architecture's max uptime from declared topology) seem useful or confusing?
 
 Happy to answer any questions about how the simulation model works.
