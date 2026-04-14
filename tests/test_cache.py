@@ -188,7 +188,7 @@ class TestHashGraph:
         h1 = ResultCache.hash_graph(mock_graph)
         h2 = ResultCache.hash_graph(mock_graph)
         assert h1 == h2
-        assert len(h1) == 16
+        assert len(h1) == 64  # full SHA-256 hex digest (256 bits)
 
     def test_hash_graph_different_for_different_graphs(self):
         """Different graphs should produce different hashes."""

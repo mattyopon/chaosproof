@@ -423,12 +423,36 @@ class CustomScoringEngine:
                     f"Rule '{name}' is missing 'check' field"
                 )
 
+            raw_weight = entry.get("weight", 1.0)
+            try:
+                weight = float(raw_weight)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Rule '{name}': weight must be a finite non-negative "
+                    f"number, got {raw_weight!r}"
+                ) from exc
+            # Reject negative weights (flip scoring semantics), NaN, and
+            # infinities (dominate the weighted sum and produce bogus 100
+            # scores regardless of the other rules).
+            if not (weight >= 0 and weight != float("inf")):
+                raise ValueError(
+                    f"Rule '{name}': weight must be a finite non-negative "
+                    f"number, got {raw_weight!r}"
+                )
+
+            params = entry.get("params", {})
+            if not isinstance(params, dict):
+                raise ValueError(
+                    f"Rule '{name}': params must be a mapping, got "
+                    f"{type(params).__name__}"
+                )
+
             rules.append(ScoringRule(
                 name=name,
                 description=entry.get("description", ""),
-                weight=float(entry.get("weight", 1.0)),
+                weight=weight,
                 check_fn=check,
-                params=entry.get("params", {}),
+                params=params,
             ))
 
         return cls(graph=graph, rules=rules, model_name=model_name)

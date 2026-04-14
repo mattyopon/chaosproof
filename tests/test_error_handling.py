@@ -780,7 +780,7 @@ class TestCacheHashGraph:
         g = InfraGraph()
         h = ResultCache.hash_graph(g)
         assert isinstance(h, str)
-        assert len(h) == 16  # truncated to 16 hex chars
+        assert len(h) == 64  # full SHA-256 hex digest (256 bits)
 
     def test_hash_graph_deterministic(self):
         """Same graph should always produce the same hash."""

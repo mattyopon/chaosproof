@@ -174,8 +174,12 @@ class ResultCache:
     def hash_graph(graph: object) -> str:
         """Content-addressed hash of an InfraGraph.
 
-        Uses SHA-256 over the JSON-serialized graph data with sorted keys,
-        truncated to 16 hex characters.
+        Uses the FULL SHA-256 hex digest (64 chars = 256 bits) over the
+        JSON-serialized graph data with sorted keys.  The previous 16-char
+        truncation (64 bits) had a birthday-paradox collision risk at
+        around 4 billion entries — benign at present scale but unsafe for
+        a content-addressed cache that silently returns the matching
+        entry (a collision would serve the wrong result).
         """
         data = json.dumps(graph.to_dict(), sort_keys=True, default=str)  # type: ignore[attr-defined]
-        return hashlib.sha256(data.encode()).hexdigest()[:16]
+        return hashlib.sha256(data.encode()).hexdigest()
