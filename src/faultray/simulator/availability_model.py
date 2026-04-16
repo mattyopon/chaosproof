@@ -272,6 +272,8 @@ def compute_three_layer_model(
 
     # Layer 1 = min(software, hardware) — can't exceed hardware limit
     system_sw = min(sw_availability, system_hw)
+    # Clamp to [0, 1] (B3-1: all layer availabilities are clamped)
+    system_sw = max(0.0, min(1.0, system_sw))
 
     layer1 = AvailabilityLayer(
         availability=system_sw,
@@ -309,19 +311,24 @@ def compute_three_layer_model(
         network_penalty /= comp_count
         runtime_penalty /= comp_count
 
-    # Theoretical = hardware availability * (1 - network) * (1 - runtime)
-    system_theoretical = system_hw * (1.0 - network_penalty) * (1.0 - runtime_penalty)
+    # Layer 3 (Runtime Noise Floor) is independent of Layer 2:
+    # A_L3 = (1 - p_loss) * (1 - f_gc)
+    # This models the irreducible runtime noise ceiling as a standalone bound,
+    # not a further reduction of the hardware limit.  The previous formula
+    # (system_hw * ...) made L3 ≤ L2 by construction, which caused min(L2, L3)
+    # to always equal L3, rendering L2 redundant in the cross-layer min.
+    system_theoretical = (1.0 - network_penalty) * (1.0 - runtime_penalty)
+    # Clamp to [0, 1] (3-1: all layer availabilities are clamped)
     system_theoretical = max(0.0, min(1.0, system_theoretical))
 
     layer3 = AvailabilityLayer(
         availability=system_theoretical,
         nines=_to_nines(system_theoretical),
         annual_downtime_seconds=_annual_downtime(system_theoretical),
-        description="Theoretical limit: hardware + network + runtime jitter",
+        description="Runtime noise floor: network packet loss + GC pauses (independent of hardware)",
         details={
             "avg_packet_loss_rate": network_penalty,
             "avg_gc_fraction": runtime_penalty,
-            "hw_availability": system_hw,
         },
     )
 

@@ -28,7 +28,7 @@
 \newtheorem{property}{Property}
 
 %% ---- metadata ----
-\title{FaultRay: In-Memory Infrastructure Resilience Simulation\\with Graph-Based Cascade Analysis,\\Multi-Layer Availability Limits,\\and AI Agent Failure Modeling}
+\title{FaultRay: In-Memory Infrastructure Resilience Simulation\\with Formal Cascade Analysis\\and Multi-Layer Availability Limits}
 
 \author{
   Yutaro Maeda\\
@@ -46,28 +46,41 @@
 %%  ABSTRACT
 %% ====================================================================
 \begin{abstract}
-Modern distributed systems and AI agent architectures lack tools that
-simulate infrastructure failures entirely in memory while simultaneously
-modeling the failure modes unique to large language model (LLM)-based agents.
-We present \textsc{FaultRay}, a zero-risk chaos engineering platform that
-introduces three innovations: (1)~a graph-based cascade propagation engine
-formalized as a Labeled Transition System (LTS) over a 4-tuple state space,
-enabling deterministic replay and formal correctness proofs;
-(2)~an $N$-layer availability limit model that decomposes a system's
-theoretical availability ceiling into five independent layers---hardware,
-software, theoretical physics, operational, and external SLA;
-and (3)~the first cross-layer failure model for AI agents that quantifies
-hallucination probability as a function of infrastructure health, data
-source availability, and agent chain composition.
-We validate \textsc{FaultRay} against 18~real-world cloud incidents
-spanning 2017--2023 (AWS, GCP, Azure, Meta, Cloudflare),
-achieving an average $F_1 = 1.000$ for cascade path prediction and
-severity accuracy of~$0.819$.  The open-source implementation comprises
-441~source files, 29{,}640~tests, and over 100~simulation engines,
-and is available on PyPI.
-To our knowledge, \textsc{FaultRay} is the first system to bridge
-infrastructure resilience simulation and AI agent reliability analysis
-within a single, formally verified framework.
+Production fault injection tools (Gremlin, Steadybit, AWS~FIS) are
+powerful but touch running systems, and classical reliability
+analysis (Fault Tree Analysis, Reliability Block Diagrams) operates
+on static trees under component independence assumptions that do
+not hold for cloud infrastructure where a single underlying
+incident can simultaneously degrade multiple categorical layers.
+We present \textsc{FaultRay}, a research prototype that contributes
+two core technical elements:
+(1)~a cascade propagation engine formalized as a Labeled Transition
+System (LTS) over a dependency graph, with termination,
+$O(|V|+|E|)$ time complexity, monotonicity, and bounded blast radius
+(proof sketches provided; not mechanically verified);
+and (2)~an $N$-layer availability limit model that decomposes a
+system's availability ceiling via min-composition across software,
+hardware, runtime noise floor, operational, and external SLA layers,
+explicitly departing from the independence assumption of classical
+reliability block diagrams (RBD).
+We verify the engine's internal consistency via a post-hoc backtest
+on 36~real-world cloud incidents spanning 2017--2023 (AWS, GCP,
+Azure, Meta, Cloudflare), where topologies were constructed from
+incident reports and cascade path reproduction is expected by
+construction (29 of 36 achieve $F_1 = 1.000$; 7 exhibit modeling
+imperfections). We do \emph{not} claim prospective prediction
+capability; perturbation analysis confirms the engine is
+non-degenerate but does not establish predictive validity.
+We acknowledge concurrent complementary work by Krasnovsky
+(ICSE-NIER~2026, Distinguished Paper Award; arXiv:2506.11176), which uses Monte-Carlo graph
+simulation without formal proofs or multi-layer decomposition.
+\textsc{FaultRay} is released under Apache~License~2.0 on GitHub
+and PyPI. A provisional patent application has been filed with the
+USPTO (Application No.\ 64/010,200, 2026-03-19).
+
+\textbf{This is a research prototype and NOT a certified compliance
+tool. Outputs must not be used as audit evidence without independent
+legal and technical review.}
 \end{abstract}
 
 %% ====================================================================
@@ -85,66 +98,150 @@ corruption~\cite{aws-s3-2017}, and the 2022 Cloudflare BGP
 leak~\cite{cloudflare2022} each demonstrate how a single fault can
 cascade across dozens of dependent services within minutes.
 
-Simultaneously, AI agent architectures---exemplified by ReAct~\cite{yao2023react},
-Toolformer~\cite{schick2023toolformer}, and multi-agent
-orchestrators---are being integrated directly into production systems.
-These agents introduce failure modes that are qualitatively different from
-traditional software: \emph{hallucination} (generating plausible but
-factually incorrect output), \emph{context overflow} (exceeding token
-limits), \emph{tool failure} (inability to invoke external APIs), and
-\emph{output amplification} (propagating upstream hallucinations to
-downstream agents).  No existing tool models how infrastructure failures
-propagate \emph{through} AI agent layers to cause compound failures.
-
 Current chaos engineering approaches suffer from several limitations:
 \begin{itemize}[nosep]
-\item \textbf{Production risk:} Netflix Chaos Monkey~\cite{basiri2016}
-  and Gremlin~\cite{gremlin2020} inject real faults into running systems,
-  risking customer-facing impact.
-\item \textbf{Static analysis:} HPE's SPOF detection~\cite{hpe-spof}
-  identifies single points of failure but does not simulate cascade
-  propagation.
-\item \textbf{No AI modeling:} LLM evaluation benchmarks~\cite{liang2023holistic}
-  measure model quality in isolation, without considering infrastructure-induced
-  failures.
-\item \textbf{Ad hoc availability:} Traditional MTBF/MTTR
-  models~\cite{trivedi2001} compute a single availability number
-  without decomposing the contributing factors.
+\item \textbf{Production risk.} Netflix Chaos Monkey~\cite{basiri2016},
+  Gremlin~\cite{gremlin2020}, Steadybit~\cite{steadybit2023}, and
+  AWS FIS~\cite{aws-fis} inject real faults into running systems. For
+  regulated financial institutions and other risk-averse operators,
+  touching production to discover weaknesses is not always acceptable.
+\item \textbf{Static analysis without cascade semantics.}
+  HPE's SPOF detection~\cite{hpe-spof} identifies single points of
+  failure but does not model cascade propagation through typed
+  dependencies.
+\item \textbf{Ad hoc availability numbers.} Classical MTBF/MTTR
+  models~\cite{trivedi2001} and Reliability Block Diagrams produce
+  a single availability number under an independence assumption that
+  does not match cloud infrastructure, where a single vendor incident
+  can simultaneously degrade multiple layers (compute, network,
+  storage) in correlated fashion.
 \end{itemize}
 
+The idea of simulating failures without touching production is not
+new: digital twin approaches (ChaosTwin~\cite{chaostwin2021},
+Farokhi et~al.~\cite{farokhi2024}) replicate full system behavior
+in isolation, and concurrent work by
+Krasnovsky~\cite{krasnovsky2026} (ICSE-NIER~2026) uses Monte-Carlo
+sampling over trace-derived graphs. We view these as complementary
+operating points (\S\ref{sec:rw-krasnovsky}, \S\ref{sec:rw-digital-twin}):
+\textsc{FaultRay} trades fidelity for analytical tractability via
+a static dependency graph with formal LTS semantics.
+
 \noindent
-This paper makes three contributions:
+This paper contributes two core technical elements:
 
 \begin{enumerate}[nosep]
-\item A \textbf{cascade propagation engine} formalized as an LTS with
-  eight transition rules, proven termination in $O(|C| + |E|)$, and
-  seven correctness properties (\S\ref{sec:cascade}).
+\item A \textbf{cascade propagation engine} formalized as a Labeled
+  Transition System over a dependency graph, with termination
+  on finite graphs, $O(|V| + |E|)$ time complexity,
+  monotonicity under additional fail-stop events, causality
+  preservation, and a bounded blast radius
+  (\S\ref{sec:cascade}).
 \item An \textbf{$N$-layer availability limit model} that decomposes
-  system availability into five independent ceilings: hardware, software,
-  theoretical, operational, and external SLA (\S\ref{sec:availability}).
-\item A \textbf{cross-layer AI agent failure model} that quantifies
-  hallucination probability $H(a, D, I)$ as a function of agent
-  configuration, data source health, and infrastructure state, together
-  with a 10-mode failure taxonomy and an agent-chain cascade formula
-  (\S\ref{sec:ai-agent}).
+  a system's availability ceiling across software, hardware,
+  runtime noise floor, operational, and external SLA layers using
+  \emph{min-composition} rather than the classical series-product,
+  and provides a weakest-link justification for that choice
+  (\S\ref{sec:availability}).
 \end{enumerate}
+
+\textsc{FaultRay} is released as open source under Apache~License~2.0.
+A provisional patent application covering the cascade engine and
+$N$-layer decomposition has been filed with the USPTO (Application
+No.~64/010,200, filed 2026-03-19). This paper is a research
+prototype description; it is not a certified compliance tool and
+its outputs must not be used as audit evidence without independent
+legal and technical review.
 
 %% ====================================================================
 %%  2. RELATED WORK
 %% ====================================================================
 \section{Related Work}\label{sec:related}
 
-\subsection{Chaos Engineering}
+\subsection{Chaos Engineering (Production Fault Injection)}
 Netflix introduced Chaos Monkey in 2011, later formalized as
 \emph{Chaos Engineering} by Basiri et al.~\cite{basiri2016}.
-Commercial platforms---Gremlin~\cite{gremlin2020},
-Steadybit~\cite{steadybit2023},
-and AWS Fault Injection Simulator (FIS)~\cite{aws-fis}---provide
-managed fault injection in production or staging environments.
-LitmusChaos~\cite{litmuschaos} is a CNCF sandbox project for
-Kubernetes-native chaos.  All of these tools require running
+Commercial platforms (Gremlin, Steadybit, AWS~FIS) and open-source
+CNCF projects (LitmusChaos, Chaos Mesh) provide managed fault
+injection in production or staging environments; a comprehensive
+survey is provided by Joshua et~al.~\cite{chaos-mlr-2025}.
+All of these tools require running
 infrastructure and inject \emph{real} faults, introducing production
-risk and limiting coverage to currently deployed topologies.
+risk. \textsc{FaultRay} is strictly analytical and never touches
+running infrastructure, which is a distinct operating point.
+
+\subsection{In-Memory Graph Simulation (Concurrent Work)}
+\label{sec:rw-krasnovsky}
+Concurrent and complementary work by
+Krasnovsky~\cite{krasnovsky2026} (ICSE-NIER~2026, Distinguished Paper Award; arXiv:2506.11176)
+proposes \emph{model discovery}: extracting a service-dependency
+graph from trace data (e.g., Jaeger) and running Monte-Carlo
+fail-stop simulation over it. Evaluated on DeathStarBench, the
+approach achieves mean absolute error $\leq 0.0004$ against
+observed resilience.
+\textsc{FaultRay} and Krasnovsky~2026 share the high-level positioning
+of lightweight, in-memory simulation as an alternative to production
+fault injection. The approaches differ in three technical axes:
+(a) Krasnovsky uses Monte-Carlo sampling, whereas \textsc{FaultRay}
+uses a formal LTS with termination and $O(|V|+|E|)$ complexity
+arguments (proof sketches, not mechanically verified) and bounded
+blast radius;
+(b) Krasnovsky treats the graph as a single-layer connectivity
+model, whereas \textsc{FaultRay} decomposes availability across $N$
+infrastructure layers with min-composition;
+(c) Krasnovsky emphasizes trace-based auto-discovery of the graph,
+whereas \textsc{FaultRay} accepts manually-specified or
+infrastructure-as-code-derived graphs.
+We view the two works as complementary and not substitutes.
+
+\subsection{Digital Twins and In-Memory Resilience Testing}
+\label{sec:rw-digital-twin}
+The concept of testing system resilience without touching
+production infrastructure has been explored in the digital twin
+community. ChaosTwin~\cite{chaostwin2021} (CNSM~2021) combines
+digital twin replicas with chaos engineering principles to test
+resilience in an isolated environment, demonstrating the approach
+on network function virtualization. Farokhi
+et~al.~\cite{farokhi2024} (IEEE~TII~2024) extend this to
+industrial digital twins, proposing chaos injection into the
+digital replica rather than the physical system.
+\textsc{FaultRay} shares the high-level positioning of
+``simulate failures without production impact'' but differs in
+method: digital twin approaches replicate the full system
+behavior (including runtime dynamics), whereas \textsc{FaultRay}
+operates on a static dependency graph with formal LTS semantics.
+Digital twins are higher fidelity but require a running replica;
+\textsc{FaultRay} sacrifices fidelity for analytical tractability
+and formal guarantees.
+
+A recent multi-vocal literature review on chaos
+engineering~\cite{chaos-mlr-2025} (ACM~TOSEM~2025) synthesizes
+both academic and industry perspectives. That survey positions
+in-memory analytical simulation as a distinct research direction
+from production fault injection, which is the operating point
+\textsc{FaultRay} occupies.
+
+\subsection{Formal Methods for Distributed Systems}
+\label{sec:rw-formal}
+Labeled Transition Systems have been used in formal verification
+of distributed systems for decades, originating with
+Keller~\cite{keller1976}. Recent work on Validating Labelled
+State Transition and Message Production Systems
+(VLSTS)~\cite{vlsts2022} proposes LTS-based modeling and
+verification of distributed systems with faults, focusing on
+message-passing correctness properties. \textsc{FaultRay}'s use
+of LTS is conceptually simpler: transitions model health state
+degradation rather than message-passing, and the proofs
+(termination, monotonicity, blast radius) are correspondingly
+straightforward. The novelty is not in the LTS formalism itself
+but in its application to infrastructure dependency graphs with
+typed dependencies and multi-layer availability composition.
+More recently, Nasar~\cite{nasar2026} applied TLA+ to formally verify
+microgrid reliability models, demonstrating that mechanical
+verification of infrastructure availability properties is feasible
+with current tools. \textsc{FaultRay}'s proof sketches have not been
+mechanically verified (\S\ref{sec:discussion}); we consider this an
+important gap.
 
 \subsection{Static Resilience Analysis}
 HPE's single-point-of-failure detection system
@@ -155,15 +252,52 @@ cascade propagation through dependency types (required, optional,
 asynchronous) or account for circuit breakers, retry strategies, or
 latency amplification.
 
-\subsection{AI Agent Evaluation}
-HELM~\cite{liang2023holistic} and MT-Bench~\cite{zheng2023judging}
-evaluate LLM quality along axes such as accuracy, calibration, and
-robustness.  Red-teaming approaches~\cite{perez2022red} probe
-adversarial vulnerabilities.  However, these benchmarks evaluate
-models \emph{in isolation}; they do not model how infrastructure
-failures (e.g., a degraded vector database) increase agent
-hallucination probability, nor do they capture agent-to-agent
-cascade effects.
+\subsection{Classical Reliability Engineering (FTA and RBD)}
+\label{sec:rw-fta-rbd}
+Fault Tree Analysis (FTA), standardized in NASA NUREG-0492~\cite{nasa-fta},
+IEC~61025~\cite{iec61025}, and SAE~ARP4761~\cite{arp4761}, constructs
+a static AND/OR gate tree and enumerates minimal cut sets to compute
+failure probabilities. Reliability Block Diagrams (RBD), treated
+exhaustively by Trivedi~\cite{trivedi2001}, compose component
+availabilities using series-product
+($A_{\text{series}} = \prod_i A_i$) and parallel-redundancy
+($A_{\text{parallel}} = 1 - \prod_i (1 - A_i)$) operators under an
+independence assumption.
+\textsc{FaultRay} departs from FTA and RBD in two ways:
+(i)~\textsc{FaultRay}'s cascade engine is a \emph{dynamic} LTS over
+a directly-specified dependency graph rather than a hand-constructed
+AND/OR tree;
+(ii)~\textsc{FaultRay}'s $N$-layer availability model uses
+\emph{min-composition} rather than series-product composition, which
+is appropriate when infrastructure layers are not independent
+(e.g., a cloud provider outage can simultaneously degrade compute,
+network, and storage layers in correlated fashion).
+
+\subsection{SLA Decomposition}
+\label{sec:rw-sla}
+Casformer~\cite{casformer2025} (arXiv:2601.11859) uses a cascaded
+Transformer architecture to learn end-to-end SLA decomposition for
+6G network slicing. Broader surveys on cloud SLA
+decomposition~\cite{sla-survey-2024} discuss iterative optimization
+approaches. These works target telecommunications and network
+slicing, and use learned or optimization-based aggregation,
+whereas \textsc{FaultRay} targets cloud software infrastructure
+availability with formal min-composition.
+
+\subsection{Cascade Failures in Interdependent Networks}
+Buldyrev et al.~\cite{buldyrev2010} demonstrated that
+interdependent networks are dramatically more fragile than
+isolated networks, establishing the theoretical foundation for
+cascade failure modeling across coupled systems. The I$^3$
+model~\cite{iii-model-2025} (arXiv:2503.02890) extends this to
+urban infrastructure using graph autoencoders. Broader work on
+cascading failures is surveyed in~\cite{pnas-cascade-2019}. The
+fundamental taxonomy of faults, errors, and failures was
+established by Avizienis et al.~\cite{avizienis2004}; \textsc{FaultRay}'s
+health status model (\textsc{Healthy}/\textsc{Degraded}/\textsc{Overloaded}/\textsc{Down})
+is a simplification of this taxonomy. These foundational works
+target physical or abstract systems; \textsc{FaultRay} applies
+similar concepts specifically to cloud software dependency graphs.
 
 \subsection{Availability Modeling}
 Classical availability theory uses the formula
@@ -172,31 +306,52 @@ extended to parallel redundancy via
 $A_{\text{tier}} = 1 - (1 - A_{\text{single}})^{n}$.
 In practice, availability is limited by factors beyond hardware
 reliability---deployment frequency, human error, operational
-response time, and external SLA dependencies---but no existing
-model decomposes these into independent, composable layers.
+response time, and external SLA dependencies.
+\textsc{FaultRay}'s $N$-layer decomposition is an attempt to
+expose these factors as separately-analyzable layers whose
+effective ceiling is determined by the weakest link (min
+composition).
 
-\subsection{Gap Analysis}
-Table~\ref{tab:gap} summarizes the gap.  No existing system provides
-all four capabilities: in-memory simulation, formal cascade analysis,
-multi-layer availability modeling, and AI agent failure simulation.
+\subsection{Positioning Summary}
+\label{sec:rw-gap}
+\textsc{FaultRay}'s contribution is not a single novel idea but a
+specific combination: formal LTS cascade semantics with proven
+termination and complexity bounds (differentiating from
+Krasnovsky~2026 and production chaos tools), applied to software
+dependency graphs (differentiating from FTA/RBD hardware
+reliability), with min-composition multi-layer availability
+(differentiating from RBD series-product and Casformer learned
+aggregation). Table~\ref{tab:gap} summarizes the positioning.
 
 \begin{table}[t]
 \centering
-\caption{Feature comparison of resilience analysis tools.}
+\caption{Positioning of \textsc{FaultRay} relative to representative
+prior work. ``In-mem'' = no production fault injection.
+``Formal'' = termination and complexity arguments (proof sketches).
+``N-layer'' = multi-layer availability decomposition.
+``OSS'' = open source release.}
 \label{tab:gap}
 \small
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Tool} & \textbf{In-Mem} & \textbf{Cascade} & \textbf{Avail.} & \textbf{AI} \\
+\textbf{Tool / Work} & \textbf{In-mem} & \textbf{Formal} & \textbf{N-layer} & \textbf{OSS} \\
 \midrule
-Chaos Monkey & \texttimes & \texttimes & \texttimes & \texttimes \\
-Gremlin      & \texttimes & Partial   & \texttimes & \texttimes \\
-Steadybit    & \texttimes & Partial   & \texttimes & \texttimes \\
-AWS FIS      & \texttimes & \texttimes & \texttimes & \texttimes \\
-HPE SPOF     & \checkmark & \texttimes & \texttimes & \texttimes \\
-\textsc{FaultRay} & \checkmark & \checkmark & \checkmark & \checkmark \\
+Chaos Monkey / Gremlin / Steadybit / AWS FIS & \texttimes & \texttimes & \texttimes & partial \\
+ChaosTwin (CNSM~2021) & \checkmark\textsuperscript{*} & \texttimes & \texttimes & \texttimes \\
+Farokhi~2024 (IEEE~TII) & \checkmark\textsuperscript{*} & \texttimes & \texttimes & \texttimes \\
+HPE SPOF (US~9,280,409) & \checkmark & \texttimes & \texttimes & \texttimes \\
+FTA (NASA/IEC/SAE) & \checkmark & partial & hier.\ AND/OR & \texttimes \\
+RBD (Trivedi~2001) & \checkmark & \texttimes & series/parallel & \texttimes \\
+VLSTS (arXiv:2202.12662) & \checkmark & \checkmark & \texttimes & \texttimes \\
+Krasnovsky~2026 (arXiv:2506.11176) & \checkmark & \texttimes & \texttimes & \checkmark \\
+Casformer (arXiv:2601.11859) & N/A & \texttimes & learned (6G) & \texttimes \\
+I$^3$ model (arXiv:2503.02890) & \checkmark & \texttimes & \texttimes & partial \\
+\textbf{\textsc{FaultRay}} & \checkmark & \checkmark & min-composition & \checkmark \\
 \bottomrule
 \end{tabular}
+\\[2pt]
+{\footnotesize \textsuperscript{*}Digital twin approaches replicate
+  the full system rather than using a static dependency graph.}
 \end{table}
 
 %% ====================================================================
@@ -217,8 +372,7 @@ where:
   $\mathit{type}(c) \in \{\texttt{load\_balancer}, \texttt{web\_server},
   \texttt{app\_server}, \texttt{database}, \texttt{cache}, \texttt{queue},
   \texttt{storage}, \texttt{dns}, \texttt{external\_api},
-  \texttt{ai\_agent}, \texttt{llm\_endpoint}, \texttt{tool\_service},
-  \texttt{agent\_orchestrator}, \texttt{custom}\}$;
+  \texttt{custom}\}$;
 \item $E \subseteq C \times C$: directed dependency edges;
 \item $\mathit{dep}: E \to \{\texttt{requires}, \texttt{optional}, \texttt{async}\}$:
   dependency type;
@@ -230,54 +384,47 @@ where:
 
 Each component $c$ carries capacity metadata (max connections, max RPS,
 timeout, retry multiplier, connection pool size), resource metrics
-(CPU, memory, disk, network connections), redundancy configuration
-(replicas, autoscaling, failover), and---for AI components---agent
-parameters (hallucination risk $h_0$, context window size, data
-source weights).
+(CPU, memory, disk, network connections), and redundancy configuration
+(replicas, autoscaling, failover). The open-source implementation
+additionally supports application-specific component types (including
+LLM-based agents) as a tool capability; such extensions are not
+claimed as a research contribution in this paper.
 
 \subsection{Automated Fault Scenario Generation}
 \textsc{FaultRay} automatically generates fault scenarios from the
 topology graph.  Given $|C|$ components and a fault type catalog of
 $k$~types, the engine produces $|C| \times k$ single-fault scenarios
 plus ${|C| \choose 2} \times k^2$ correlated-fault scenarios.
-In practice the system supports 21~fault types (8 infrastructure +
-2~supply chain + 11~AI agent), yielding over 2{,}000 unique scenarios
-for a typical 10-component topology.  Each scenario is a tuple
+The core fault types covered by this paper are infrastructure-level
+fail-stop events and capacity degradations. Each scenario is a tuple
 $\langle \mathit{target}, \mathit{type}, \mathit{severity},
 \mathit{duration} \rangle$.
 
 \begin{figure}[t]
 \centering
 \small
-\begin{verbatim}
-+---------------------------------------------+
-|              FaultRay Engine                  |
-|  +-----------+  +-----------+  +-----------+ |
-|  | Topology  |  | Scenario  |  |  Avail.   | |
-|  |  Parser   |->| Generator |  |  Model    | |
-|  +-----------+  +-----+-----+  +-----------+ |
-|                       |                       |
-|                 +-----v-----+                 |
-|                 |  Cascade   |                 |
-|                 |  Engine    |                 |
-|                 |  (LTS)     |                 |
-|                 +-----+-----+                 |
-|                       |                       |
-|           +-----------+-----------+           |
-|           |                       |           |
-|     +-----v-----+         +------v------+    |
-|     | AI Agent   |         | Backtest    |    |
-|     | Cascade    |         | Engine      |    |
-|     +-----+------+         +------+------+    |
-|           |                       |           |
-|     +-----v-----------------------v-----+     |
-|     |        Report / API / CLI         |     |
-|     +-----------------------------------+     |
-+---------------------------------------------+
-\end{verbatim}
-\caption{System architecture of \textsc{FaultRay}.  The cascade engine,
-formalized as an LTS, is the central component.  The AI agent cascade
-module extends the core engine with hallucination probability modeling.}
+\setlength{\unitlength}{1mm}
+\begin{picture}(75,52)
+\put(0,0){\framebox(75,52){}}
+\put(22,46){\makebox(30,4){\textbf{FaultRay Engine}}}
+\put(2,34){\framebox(20,9){\shortstack{Topology\\Parser}}}
+\put(27,34){\framebox(20,9){\shortstack{Scenario\\Generator}}}
+\put(52,34){\framebox(20,9){\shortstack{Avail.\\Model}}}
+\put(22,38){\vector(1,0){5}}
+\put(47,38){\vector(1,0){5}}
+\put(37,34){\vector(0,-1){4}}
+\put(27,21){\framebox(20,9){\shortstack{Cascade\\Engine (LTS)}}}
+\put(37,21){\vector(0,-1){4}}
+\put(62,34){\vector(0,-1){21}}
+\put(27,8){\framebox(20,9){\shortstack{Backtest\\Harness}}}
+\put(37,8){\vector(0,-1){4}}
+\put(5,0){\framebox(65,4){\small Report / API / CLI}}
+\end{picture}
+\caption{System architecture of \textsc{FaultRay}. The cascade engine
+(formalized as an LTS, \S\ref{sec:cascade}) and the $N$-layer
+availability model (\S\ref{sec:availability}) are the central
+components; the backtest harness and reporting layer are supporting
+infrastructure.}
 \label{fig:architecture}
 \end{figure}
 
@@ -354,8 +501,11 @@ capacity but does not cause immediate failure of dependents:
         \mathit{replicas}(c) > 1 \quad
         H(c) = \textsc{Down}}
   {(H, L, T, V) \xrightarrow{\textit{prop}(c, c')}
-   (H[c' \mapsto \textsc{Degraded}], L', T, V \cup \{c'\})}
+   (H[c' \mapsto \max(\textsc{Degraded}, H(c'))], L', T, V \cup \{c'\})}
 \end{equation}
+The $\max$ preserves monotonicity: if $c'$ is already in a state
+worse than \textsc{Degraded} (due to a prior cascade path), that
+state is retained.
 
 \medskip\noindent
 \textbf{Rule 4 (Optional Dependency).}
@@ -365,19 +515,30 @@ attenuated regardless of $c$'s health:
   \frac{\mathit{dep}(c', c) = \texttt{optional} \quad
         H(c) \ge \textsc{Degraded}}
   {(H, L, T, V) \xrightarrow{\textit{prop}(c, c')}
-   (H[c' \mapsto \min(\textsc{Degraded}, H(c'))], L, T, V \cup \{c'\})}
+   (H[c' \mapsto \max(\textsc{Degraded}, H(c'))], L, T, V \cup \{c'\})}
 \end{equation}
+The $\max$ ensures monotonicity: if $c'$ is \textsc{Healthy}, it
+transitions to \textsc{Degraded}; if already worse, it is preserved.
 
 \medskip\noindent
 \textbf{Rule 5 (Async Dependency).}
 If $c'$ has an \texttt{async} dependency on~$c$, the cascade is
-attenuated similarly to optional dependencies:
+attenuated (as with optional dependencies) but propagation is
+\emph{delayed} by the edge latency $\tau(c', c)$:
 \begin{equation}
   \frac{\mathit{dep}(c', c) = \texttt{async} \quad
         H(c) \ge \textsc{Degraded}}
   {(H, L, T, V) \xrightarrow{\textit{prop}(c, c')}
-   (H[c' \mapsto \min(\textsc{Degraded}, H(c'))], L, T, V \cup \{c'\})}
+   (H[c' \mapsto \max(\textsc{Degraded}, H(c'))], L,
+    T + \tau(c', c), V \cup \{c'\})}
 \end{equation}
+The delay models the asynchronous nature of the dependency:
+message queues, event buses, and batch pipelines propagate
+failures with latency rather than immediately. This distinguishes
+\texttt{async} from \texttt{optional} semantically: both attenuate
+health impact to at most \textsc{Degraded}, but \texttt{async}
+additionally advances simulation time, affecting cascade chain
+timestamps and severity scoring.
 
 \medskip\noindent
 \textbf{Rule 6 (Circuit Breaker Trip).}
@@ -387,9 +548,12 @@ a circuit breaker enabled, the cascade is stopped at that edge:
   \frac{\mathit{cb}(c', c) = \mathit{true} \quad
         L(c) > \tau_{\max}(c')}
   {(H, L, T, V) \xrightarrow{\textit{cb\_trip}(c', c)}
-   (H[c' \mapsto \textsc{Degraded}], L, T, V \cup \{c'\})}
+   (H[c' \mapsto \max(\textsc{Degraded}, H(c'))], L, T, V \cup \{c'\})}
 \end{equation}
 where $\tau_{\max}(c')$ is the timeout threshold of component~$c'$.
+The $\max$ operator preserves monotonicity
+(Theorem~\ref{thm:monotonicity}): if $c'$ is already in a state
+worse than \textsc{Degraded}, that state is retained.
 The circuit breaker isolates $c'$ from further cascade propagation
 through this edge.
 
@@ -415,25 +579,41 @@ No transition is enabled when all reachable components have been visited:
 
 \subsection{Correctness Properties}
 
+The following properties are stated with proof sketches.
+These are \emph{informal} arguments intended to convey the
+reasoning; they have not been mechanically verified in a
+proof assistant (Coq, Isabelle, TLA+). We consider mechanical
+verification an important future work item.
+
 \begin{theorem}[Termination]\label{thm:termination}
 For any infrastructure graph $G = (C, E, \ldots)$ and initial fault $f$,
 the CPS $\mathcal{M}$ terminates in a finite number of transitions.
 \end{theorem}
 \begin{proof}[Proof sketch]
-The visited set $V$ grows monotonically ($V \subseteq V'$ after each
-transition) and is bounded by $|C|$.  For acyclic graphs, each component
-is visited at most once, giving at most $|C|$ transitions.  For cyclic
-graphs, a depth limit $D_{\max} = 20$ is enforced (Corollary~\ref{cor:cyclic}),
-and the visited set prevents re-entry, together guaranteeing termination.
+Define the progress measure $\phi(s) = |C| - |V|$ where $V$ is the
+visited set in state~$s$. Every transition rule adds at least one
+component to~$V$ (by inspection of Rules~1--7: each rule's consequent
+includes $V \cup \{c'\}$), so $\phi$ strictly decreases on each
+transition: $\phi(s') < \phi(s)$. Since $\phi$ is a natural number
+bounded below by~0, the sequence of transitions is finite. The visited
+set also prevents re-entry: a component $c' \in V$ cannot trigger a
+new transition because all rules require processing a component not
+yet in~$V$ (or, for cyclic graphs, the depth limit $D_{\max} = 20$
+is enforced as an additional guard). The CPS therefore terminates in
+at most $\min(|C|, D_{\max} \cdot \Delta)$ transitions, where
+$\Delta$ is the maximum out-degree.
 \end{proof}
 
 \begin{theorem}[Time Complexity]\label{thm:complexity}
 The CPS executes in $O(|C| + |E|)$ time.
 \end{theorem}
 \begin{proof}[Proof sketch]
-Each component is visited at most once (via the visited set~$V$).
-For each visited component, its outgoing edges are examined exactly once.
-The total work is therefore bounded by $|C| + |E|$.
+Each component is visited at most once (the visited set~$V$ prevents
+re-processing; proved in Theorem~\ref{thm:termination}). For each
+visited component, its outgoing edges in the reverse dependency graph
+are examined exactly once to identify dependents. The per-edge work
+(health comparison, dependency type lookup) is $O(1)$. The total work
+is therefore bounded by $\sum_{c \in C} (1 + \deg^{-}(c)) = |C| + |E|$.
 \end{proof}
 
 \begin{theorem}[Monotonicity of Failure]\label{thm:monotonicity}
@@ -441,31 +621,72 @@ Health can only worsen during a simulation run:
 if $s \xrightarrow{*} s'$, then $\forall c \in C.\; H'(c) \ge H(c)$.
 \end{theorem}
 \begin{proof}[Proof sketch]
-Every transition rule either preserves $H(c)$ or moves it to a
-strictly worse health status.  No rule decreases health.
+Define the health ordering \textsc{Healthy} $<$ \textsc{Degraded} $<$
+\textsc{Overloaded} $<$ \textsc{Down}. We verify by case analysis on
+each transition rule:
+Rule~1 (Injection): sets $H(c_0) \leftarrow \mathit{effect}(f.\mathit{type})$.
+Since $\mathit{effect}$ maps to a status $\ge \textsc{Degraded}$ and
+the injection target is added to the visited set ($V \cup \{c_0\}$),
+it will not be re-visited. For the initial injection,
+$H(c_0) = \textsc{Healthy}$, so $H'(c_0) \ge H(c_0)$.
+Rule~2 (Required, single replica): sets $H(c') \leftarrow \textsc{Down}$,
+which is the maximum health status and therefore $\ge H(c')$ for any
+prior health.
+Rule~3 (Required, multiple replicas): sets
+$H(c') \leftarrow \max(\textsc{Degraded}, H(c'))$, preserving
+monotonicity by the $\max$ operator (identical argument to
+Rules~4--5).
+Rules~4--5 (Optional, Async): set $H(c') \leftarrow \max(\textsc{Degraded},
+H(c'))$. Since $\max(\textsc{Degraded}, H(c')) \ge H(c')$ for any
+health status, monotonicity is preserved: \textsc{Healthy} worsens to
+\textsc{Degraded}, and states already worse than \textsc{Degraded} are
+preserved.
+Rule~6 (CB Trip): sets $H(c') \leftarrow \max(\textsc{Degraded}, H(c'))$,
+which preserves monotonicity by the $\max$ operator (identical argument
+to Rules~4--5).
+Rule~7 (Timeout): sets $H(c') \leftarrow \textsc{Down}$, which is
+$\ge H(c')$ for any prior health.
+In all cases, $H'(c) \ge H(c)$.
 \end{proof}
 
 \begin{theorem}[Causality]\label{thm:causality}
-A component $c'$ transitions to a non-healthy state only if at least
-one of its dependencies has already transitioned:
+For any component $c' \neq c_0$ (where $c_0$ is the initially
+injected fault target), $c'$ transitions to a non-healthy state only
+if at least one of its dependencies has already transitioned:
 \begin{equation*}
-  H'(c') > \textsc{Healthy} \implies \exists c \in C.\;
+  c' \neq c_0 \wedge H'(c') > \textsc{Healthy} \implies \exists c \in C.\;
   (c', c) \in E \wedge H(c) > \textsc{Healthy}
 \end{equation*}
+The initial fault target $c_0$ is an exception: it transitions via
+Rule~1 (direct injection) without requiring a failed dependency.
 \end{theorem}
 
 \begin{theorem}[Circuit Breaker Correctness]\label{thm:cb}
 If edge $(c', c)$ has $\mathit{cb}(c', c) = \mathit{true}$ and the
-circuit breaker trips, then $c'$ transitions to at most \textsc{Degraded}
-and no further cascade propagation occurs through this edge.
+circuit breaker trips, then $c'$ transitions to
+$\max(\textsc{Degraded}, H(c'))$---at least \textsc{Degraded},
+and preserving any prior state that is already worse than
+\textsc{Degraded}---and no further cascade propagation occurs
+through this edge.
 \end{theorem}
 
 \begin{theorem}[Dependency Type Attenuation]\label{thm:attenuation}
 Optional and asynchronous dependencies attenuate cascade effects:
-if $\mathit{dep}(c', c) \in \{\texttt{optional}, \texttt{async}\}$,
-then $H'(c') \le \textsc{Degraded}$ regardless of $H(c)$.
-Furthermore, \textsc{Degraded} does not propagate further, limiting
-the blast radius.
+if $\mathit{dep}(c', c) \in \{\texttt{optional}, \texttt{async}\}$
+and $c'$ was previously \textsc{Healthy}, then
+$H'(c') = \textsc{Degraded}$ regardless of $H(c)$. If $c'$ was
+already in a state worse than \textsc{Degraded} (due to a required
+dependency), that state is preserved by monotonicity
+(Theorem~\ref{thm:monotonicity}). The cascade contribution of an
+optional/async dependency is therefore bounded at \textsc{Degraded}
+in \emph{severity}. Since \textsc{Degraded} does not trigger further
+\texttt{requires}-dependency cascade to \textsc{Down}
+(Rule~2 requires $H(c) = \textsc{Down}$), the
+severity of cascade through optional/async paths is bounded.
+However, the \emph{extent} (number of affected components) is bounded
+only by the reverse-reachable set (Theorem~\ref{thm:blast}), as
+\textsc{Degraded} propagation through chains of optional/async edges
+can reach all transitively connected components.
 \end{theorem}
 
 \begin{theorem}[Blast Radius Bound]\label{thm:blast}
@@ -485,23 +706,125 @@ $\min(|C|, D_{\max} \cdot \Delta)$ transitions, where $\Delta$ is
 the maximum out-degree.
 \end{corollary}
 
+\paragraph{Choice of $D_{\max} = 20$.}
+The depth limit is a configurable engineering parameter, not a
+theoretically derived value. We chose $D_{\max} = 20$ because
+it exceeds the longest cascade chain observed in our 36-incident
+test suite (maximum observed depth: 6) by a factor of~3, providing
+headroom for larger topologies while bounding worst-case execution
+in cyclic graphs. For very large service meshes ($>$500~components),
+a practitioner may increase $D_{\max}$ or rely solely on the
+visited set for termination. The formal termination guarantee
+(Theorem~\ref{thm:termination}) holds for any finite $D_{\max}$.
+
 %% ====================================================================
 %%  5. N-LAYER AVAILABILITY LIMIT MODEL
 %% ====================================================================
 \section{$N$-Layer Availability Limit Model}\label{sec:availability}
 
 Traditional availability is a single number:
-$A = \text{MTBF} / (\text{MTBF} + \text{MTTR})$.
-In practice, multiple independent factors cap availability at different
-ceilings.  \textsc{FaultRay} decomposes system availability into
-five layers, each representing an independent upper bound.
+$A = \text{MTBF} / (\text{MTBF} + \text{MTTR})$~\cite{trivedi2001}.
+Classical Reliability Block Diagrams extend this with a
+series-product composition rule
+$A_{\text{series}} = \prod_i A_i$
+under an assumption that components fail independently.
+\textsc{FaultRay} takes a different position: in cloud infrastructure,
+different categories of availability loss (deployment mistakes,
+hardware faults, physical jitter, operational response time, external
+SLA dependencies) are \emph{not} independent in the failure-causing
+sense, because a single underlying incident---a provider region
+outage, a kernel bug, a human deploy error---can simultaneously
+degrade multiple categories.
+
+We therefore decompose system availability into five
+\emph{categorical layers}, each representing an upper bound imposed
+by a distinct class of failure causes, and compose them with the
+\emph{min} operator rather than the series-product:
 
 \begin{definition}[System Availability Ceiling]
 \begin{equation}
   A_{\text{system}} = \min(A_{\text{L1}},\, A_{\text{L2}},\, A_{\text{L3}},\, A_{\text{L4}},\, A_{\text{L5}})
 \end{equation}
-The system cannot exceed the minimum of its five layer availabilities.
 \end{definition}
+
+\paragraph{Why min rather than product?}
+There are three reasons to compose categorical availability ceilings
+with $\min$ rather than $\prod$:
+
+\emph{(1) Correlated failure modes.}
+Classical RBD series-product
+$\prod_i A_i$ assumes that component failures are
+\emph{statistically independent}. For cloud infrastructure layers,
+this assumption fails: a cloud provider region incident can
+simultaneously reduce $A_{\text{L2}}$ (hardware availability as
+observed through the VM layer), $A_{\text{L3}}$ (network packet
+loss), and $A_{\text{L5}}$ (external SLA delivered by downstream
+services running in the same region). Treating these as
+independent would under-estimate the risk.
+
+\emph{(2) Weakest-link interpretation.}
+When a user observes system availability over a window, they
+observe whichever category of failure happened to dominate that
+window. A month dominated by deploy mistakes is capped by
+$A_{\text{L1}}$; a month dominated by hardware failures is capped
+by $A_{\text{L2}}$; a month dominated by downstream SLA violations
+is capped by $A_{\text{L5}}$. The observed availability is
+approximately the minimum, not the product, of the categorical
+ceilings.
+
+\emph{(3) Conservatism and interpretability.}
+For the intended use case---estimating a ceiling that practitioners
+should not expect to exceed---$\min$ is conservative (it gives the
+tighter upper bound among reasonable choices) and interpretable
+(the dominating layer is immediately visible). Practitioners can
+then ask ``which layer is the weakest link, and how do I raise it?''
+rather than reasoning about the compound effect of a product.
+
+\paragraph{Relationship to classical RBD.}
+We do not claim that min-composition is universally preferable to
+the series-product. For \emph{hardware subsystems within a single
+layer}, where component independence is a reasonable approximation
+(e.g., disks in a RAID array, replicated VMs in different failure
+domains), the classical series-product remains appropriate and is
+retained inside the individual layer models below. The contribution
+of this section is specifically the \emph{cross-layer} composition:
+we compose \emph{layers} with $\min$, while each layer internally
+may still use classical composition.
+
+\paragraph{Limitation.}
+The min-composition operator is a \emph{modeling choice} motivated
+by the weakest-link interpretation, not a theorem derived from
+first principles. A practitioner whose system exhibits strong
+independence between categories (an unusual situation) should use
+the series-product instead. The open-source release allows users
+to substitute a different composition operator.
+
+\paragraph{Sensitivity analysis: min vs.\ product.}
+To quantify the practical impact of the composition operator
+choice, we computed both $\min$ and $\prod$ across the 36~test
+topologies. The min-composition yields system availability
+0.01--0.10~percentage points higher (more optimistic) than the
+series-product (mean: 0.02~pp across the test suite). This gap
+grows with the number of layers and with inter-layer availability
+differences: when one layer dominates (e.g., $A_{\text{L1}} = 0.998$
+while others are $\ge 0.9999$), $\min$ and $\prod$ nearly coincide;
+when multiple layers are comparably weak, $\prod$ gives a
+substantially lower estimate. Practitioners can compare both operators on their
+topology to decide which better matches their operational
+experience. The key question is empirical: do observed outages
+tend to be dominated by a single category per window
+(favoring~$\min$) or by simultaneous contributions from multiple
+categories (favoring~$\prod$)?
+
+\paragraph{Direction of the gap.}
+The min-composition is more \emph{optimistic} (higher availability estimate)
+than the series-product. For a resilience analysis tool, this direction
+warrants caution: practitioners who rely on the ceiling estimate may
+under-estimate risk relative to the classical approach. We recommend
+that practitioners compute both operators on their topology and treat
+the series-product as a pessimistic lower bound and the min-composition
+as an optimistic upper bound. The gap between the two quantifies the
+sensitivity to the independence assumption.
 
 \subsection{Layer 1: Software Limit}
 The practical ceiling accounting for deployment downtime, human error,
@@ -516,9 +839,19 @@ where $d$ is deployments per month, $\bar{t}_{\text{deploy}}$ is mean
 deploy downtime (seconds), $T_{\text{month}} = 30.44 \times 86400$~s,
 $p_{\text{human}}$ is human error probability per month, and
 $p_{\text{drift}}$ is configuration drift probability.
+All layer availabilities are clamped to $[0, 1]$:
+$A_{\text{Lk}} = \max(0, \min(1, \ldots))$.
 
 \subsection{Layer 2: Hardware Limit}
-The physical ceiling from MTBF, MTTR, redundancy, and failover:
+The physical ceiling from MTBF, MTTR, redundancy, and failover.
+When component-specific MTBF/MTTR values are not provided, the
+implementation uses configurable defaults (e.g., app server
+MTBF~=~2160h, MTTR~=~5min; database MTBF~=~4320h, MTTR~=~30min).
+These defaults are \emph{engineering estimates}, not empirically
+derived from field data. Practitioners should supply measured
+values from their monitoring systems; the defaults are intended
+only as starting points for exploratory analysis.
+The formulas are:
 \begin{equation}
   A_{\text{single}}(c) = \frac{\text{MTBF}(c)}{\text{MTBF}(c) + \text{MTTR}(c)}
 \end{equation}
@@ -533,15 +866,18 @@ where $f_{\text{fo}}(c)$ is the failover downtime fraction, computed from
 failover event frequency and promotion time.  The system hardware
 availability is the product over critical-path components:
 \begin{equation}
-  A_{\text{L2}} = \prod_{c \in C_{\text{crit}}} A_{\text{tier}}^{\prime}(c)
+  A_{\text{L2}} = \max\!\left(0, \min\!\left(1,\,
+    \prod_{c \in C_{\text{crit}}} A_{\text{tier}}^{\prime}(c)\right)\right)
 \end{equation}
 
-\subsection{Layer 3: Theoretical Limit}
-The mathematical upper bound accounting for irreducible physical noise
---- network packet loss, garbage collection pauses, and kernel scheduling
-jitter --- even with perfect software:
+\subsection{Layer 3: Runtime Noise Floor}
+The ceiling imposed by irreducible runtime overhead---network packet
+loss, garbage collection pauses, and kernel scheduling jitter---as a
+standalone environment-specific bound, independent of the hardware
+limit:
 \begin{equation}
-  A_{\text{L3}} = A_{\text{L2}} \cdot (1 - \bar{p}_{\text{loss}}) \cdot (1 - \bar{f}_{\text{gc}})
+  A_{\text{L3}} = \max\!\left(0, \min\!\left(1,\,
+    (1 - \bar{p}_{\text{loss}}) \cdot (1 - \bar{f}_{\text{gc}})\right)\right)
 \end{equation}
 where $\bar{p}_{\text{loss}}$ is the mean packet loss rate across
 components and $\bar{f}_{\text{gc}}$ is the mean fraction of time
@@ -550,26 +886,43 @@ spent in GC pauses:
   \bar{f}_{\text{gc}} = \frac{1}{|C|} \sum_{c \in C}
     \frac{\mathit{gc\_pause}(c) \cdot \mathit{gc\_freq}(c)}{1000}
 \end{equation}
+Note: the earlier formulation $A_{\text{L3}} = A_{\text{L2}} \cdot
+(1-\bar{p}_{\text{loss}}) \cdot (1-\bar{f}_{\text{gc}})$ made
+$A_{\text{L3}} \le A_{\text{L2}}$ by construction, which caused
+$\min(A_{\text{L2}}, A_{\text{L3}}) = A_{\text{L3}}$ always,
+rendering~$A_{\text{L2}}$ redundant in the cross-layer min.
+The revised formula treats Layer~3 as an independent runtime
+noise ceiling.
 
 \subsection{Layer 4: Operational Limit}
 Captures the human factor---incident detection and resolution speed:
 \begin{equation}
-  A_{\text{L4}} = 1 - \frac{n_{\text{inc}} \cdot \bar{t}_{\text{resp}}}{8760 \cdot p_{\text{cov}}}
+  A_{\text{L4}} = \max\!\left(0, \min\!\left(1,\,
+    1 - \frac{n_{\text{inc}} \cdot \bar{t}_{\text{resp}}}{8760 \cdot p_{\text{cov}}}\right)\right)
 \end{equation}
 where $n_{\text{inc}}$ is incidents per year,
 $\bar{t}_{\text{resp}}$ is mean response time (hours),
 and $p_{\text{cov}} \in (0, 1]$ is on-call coverage fraction
 (1.0 = 24/7, 0.33 = business hours).
+The clamp is necessary: for high incident rates or long response times
+the formula can yield $A_{\text{L4}} < 0$ without it
+(e.g., $n_{\text{inc}} = 500$, $\bar{t}_{\text{resp}} = 20$h,
+$p_{\text{cov}} = 0.33$ gives $A_{\text{L4}} \approx -2.46$).
 Per-component operational readiness factors (runbook coverage,
 automation percentage) further reduce the effective response time.
 
 \subsection{Layer 5: External SLA Cascading}
 If the system depends on $m$ external services, each with SLA $a_i$:
 \begin{equation}
-  A_{\text{L5}} = \prod_{i=1}^{m} a_i
+  A_{\text{L5}} = \max\!\left(0, \min\!\left(1,\,\prod_{i=1}^{m} a_i\right)\right)
 \end{equation}
 This layer captures the multiplicative compounding of external SLA
 dependencies.
+When multiple external services are hosted by the same cloud
+provider, their SLAs are correlated (a provider-level outage
+degrades all). In such cases, the series-product over-estimates
+the compounding effect; practitioners should group co-located
+services and apply $\min$ within each provider group.
 
 \subsection{Cascade Path Availability}
 For a cascade path $P = (c_1, c_2, \ldots, c_k)$ through the
@@ -581,160 +934,59 @@ dependency graph, each edge introduces an attenuation factor:
 where $\alpha(\texttt{requires}) = 1.0$,
 $\alpha(\texttt{optional}) \le 0.5$, and
 $\alpha(\texttt{async}) \le 0.3$.
-
+These attenuation factors are configurable engineering parameters,
+not empirically measured values (see \S\ref{sec:discussion}).
 %% ====================================================================
-%%  6. AI AGENT CROSS-LAYER FAILURE SIMULATION
+%%  7. ILLUSTRATIVE BACKTEST (NOT PROSPECTIVE EVALUATION)
 %% ====================================================================
-\section{AI Agent Cross-Layer Failure Simulation}\label{sec:ai-agent}
+\section{Illustrative Backtest}\label{sec:eval}
 
-\subsection{AI Component Types}
-\textsc{FaultRay} extends the component type system with four
-AI-specific types:
-\begin{itemize}[nosep]
-\item \texttt{ai\_agent}: An autonomous agent that reasons and acts.
-\item \texttt{llm\_endpoint}: An LLM API endpoint (e.g., GPT-4, Claude).
-\item \texttt{tool\_service}: An external tool or API invoked by an agent.
-\item \texttt{agent\_orchestrator}: A multi-agent coordinator.
-\end{itemize}
+\textbf{Scope and limitations of this section.}
+This section does \emph{not} constitute a prospective evaluation.
+All results below are \emph{post-hoc}: for each incident, the
+topology graph was constructed after reading the public
+post-mortem, so the graph already encodes which components were
+affected. The $F_1$ scores reported below are therefore
+\textbf{trivially achievable by construction}---any correct
+graph traversal over a topology that encodes the ground truth
+will reproduce the known cascade path. The purpose of this
+section is limited to verifying a \emph{necessary sanity check}:
+given an accurate topology and the documented root cause, does
+the cascade engine's propagation rules reproduce the known
+cascade path under the modeled dependency semantics? A cascade
+engine that fails this check would be incorrect; passing it is
+necessary but not sufficient evidence of utility.
 
-Each AI component carries additional parameters: base hallucination
-risk $h_0 \in [0, 1]$, maximum context tokens, data source weights,
-and grounding configuration.
+We explicitly do not claim predictive accuracy on unseen
+topologies. Whether a formal LTS cascade engine generalizes
+to infrastructures whose dependency types and circuit breakers
+are unknown at the time of failure remains an open question.
+Prospective evaluation on live systems (e.g., against
+DeathStarBench traces as in Krasnovsky~\cite{krasnovsky2026})
+is needed to establish predictive validity and is left to
+future work.
 
-\subsection{Hallucination Probability Model}
+\subsection{Post-Hoc Cascade Path Reproduction}
 
-\begin{definition}[Hallucination Probability]\label{def:hallucination}
-For agent $a$ with base hallucination risk $h_0(a)$, data sources
-$D = \{d_1, \ldots, d_n\}$, and infrastructure state $I$, the
-hallucination probability is:
-\begin{equation}\label{eq:hallucination}
-  H(a, D, I) = 1 - \prod_{d \in D_{\text{unhealthy}}} (1 - h_d)
-\end{equation}
-where $D_{\text{unhealthy}} = \{d \in D \mid I(d) \ne \textsc{Healthy}\}$
-and the per-source contribution $h_d$ depends on infrastructure state:
-\begin{equation}
-  h_d = \begin{cases}
-    h_0(a) & \text{if } I(d) = \textsc{Healthy} \\
-    h_0(a) + (1 - h_0(a)) \cdot w(d) & \text{if } I(d) = \textsc{Down} \\
-    h_0(a) + (1 - h_0(a)) \cdot w(d) \cdot \delta & \text{if } I(d) = \textsc{Degraded} \\
-    h_0(a) + (1 - h_0(a)) \cdot w(d) \cdot \omega & \text{if } I(d) = \textsc{Overloaded}
-  \end{cases}
-\end{equation}
-with $w(d) \in [0, 1]$ the dependency weight, $\delta = 0.5$ the
-degradation factor, and $\omega = 0.3$ the overload factor.
-When all sources are healthy, $H(a, D, I) = h_0(a)$.
-\end{definition}
-
-\begin{property}[Monotonicity]
-$H(a, D, I)$ is monotonically non-decreasing in the severity of
-infrastructure degradation: worsening any data source's health can
-only increase $H$.
-\end{property}
-
-\begin{property}[Boundedness]
-$H(a, D, I) \in [0, 1]$ for all valid inputs, with
-$H = h_0(a)$ when all sources are healthy and $H \to 1$ as all
-critical sources fail.
-\end{property}
-
-\begin{property}[Compositionality]
-The combined probability under the independence assumption
-(Eq.~\ref{eq:hallucination}) satisfies
-$H(a, D_1 \cup D_2, I) \ge \max(H(a, D_1, I),\, H(a, D_2, I))$.
-\end{property}
-
-\subsection{Cross-Layer Cascade Model}
-Infrastructure failures propagate to AI agents through four layers:
-
-\begin{description}[nosep]
-\item[L1 (Infrastructure):] Component failure (database down, cache degraded).
-\item[L2 (Data Availability):] Reduced data quality or availability
-  for agent grounding.
-\item[L3 (Agent Behavior):] Increased hallucination probability $H(a, D, I)$,
-  degraded reasoning quality.
-\item[L4 (Downstream Impact):] Incorrect agent outputs consumed by
-  users or other agents.
-\end{description}
-
-When the cascade engine detects a fault on a component that is a data
-source for an AI agent, it computes $H(a, D, I)$ and annotates the
-agent component with the elevated hallucination risk.
-
-\subsection{10-Mode Failure Taxonomy}
-
-\textsc{FaultRay} defines a comprehensive taxonomy of AI agent failure
-modes (Table~\ref{tab:taxonomy}).
-
-\begin{table}[t]
-\centering
-\caption{AI agent failure taxonomy (10 modes).}
-\label{tab:taxonomy}
-\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Mode} & \textbf{Health} & \textbf{Description} \\
-\midrule
-Hallucination       & Degraded   & Ungrounded output \\
-Context overflow    & Down       & Token limit exceeded \\
-LLM rate limit      & Overloaded & API throttling \\
-Token exhaustion    & Down       & Budget depleted \\
-Tool failure        & Degraded   & External tool unavailable \\
-Agent loop          & Down       & Infinite iteration \\
-Prompt injection    & Degraded   & Adversarial input \\
-Confidence miscal.  & Degraded   & Unreliable confidence \\
-CoT collapse        & Degraded   & Reasoning chain failure \\
-Output amplification& Degraded   & Upstream error propagation \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-An eleventh mode, \emph{grounding staleness} (cached data becomes
-outdated), is also modeled but treated as a variant of hallucination
-with a temporal dimension.
-
-\subsection{Agent-to-Agent Compound Cascade}
-
-When agent $a_1$ feeds output to agent $a_2$, the effective
-hallucination probability for $a_2$ is:
-\begin{equation}
-  H_{\text{eff}}(a_2) = 1 - (1 - H(a_2)) \cdot (1 - H(a_1) \cdot \gamma)
-\end{equation}
-where $\gamma \in [0, 1]$ is the amplification factor ($\gamma = 1$ for
-no independent verification; $\gamma = 0$ for full verification).
-
-For a chain of $n$ agents $(a_1, a_2, \ldots, a_n)$:
-\begin{equation}
-  H_{\text{chain}}(a_n) = 1 - \prod_{i=1}^{n} (1 - H_{\text{eff}}(a_i))
-\end{equation}
-
-This compound cascade formula shows that even agents with low individual
-hallucination risk ($h_0 = 0.05$) can produce high chain-level failure
-probability.  For example, a chain of 5~agents each with $h_0 = 0.05$
-and $\gamma = 1.0$ yields $H_{\text{chain}} \approx 0.226$---a
-$4.5\times$ amplification.
-
-%% ====================================================================
-%%  7. EVALUATION
-%% ====================================================================
-\section{Evaluation}\label{sec:eval}
-
-\subsection{Backtest Against Real-World Incidents}
-
-We validated \textsc{FaultRay}'s cascade predictions against 18
-real-world cloud infrastructure incidents spanning 2017--2023.  For each
-incident, we constructed a representative topology graph, injected the
-documented root cause as a fault, and compared the predicted cascade
-path and severity against the actual incident report.
-
-Table~\ref{tab:backtest} shows the results for selected incidents.
-Precision measures the fraction of predicted affected components that
-were actually affected; recall measures the fraction of actually
-affected components that were predicted.
+We assembled 36~incident topologies from real-world cloud
+infrastructure incidents spanning 2017--2023, of which 29~achieve
+$F_1 = 1.000$ and 7~exhibit imperfect cascade reproduction
+(see below). For each incident, we constructed a representative
+topology graph from the public post-mortem, injected the documented
+root cause as a fault, and compared the predicted cascade path
+against the incident report. Because the topology encodes the
+answer, the cascade path $F_1$ is expected to be 1.000; any
+deviation indicates a modeling limitation rather than a meaningful
+predictive result.
 
 \begin{table*}[t]
 \centering
-\caption{Backtest results against real-world incidents (selected).
-  Prec.\ = Precision, Rec.\ = Recall, Sev.\ Acc.\ = Severity Accuracy.}
+\caption{Post-hoc cascade path reproduction on real-world incidents
+  (8 of 29 with $F_1 = 1.000$ shown; full results in repository).
+  Because topologies were constructed from incident reports, the
+  path $F_1 = 1.000$ is \emph{expected by construction} and does
+  not indicate predictive power.
+  Sev.\ Acc.\ = Severity Accuracy (non-trivial).}
 \label{tab:backtest}
 \small
 \begin{tabular}{@{}llccccc@{}}
@@ -750,58 +1002,203 @@ Azure AD outage            & 2023 & 5 components & 5 components & 1.000 & 1.000 
 GitHub Actions outage      & 2022 & 4 components & 4 components & 1.000 & 1.000 & 1.000 \\
 Fastly CDN outage          & 2021 & 3 components & 3 components & 1.000 & 1.000 & 1.000 \\
 \midrule
-\multicolumn{2}{@{}l}{\textbf{Average (18 incidents)}} & --- & --- & \textbf{1.000} & \textbf{1.000} & \textbf{1.000} \\
+\multicolumn{2}{@{}l}{\textbf{Average (29 of 36 incidents)}} & --- & --- & 1.000 & 1.000 & 1.000\textsuperscript{$\dagger$} \\
 \multicolumn{2}{@{}l}{\textbf{Severity Accuracy}} & \multicolumn{5}{c}{\textbf{0.819}} \\
 \bottomrule
 \end{tabular}
+\\[2pt]
+{\footnotesize \textsuperscript{$\dagger$}Expected by construction;
+  see \S\ref{sec:eval} preamble.}
 \end{table*}
 
-The perfect $F_1$ score warrants careful interpretation.
-Topologies were constructed \emph{post-hoc} from public incident reports,
-so the topology model already encodes knowledge of which components were
-affected.  The $F_1 = 1.000$ therefore validates that the cascade engine's
-propagation rules correctly reproduce \emph{known} cascade paths given
-an accurate topology, rather than demonstrating predictive power on
-unseen infrastructures.  Prospective validation---applying \textsc{FaultRay}
-to a live topology \emph{before} an incident occurs---is future work.
-The severity accuracy of 0.819 reflects the inherent
-difficulty of mapping continuous severity scores to discrete incident
-severity levels (critical/high/medium/low), as real-world incident
-reports use inconsistent severity definitions.
+\subsection{Perturbation Analysis: Is the Result Trivial?}
+
+To demonstrate that the cascade path reproduction is not achieved
+by a degenerate engine (e.g., one that simply marks all reachable
+nodes as failed), we performed a perturbation analysis. For each
+of the 36~incident topologies in our test suite, we systematically
+perturbed the topology in three ways and re-ran the cascade engine:
+
+\begin{enumerate}[nosep]
+\item \textbf{Edge deletion}: removed one randomly-selected
+  dependency edge. Average $F_1$ dropped from 0.971 to 0.818
+  (average recall dropped to 0.724 because the engine could no
+  longer reach components through the deleted path).
+\item \textbf{Edge addition}: added one spurious \texttt{requires}
+  dependency from a new component to the root-cause node. Average
+  precision dropped to 0.748 (the engine propagated failure to
+  the spurious component, which was not in the ground-truth
+  cascade path).
+\item \textbf{Dependency type swap}: changed one randomly-selected
+  \texttt{requires} edge to \texttt{optional}. Average $F_1$
+  dropped to 0.959 (moderate effect because optional dependencies
+  attenuate to \textsc{Degraded} rather than \textsc{Down},
+  partially stopping further cascade).
+\end{enumerate}
+
+These perturbations confirm that the engine's behavior is
+\emph{sensitive to topology structure}: incorrect topologies
+produce measurably worse results. Edge deletion has the largest
+impact ($\Delta F_1 = -0.153$), confirming that the engine does
+not trivially mark all reachable nodes as failed. This does not
+establish predictive power, but it does establish that the engine
+is non-degenerate.
+A limitation of the edge addition perturbation is that it
+introduces a new node not present in the original topology,
+which inflates false positives in a somewhat artificial way.
+A more realistic perturbation would add a spurious edge between
+two existing nodes; we chose the node-addition variant for
+simplicity and to avoid confounds from existing dependency
+structure.
+
+\paragraph{Baseline imperfection on the full test suite.}
+We note that the baseline $F_1$ across all 36~incident topologies
+is 0.971, not 1.000. Seven incidents exhibit over-propagation
+(6~cases, where the engine predicts cascade to a component not
+in the ground truth) or under-propagation (1~case, where the
+engine misses an affected component) relative to the
+ground-truth cascade path. This reflects a real limitation:
+the engine's propagation rules (particularly for optional and
+async dependencies) do not perfectly match the actual cascade
+behavior in all cases. Table~\ref{tab:backtest} shows 8 representative incidents from
+the 29 that achieve $F_1 = 1.000$; the full 36-incident results
+are available in the repository.
+
+Table~\ref{tab:imperfect} summarizes the seven imperfect incidents by failure mode and root cause.
+
+\begin{table}[h]
+\centering
+\caption{Seven incidents with imperfect cascade reproduction ($F_1 < 1.000$).
+  All six over-propagation cases arise from optional-dependency attenuation:
+  the engine propagates \textsc{Degraded} to components that were
+  isolated by circuit breakers or feature flags in the real incident.
+  The one under-propagation case reflects a missing implicit dependency
+  (shared storage or DNS) not captured in the topology YAML.}
+\label{tab:imperfect}
+\small
+\begin{tabular}{@{}lllp{5.5cm}@{}}
+\toprule
+\textbf{Incident} & \textbf{Year} & \textbf{Mode} & \textbf{Root Cause of Mismatch} \\
+\midrule
+Provider A outage  & 2017 & over  & Optional dep.\ propagated to isolated replica group \\
+Provider B routing & 2019 & over  & CB trip masked downstream; engine still propagated \\
+Provider C auth    & 2020 & over  & Feature-flag disabled path not modeled as isolated \\
+Provider D storage & 2021 & over  & Async dep.\ to read-replica treated as active path \\
+Provider E BGP     & 2022 & over  & BGP scope limited to 19 DCs; engine applied globally \\
+Provider F SSL     & 2022 & over  & Certificate scope mismatch; engine over-generalized \\
+Provider G control & 2023 & under & Implicit shared-state dependency absent from YAML \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A separate evaluation on a 54-incident superset spanning 21 providers
+and 2017--2024 shows $F_1 = 0.87$ and recall $= 0.81$, consistent
+with the modeling limitations described above; details are reported
+in a companion short paper.
+
+\paragraph{Severity accuracy.}
+The severity accuracy of 0.819 is the only non-trivial metric in
+this section: severity scores are computed by the engine's internal
+scoring function (a weighted combination of health-state impact,
+cascade spread, and likelihood; 0--10 scale), so they represent
+a genuine---if limited---signal. The metric maps the continuous score to four levels
+(critical: $\ge 7.0$, major: $\ge 4.0$, minor: $\ge 1.0$,
+low: $< 1.0$) and compares against the level reported in
+the incident post-mortem. The moderate accuracy
+reflects both modeling limitations and the inconsistent severity
+definitions used across different cloud providers' incident
+reports. The scoring function and thresholds are documented
+in the open-source implementation (\texttt{cascade.py}).
 
 \subsection{Scale}
-The \textsc{FaultRay} implementation comprises 441~source files,
-29{,}640~tests, and over 100~distinct simulation engines covering
-domains from blast radius prediction to SLA contract validation.
+The \textsc{FaultRay} repository contains 512~Python source files
+and over 30{,}000~test functions. The core modules relevant to the
+contributions of this paper (cascade engine, availability model,
+and infrastructure graph model) comprise approximately 12~source
+files and 2{,}000~lines of code; the remainder covers domain-specific
+extensions, API endpoints, integrations, and tooling that are part
+of the open-source release but not claimed as research contributions.
 The cascade engine processes a 50-component topology in under 10\,ms
 on commodity hardware (Apple M1, 16\,GB RAM).
 
 \subsection{Comparison with Existing Tools}
 
+Table~\ref{tab:comparison} summarizes the structural differences
+between \textsc{FaultRay} and representative chaos engineering
+platforms. We emphasize that these are different operating
+points, not a value judgment: production fault injection and
+in-memory analytical simulation address different use cases.
+
 \begin{table}[t]
 \centering
-\caption{Feature comparison with chaos engineering platforms.}
+\caption{Structural differences between \textsc{FaultRay} and
+  representative chaos engineering platforms. These are distinct
+  operating points, not absolute rankings.}
 \label{tab:comparison}
 \small
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 \textbf{Feature} & \textbf{FR} & \textbf{Gr} & \textbf{Sb} & \textbf{FIS} \\
 \midrule
-In-memory simulation  & \checkmark & \texttimes & \texttimes & \texttimes \\
-Formal verification   & \checkmark & \texttimes & \texttimes & \texttimes \\
-Cascade prediction    & \checkmark & Partial    & Partial    & \texttimes \\
-$N$-layer avail.      & \checkmark & \texttimes & \texttimes & \texttimes \\
-AI agent modeling     & \checkmark & \texttimes & \texttimes & \texttimes \\
-Zero production risk  & \checkmark & \texttimes & \checkmark & \texttimes \\
-Open source           & \checkmark & \texttimes & Partial    & \texttimes \\
-Backtest validation   & \checkmark & \texttimes & \texttimes & \texttimes \\
+Analytical (in-memory) & \checkmark & \texttimes & \texttimes & \texttimes \\
+Formal cascade proofs  & \checkmark & \texttimes & \texttimes & \texttimes \\
+Cascade propagation    & \checkmark & Partial    & Partial    & \texttimes \\
+$N$-layer decomposition & \checkmark & \texttimes & \texttimes & \texttimes \\
+Zero production touch  & \checkmark & \texttimes & partial & \texttimes \\
+Open source (Apache 2.0) & \checkmark & \texttimes & Partial    & \texttimes \\
+Real fault injection  & \texttimes & \checkmark & \checkmark & \checkmark \\
 \bottomrule
 \end{tabular}
 
 \smallskip
 \raggedright
 \footnotesize FR = FaultRay, Gr = Gremlin, Sb = Steadybit, FIS = AWS FIS.
+The bottom row (real fault injection) is a capability that
+\textsc{FaultRay} deliberately does not provide.
 \end{table}
+
+\paragraph{Limitations of this comparison.}
+Table~\ref{tab:comparison} is a \emph{structural feature
+matrix}, not a quantitative accuracy comparison. Direct
+accuracy comparison between \textsc{FaultRay} and production
+fault injection tools is not possible without a shared benchmark
+topology where both approaches are evaluated against the same
+ground truth. Krasnovsky~\cite{krasnovsky2026} evaluated against
+DeathStarBench (MAE~$\leq$~0.0004); replicating this benchmark
+in \textsc{FaultRay} would require manually constructing the
+topology from Jaeger traces, which we have not done. We
+acknowledge this as an important gap: \textbf{no quantitative
+comparison to any baseline exists in this paper.}
+
+\paragraph{Comparison with naive graph reachability.}
+For binary cascade path prediction (``is component~$c$ affected
+or not?''), the cascade engine produces identical results to
+naive reverse-BFS on all 36~test topologies ($F_1 = 0.971$ for
+both). This equivalence holds even on topologies containing
+\texttt{optional} and \texttt{async} dependencies, because the
+binary $F_1$ metric treats \textsc{Degraded} and \textsc{Down}
+identically as ``affected.'' The cascade engine's \emph{actual}
+added value over BFS lies in severity differentiation
+(assigning \textsc{Degraded} vs.\ \textsc{Overloaded} vs.\
+\textsc{Down} based on dependency type and weight), latency
+cascade simulation, and the formal guarantees
+(Theorems~\ref{thm:termination}--\ref{thm:blast}), none of
+which are captured by the binary $F_1$ metric.
+
+\paragraph{Min-composition vs.\ series-product.}
+On all 36~test topologies, the 3-layer min-composition yields
+system availability estimates 0.01--0.10~percentage points
+\emph{higher} (more optimistic) than the classical
+series-product (mean: 0.02~pp), corresponding to
+50--540~fewer minutes of estimated annual downtime
+(mean: 103~minutes). This is consistent with the
+intended interpretation: $\min$ produces a \emph{ceiling}
+(what you cannot exceed), while the series-product produces
+a \emph{point estimate} (what you expect under independence).
+Neither is universally correct; the choice depends on whether
+the practitioner's layers exhibit correlated or independent
+failure modes. The open-source release allows users to
+substitute a different composition operator.
 
 %% ====================================================================
 %%  8. IMPLEMENTATION
@@ -811,12 +1208,12 @@ Backtest validation   & \checkmark & \texttimes & \texttimes & \texttimes \\
 \textsc{FaultRay} is implemented in Python 3.11+ and uses NetworkX~\cite{networkx}
 for graph operations, Pydantic for schema validation, and FastAPI for
 the REST API.  The software is distributed as an open-source package on
-PyPI under the Business Source License 1.1.
+PyPI under the Apache License 2.0.
 
 \textbf{Infrastructure graph model.}
 Topologies are defined in JSON or YAML.  Each component specifies type,
-capacity, resource metrics, redundancy configuration, and (for AI
-components) agent parameters.  Dependencies specify type
+capacity, resource metrics, and redundancy configuration.
+Dependencies specify type
 (\texttt{requires}/\texttt{optional}/\texttt{async}), weight, latency,
 circuit breaker configuration, and retry strategy.
 
@@ -838,76 +1235,209 @@ added via a plugin architecture.  Custom scoring functions allow
 organizations to weight severity according to their specific SLO
 definitions.
 
+\textbf{Reproducibility.}
+All 36~incident topology files used in the backtest are included
+in the repository at \texttt{tests/incidents/*.yaml}. The
+perturbation analysis uses a fixed random seed (42) for
+reproducibility. The Python version is 3.11+; exact dependency
+versions are pinned in \texttt{pyproject.toml}.
+
 %% ====================================================================
 %%  9. DISCUSSION
 %% ====================================================================
-\section{Discussion}\label{sec:discussion}
+\section{Discussion and Limitations}\label{sec:discussion}
 
-\textbf{Simulation vs.\ reality gap.}
+We describe the limitations of this work in detail because the
+intended contribution of the paper is enablement of a research
+prototype, not an empirical novelty claim. Practitioners considering
+\textsc{FaultRay} should understand what it does and does not
+establish.
+
+\textbf{No prospective validation.}
+All backtest results in \S\ref{sec:eval} are post-hoc: topologies
+were constructed from incident reports, so cascade path $F_1 = 1.000$
+is expected by construction rather than earned by prediction. The
+perturbation analysis (\S\ref{sec:eval}) demonstrates non-degeneracy
+but not predictive power. We explicitly do not claim predictive
+accuracy on unseen infrastructures. Prospective evaluation---ideally
+on trace-derived topologies such as DeathStarBench, where the engine
+must predict cascade paths from topology alone without foreknowledge
+of the outcome---remains the most important open validation task.
+
+\textbf{Relationship to concurrent work (Krasnovsky 2026).}
+Krasnovsky's ICSE-NIER~2026 paper~\cite{krasnovsky2026} proposes
+in-memory graph simulation with Monte-Carlo sampling, evaluated on
+DeathStarBench with quantitative mean absolute error bounds. That
+paper provides empirical results that this paper does not, and we
+recommend it for readers interested in trace-driven graph discovery.
+The two papers differ in method (Monte-Carlo vs.\ formal LTS) and
+scope (single-layer vs.\ multi-layer availability). We view them as
+complementary operating points in the design space of in-memory
+chaos analysis.
+
+\textbf{Proof sketches, not mechanized proofs.}
+The correctness properties in \S\ref{sec:cascade} (Theorems~1--7)
+are accompanied by informal proof sketches, not proofs verified
+in a proof assistant such as Coq, Isabelle/HOL, or TLA+. While
+we have attempted to make the reasoning rigorous (e.g., explicit
+progress measures for termination, case analysis for monotonicity),
+informal arguments can contain subtle errors that mechanical
+verification would catch. We consider mechanized verification of
+the core properties an important future work item.
+
+\textbf{Modeling simplifications.}
 \textsc{FaultRay} operates on a static topology model and does not
 capture runtime dynamics such as auto-healing, load balancer failover
-timing, or Kubernetes pod rescheduling latency.  The perfect $F_1$ in
-cascade path prediction may partly reflect the fact that topologies
-are constructed post-hoc to match known incidents; prospective
-validation on live systems is future work.
+timing, auto-scaling reaction time, or Kubernetes pod rescheduling
+latency. Dependency types (\texttt{requires} / \texttt{optional} /
+\texttt{async}) are a simplification of the far richer set of
+coupling semantics present in real distributed systems.
 
-\textbf{Hallucination model calibration.}
-The hallucination probability model (Eq.~\ref{eq:hallucination}) uses
-default parameters ($\delta = 0.5$, $\omega = 0.3$) derived from
-engineering judgment rather than empirical measurement.  The model is
-currently a \emph{theoretical framework} that has not been validated
-against real AI agent failure data in production.  Calibrating
-these parameters---and validating the independence assumption underlying
-the combined probability formula---against measured hallucination rates
-under infrastructure degradation is a critical direction for future work.
+\textbf{Coarse health status granularity.}
+The four-level health model (\textsc{Healthy}, \textsc{Degraded},
+\textsc{Overloaded}, \textsc{Down}) does not capture gradient
+degradation within a level. For example, \textsc{Degraded} at
+2$\times$ latency and \textsc{Degraded} at 10$\times$ latency are
+treated identically by the cascade propagation rules, yet their
+impact on user experience and downstream systems may differ
+substantially. Similarly, \textsc{Overloaded} at 71\% CPU
+utilization and 99\% are conflated. A continuous health metric
+would enable finer-grained propagation modeling but would
+complicate the formal properties (e.g., monotonicity over a
+partial order becomes monotonicity over a total order on
+$[0, 1]$). We chose discrete levels for simplicity and
+interpretability; extending to continuous health is left to
+future work.
+
+\textbf{Min-composition is a modeling choice, not a theorem.}
+As discussed in \S\ref{sec:availability}, the decision to compose
+categorical availability layers with $\min$ rather than the classical
+series-product is motivated by a weakest-link argument and by the
+observation that cloud infrastructure layers fail in correlated
+fashion. It is not derived from first principles. Practitioners whose
+system genuinely exhibits independence between categorical layers
+should use a different composition operator.
+
+\textbf{Scope of this paper.}
+An earlier version of this manuscript (v11) presented an AI-agent
+cross-layer failure model, a 10-mode taxonomy of agent failures,
+and a hallucination probability function $H(a, D, I)$ with
+hardcoded parameters. We have removed that section because
+subsequent agent failure taxonomies---notably
+MAST~\cite{cemri2025mast}, Microsoft's Taxonomy of Failure Mode in
+Agentic AI Systems, and work on AgentOps---cover the taxonomy
+contribution with substantially more empirical rigor (1600+
+annotated traces, inter-annotator agreement $\kappa = 0.88$).
+A broader framework for AI agent reliability engineering has also
+been proposed~\cite{airel2026}.
+The
+hallucination parameters $\delta = 0.5$, $\omega = 0.3$ in the v11
+paper were engineering judgment and not measured. We therefore
+scope this v12 paper to the infrastructure cascade engine and the
+$N$-layer availability model, and defer empirical AI-agent failure
+modeling to domain specialists. The open-source implementation
+retains the AI agent features as a tool capability, but they are
+not claimed as a research contribution in this paper.
+
+\textbf{Not a compliance tool.}
+\textsc{FaultRay} is a research prototype. It is not a certified
+compliance tool under DORA, FISC, SOC~2, ISO~27001, or any other
+regulatory regime. Its outputs must not be used as audit evidence
+without independent legal and technical review. Regulated entities
+should use certified tooling operated by licensed assessors for
+compliance purposes.
+
+\textbf{Patent status.}
+A US provisional patent application covering the cascade engine and
+$N$-layer availability decomposition has been filed with the USPTO
+(Application No.~64/010,200, filed 2026-03-19). The release of this
+paper under an open preprint, together with the Apache~License~2.0
+open-source release, is intended as defensive publication in
+addition to the provisional filing. Note that the Apache~License~2.0
+(\S3) includes an express patent grant to downstream users of the
+licensed software; the provisional filing preserves rights for
+uses outside the scope of the Apache license (e.g., independent
+reimplementation).
 
 \textbf{Scalability.}
-The $O(|C| + |E|)$ cascade engine scales well to hundreds of
-components, but very large topologies ($>$10{,}000 components) may
-require partitioning strategies.  The per-scenario simulation is
-embarrassingly parallel.
+The $O(|V| + |E|)$ cascade engine scales to hundreds of components
+in tens of milliseconds on commodity hardware. Very large
+topologies ($>$10{,}000 components) may require partitioning
+strategies. The per-scenario simulation is embarrassingly parallel.
 
-\textbf{Future work.}
-Three directions are promising:
-(1)~ML-enhanced scenario generation that prioritizes high-risk
-scenarios based on historical incident patterns;
-(2)~digital twin synchronization that continuously updates the
-topology model from live infrastructure (Terraform state,
-Kubernetes API, cloud provider APIs);
-(3)~natural language topology definition, allowing engineers to
-describe infrastructure in plain English and generate formal
-topology graphs via LLM.
+\textbf{What this paper does not claim.}
+To be explicit, this paper does \emph{not} claim:
+(i)~predictive accuracy on unseen topologies;
+(ii)~superiority over production fault injection for use cases
+requiring empirical fault discovery;
+(iii)~novelty over every prior work on cascade failure modeling; or
+(iv)~that $\min$-composition is universally preferable to the
+series-product.
+\textbf{Threats to validity.}
+\emph{Internal:} The proof sketches are not mechanically verified;
+subtle errors may exist. The severity accuracy metric (0.819)
+depends on manual mapping of incident reports to severity levels,
+which involves subjective judgment.
+\emph{External:} The 36~test topologies are simplified
+representations of real incidents (3--7 components each), not
+full production topologies (which may have hundreds of components
+with complex dependency types). Results may not generalize to
+larger or more complex topologies.
+\emph{Construct:} The binary $F_1$ metric does not capture
+severity differentiation, which is the cascade engine's primary
+added value over naive graph reachability.
+
+What the paper \emph{does} claim is that the specific combination of
+(I)~formal LTS cascade semantics with termination and complexity
+arguments (proof sketches), (II)~cross-layer $\min$-composition of categorical
+availability ceilings, and (III)~an Apache~2.0 in-memory analytical
+implementation, constitutes a useful operating point that, to the
+best of our knowledge, had not been disclosed in this combined form
+as of the provisional filing date (2026-03-19).
 
 %% ====================================================================
 %%  10. CONCLUSION
 %% ====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We presented \textsc{FaultRay}, an in-memory infrastructure resilience
-simulation platform with three key contributions:
+We presented \textsc{FaultRay}, a research prototype for in-memory
+infrastructure resilience analysis. The paper contributes two core
+technical elements:
 
 \begin{enumerate}[nosep]
 \item A \textbf{cascade propagation engine} formalized as a Labeled
-  Transition System with eight transition rules, proven termination in
-  $O(|C| + |E|)$, and seven correctness properties including
-  monotonicity, causality, and circuit breaker correctness.
-\item An \textbf{$N$-layer availability limit model} that decomposes
-  system availability into five independent ceilings (hardware,
-  software, theoretical, operational, and external SLA), providing
-  actionable insight into which factor is the binding constraint.
-\item A \textbf{cross-layer AI agent failure model} with a formal
-  hallucination probability function $H(a, D, I)$, a 10-mode failure
-  taxonomy, and an agent-chain compound cascade formula.
+  Transition System over a dependency graph, with termination
+  on finite graphs, $O(|V| + |E|)$ time complexity, monotonicity,
+  causality, and bounded blast radius (proof sketches in
+  \S\ref{sec:cascade}; not mechanically verified).
+\item An \textbf{$N$-layer availability limit model} that composes
+  categorical availability ceilings (software, hardware, runtime
+  noise floor, operational, external SLA) with the $\min$ operator rather than
+  the classical series-product, motivated by a weakest-link argument
+  appropriate for cloud infrastructure where categorical layers
+  exhibit correlated failure modes (\S\ref{sec:availability}).
 \end{enumerate}
 
-Validation against 18 real-world cloud incidents achieved
-$F_1 = 1.000$ for cascade path prediction and severity accuracy
-of 0.819.  To our knowledge, \textsc{FaultRay} is the first system to
-bridge infrastructure resilience simulation and AI agent reliability
-analysis within a single, formally verified framework.
+A post-hoc backtest on 36 historical cloud incidents (29 with
+$F_1 = 1.000$, 7 with modeling imperfections) confirms that the
+cascade engine largely reproduces known cascade paths when
+topologies encode the ground truth (a necessary sanity check,
+not a predictive result); perturbation analysis shows
+non-degenerate sensitivity to topology structure. Prospective
+evaluation remains open. Concurrent work by Krasnovsky~\cite{krasnovsky2026}
+(ICSE-NIER~2026) addresses the same operating point with Monte-Carlo
+sampling, and we view the two approaches as complementary.
 
-\textsc{FaultRay} is available as open-source software at
+\textsc{FaultRay} is released as open source under Apache~License~2.0
+at \url{https://github.com/mattyopon/faultray} and
 \url{https://pypi.org/project/faultray/}.
+A US provisional patent application covering the cascade engine and
+$N$-layer availability decomposition has been filed with the USPTO
+(Application No.~64/010,200, 2026-03-19).
+
+This is a research prototype, not a certified compliance tool. Its
+outputs must not be used as audit evidence without independent legal
+and technical review.
 
 %% ====================================================================
 %%  REFERENCES
@@ -964,34 +1494,6 @@ K.~S.~Trivedi,
 Computer Science Applications}, 2nd~ed.
 New York: Wiley, 2001.
 
-\bibitem{yao2023react}
-S.~Yao, J.~Zhao, D.~Yu, N.~Du, I.~Shafran, K.~Narasimhan,
-and Y.~Cao,
-``ReAct: Synergizing reasoning and acting in language models,''
-in \textit{Proc.\ ICLR}, 2023.
-
-\bibitem{schick2023toolformer}
-T.~Schick, J.~Dwivedi-Yu, R.~Dess\`{i}, R.~Raileanu,
-M.~Lomeli, E.~Hambro, L.~Zettlemoyer, N.~Cancedda, and T.~Scialom,
-``Toolformer: Language models can teach themselves to use tools,''
-in \textit{Proc.\ NeurIPS}, 2023.
-
-\bibitem{liang2023holistic}
-P.~Liang, R.~Bommasani, T.~Lee, \textit{et~al.},
-``Holistic evaluation of language models,''
-\textit{Transactions on Machine Learning Research}, 2023.
-
-\bibitem{zheng2023judging}
-L.~Zheng, W.-L.~Chiang, Y.~Sheng, \textit{et~al.},
-``Judging LLM-as-a-judge with MT-Bench and Chatbot Arena,''
-in \textit{Proc.\ NeurIPS}, 2023.
-
-\bibitem{perez2022red}
-E.~Perez, S.~Huang, F.~Song, T.~Cai, R.~Ring,
-J.~Aslanides, A.~Glaese, N.~McAleese, and G.~Irving,
-``Red teaming language models with language models,''
-in \textit{Proc.\ EMNLP}, 2022.
-
 \bibitem{networkx}
 A.~A.~Hagberg, D.~A.~Schult, and P.~J.~Swart,
 ``Exploring network structure, dynamics, and function using NetworkX,''
@@ -1015,6 +1517,106 @@ Cloudflare, Inc.,
 ``Cloudflare outage on June 21, 2022,''
 Cloudflare Blog, Jun.~2022. [Online]. Available:
 \url{https://blog.cloudflare.com/cloudflare-outage-on-june-21-2022/}
+
+\bibitem{krasnovsky2026}
+A.~A.~Krasnovsky,
+``Model Discovery and Graph Simulation: A Lightweight Gateway to
+Chaos Engineering,''
+in \textit{Proceedings of the 48th International Conference on
+Software Engineering, NIER Track (ICSE-NIER~2026)}, Apr.~2026.
+arXiv:2506.11176.
+\newblock \textit{Distinguished Paper Award.}
+
+\bibitem{casformer2025}
+C.~S.-H.~Hsu et al.,
+``Cascaded Transformer for robust and scalable SLA decomposition
+via amortized optimization,'' arXiv:2601.11859, 2026.
+
+\bibitem{nasa-fta}
+W.~Vesely, M.~Stamatelatos, J.~Dugan, J.~Fragola, J.~Minarick, and
+J.~Railsback,
+\textit{Fault Tree Handbook with Aerospace Applications},
+NASA Office of Safety and Mission Assurance, 2002.
+
+\bibitem{iec61025}
+International Electrotechnical Commission,
+\textit{IEC 61025: Fault Tree Analysis (FTA)},
+2nd ed., 2006.
+
+\bibitem{arp4761}
+SAE International,
+\textit{ARP4761: Guidelines and Methods for Conducting the Safety
+Assessment Process on Civil Airborne Systems and Equipment},
+1996.
+
+\bibitem{iii-model-2025}
+Y.~Tang, J.~Piao, H.~Wang, S.~Rajib, and Y.~Li,
+``Predicting cascade failures in interdependent urban
+infrastructure networks,'' arXiv:2503.02890, 2025.
+
+\bibitem{pnas-cascade-2019}
+J.~Duan et al.,
+``Universal behavior of cascading failures in interdependent
+networks,''
+\textit{Proceedings of the National Academy of Sciences}, 2019.
+
+\bibitem{sla-survey-2024}
+``Service Level Agreement in cloud computing: Taxonomy, prospects,
+and challenges,'' \textit{Internet of Things}, vol.~25, 101126,
+2024. doi:10.1016/j.iot.2024.101126.
+
+\bibitem{cemri2025mast}
+M.~Cemri et al.,
+``MAST: A Multi-Agent System Failure Taxonomy,''
+arXiv:2503.13657, to appear in NeurIPS 2026.
+
+\bibitem{chaostwin2021}
+P.~Pecka, T.~Rosa, K.~Zimmermann, and V.~Petrik,
+``ChaosTwin: A chaos engineering and digital twin approach for
+the validation of virtualized network functions,''
+in \textit{Proc.\ CNSM}, 2021.
+
+\bibitem{farokhi2024}
+S.~Farokhi et al.,
+``Chaos engineering for resilience assessment of digital twins,''
+\textit{IEEE Transactions on Industrial Informatics}, vol.~20,
+no.~1, pp.~1134--1143, 2024.
+
+\bibitem{chaos-mlr-2025}
+O.~S.~Joshua et al.,
+``Chaos engineering: A multi-vocal literature review,''
+\textit{ACM Computing Surveys}, vol.~58, no.~7, 2025.
+doi:10.1145/3777375.
+
+\bibitem{vlsts2022}
+V.~Zamfir, M.~Calancea, D.~Diaconescu, W.~Chmielarz,
+and J.~Tu\v{s}il,
+``Validating labelled state transition and message production
+systems,'' arXiv:2202.12662, 2022.
+
+\bibitem{buldyrev2010}
+S.~V.~Buldyrev, R.~Parshani, G.~Paul, H.~E.~Stanley, and
+S.~Havlin,
+``Catastrophic cascade of failures in interdependent networks,''
+\textit{Nature}, vol.~464, pp.~1025--1028, 2010.
+
+\bibitem{avizienis2004}
+A.~Avizienis, J.-C.~Laprie, B.~Randell, and C.~Landwehr,
+``Basic concepts and taxonomy of dependable and secure computing,''
+\textit{IEEE Transactions on Dependable and Secure Computing},
+vol.~1, no.~1, pp.~11--33, 2004.
+
+\bibitem{nasar2026}
+M.~Nasar,
+``Formal validation for microgrid reliability based on TLA+,''
+\textit{Journal of Electrical Engineering}, vol.~77, no.~1,
+pp.~46--56, 2026. doi:10.2478/jee-2026-0006.
+
+\bibitem{airel2026}
+S.~Rabanser, S.~Kapoor, P.~Kirgis, K.~Liu, S.~Utpala,
+and A.~Narayanan,
+``Towards a Science of AI Agent Reliability,''
+arXiv:2602.16666, Feb.~2026.
 
 \end{thebibliography}
 

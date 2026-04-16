@@ -216,9 +216,9 @@ class DynamicSimulationEngine:
       8. Tracks peak severity across the entire timeline.
     """
 
-    def __init__(self, graph: InfraGraph) -> None:
+    def __init__(self, graph: InfraGraph, max_depth: int = 20) -> None:
         self.graph = graph
-        self.cascade_engine = CascadeEngine(graph)
+        self.cascade_engine = CascadeEngine(graph, max_depth=max_depth)
 
     # ------------------------------------------------------------------
     # Public API

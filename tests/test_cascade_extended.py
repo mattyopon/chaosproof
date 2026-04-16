@@ -946,10 +946,11 @@ def test_cascade_async_dependency():
     assert "async" in app_effects[0].reason.lower()
 
 
-def test_cascade_required_dep_upstream_down_always_cascades_down():
-    """When the failed upstream (DOWN) has replicas > 1, the dependent is
-    still DOWN — ``failed_health=DOWN`` encodes a total outage, the
-    upstream's replicas are already counted as exhausted."""
+def test_cascade_required_dep_upstream_down_multi_replica_cascades_degraded():
+    """Rule 3: when the failed upstream has replicas > 1, the fault scenario
+    represents ONE replica failing; remaining replicas absorb load at reduced
+    capacity, so the dependent is DEGRADED (not DOWN).
+    Contrast with Rule 2 (replicas=1 upstream -> dependent is DOWN)."""
     graph = InfraGraph()
     graph.add_component(Component(
         id="db", name="DB", type=ComponentType.DATABASE, replicas=3,
@@ -967,7 +968,7 @@ def test_cascade_required_dep_upstream_down_always_cascades_down():
 
     app_effects = [e for e in chain.effects if e.component_id == "app"]
     assert len(app_effects) >= 1
-    assert app_effects[0].health == HealthStatus.DOWN
+    assert app_effects[0].health == HealthStatus.DEGRADED
 
 
 # ---------------------------------------------------------------------------

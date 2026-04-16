@@ -194,6 +194,7 @@ def simulate(
     slack_webhook: str | None = typer.Option(None, "--slack-webhook", help="Slack webhook URL for notifications"),
     pagerduty_key: str | None = typer.Option(None, "--pagerduty-key", help="PagerDuty routing key for critical alerts"),
     max_scenarios: int = typer.Option(0, "--max-scenarios", help="Max scenarios to test (0 = engine default)"),
+    max_depth: int = typer.Option(20, "--max-depth", help="Max cascade propagation depth (D_max, default 20)"),
     json_output: bool = typer.Option(False, "--json", help="Output JSON summary"),
     baseline: Path | None = typer.Option(None, "--baseline", help="Compare against a previous baseline JSON file"),
     save_baseline: Path | None = typer.Option(None, "--save-baseline", help="Save current results as a baseline JSON file"),
@@ -262,7 +263,7 @@ def simulate(
 
         if not json_output:
             console.print(f"[cyan]Running dynamic simulation ({len(graph.components)} components)...[/]")
-        dyn_engine = DynamicSimulationEngine(graph)
+        dyn_engine = DynamicSimulationEngine(graph, max_depth=max_depth)
         report = dyn_engine.run_all_dynamic_defaults()
         # report is a DynamicSimulationReport; extract .results list
         results = getattr(report, "results", report) if not isinstance(report, list) else report
@@ -274,7 +275,7 @@ def simulate(
 
     if not json_output:
         console.print(f"[cyan]Running chaos simulation ({len(graph.components)} components)...[/]")
-    engine = SimulationEngine(graph)
+    engine = SimulationEngine(graph, max_depth=max_depth)
     report = engine.run_all_defaults(max_scenarios=max_scenarios)
 
     # Auto-record to history

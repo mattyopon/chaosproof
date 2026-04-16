@@ -23,7 +23,7 @@ Key proven properties (see formal spec Section 3):
 2. **Causality** — a component fails only if a dependency has failed.
 3. **Circuit Breaker Correctness** — CB trip stops cascade at that edge.
 4. **Termination** — CPS terminates in O(|V| + |E|) for acyclic graphs;
-   depth limit D_max=20 guarantees termination for cyclic graphs.
+   depth limit D_max (default 20, configurable) guarantees termination for cyclic graphs.
 """
 
 from __future__ import annotations
@@ -132,8 +132,11 @@ class CascadeEngine:
     - ``simulate_traffic_spike``: Rule 1 applied per-component (capacity check)
     """
 
-    def __init__(self, graph: InfraGraph) -> None:
+    def __init__(self, graph: InfraGraph, max_depth: int = 20) -> None:
+        if max_depth < 1:
+            raise ValueError(f"max_depth must be >= 1, got {max_depth}")
         self.graph = graph
+        self.max_depth = max_depth
 
     def simulate_fault(self, fault: Fault) -> CascadeChain:
         """Simulate a single fault and calculate cascade effects.
@@ -285,7 +288,7 @@ class CascadeEngine:
         # discovered first.  Termination: latency grows strictly on
         # every re-enqueue, but to handle cyclic graphs we also bound
         # by the depth cap already used in ``_propagate``.
-        MAX_LATENCY_DEPTH = 20
+        MAX_LATENCY_DEPTH = self.max_depth
         worst_latency: dict[str, float] = {slow_component_id: 0.0}
         # component_id -> index of its effect in chain.effects, for in-place
         # replacement when a worse latency path arrives.
@@ -302,6 +305,16 @@ class CascadeEngine:
                 effect_index[comp_id] = len(chain.effects)
                 chain.effects.append(effect)
 
+        def _current_health(comp_id: str) -> HealthStatus:
+            """Return the currently recorded health for ``comp_id``, or HEALTHY."""
+            if comp_id in effect_index:
+                return chain.effects[effect_index[comp_id]].health
+            return HealthStatus.HEALTHY
+
+        def _max_health(a: HealthStatus, b: HealthStatus) -> HealthStatus:
+            """Return the worse (higher rank) of two HealthStatus values."""
+            return a if self._HEALTH_RANK[a] >= self._HEALTH_RANK[b] else b
+
         # Seed the queue with components that depend on the slow component.
         for dep_comp in self.graph.get_dependents(slow_component_id):
             edge = self.graph.get_dependency_edge(dep_comp.id, slow_component_id)
@@ -313,13 +326,18 @@ class CascadeEngine:
 
             # CPS Rule 6: Circuit breaker trip — cascade stopped at this edge
             # (formal spec Property 3: CB Correctness)
+            # max(DEGRADED, current_health) preserves Theorem 3 Monotonicity:
+            # a component already at OVERLOADED/DOWN must not improve to DEGRADED.
             if edge and edge.circuit_breaker.enabled:
                 cb_timeout = dep_comp.capacity.timeout_seconds * 1000
                 if cb_timeout > 0 and accumulated > cb_timeout:
+                    cb_health = _max_health(
+                        HealthStatus.DEGRADED, _current_health(dep_comp.id)
+                    )
                     _register_effect(dep_comp.id, CascadeEffect(
                         component_id=dep_comp.id,
                         component_name=dep_comp.name,
-                        health=HealthStatus.DEGRADED,
+                        health=cb_health,
                         reason=(
                             f"Circuit breaker TRIPPED on edge to {slow_component_id}: "
                             f"latency {accumulated:.0f}ms > timeout {cb_timeout:.0f}ms, "
@@ -428,13 +446,17 @@ class CascadeEngine:
                         continue
 
                     # Circuit breaker check on the dependency edge
+                    # max(DEGRADED, current_health) — Monotonicity (Theorem 3).
                     if edge and edge.circuit_breaker.enabled:
                         cb_timeout = next_dep.capacity.timeout_seconds * 1000
                         if cb_timeout > 0 and next_latency > cb_timeout:
+                            cb_health = _max_health(
+                                HealthStatus.DEGRADED, _current_health(next_dep.id)
+                            )
                             _register_effect(next_dep.id, CascadeEffect(
                                 component_id=next_dep.id,
                                 component_name=next_dep.name,
-                                health=HealthStatus.DEGRADED,
+                                health=cb_health,
                                 reason=(
                                     f"Circuit breaker TRIPPED on edge to {comp_id}: "
                                     f"latency {next_latency:.0f}ms > timeout {cb_timeout:.0f}ms, "
@@ -704,13 +726,13 @@ class CascadeEngine:
         Termination: each node can be revisited at most
         ``|HEALTH_RANK| = 4`` times (one per strict upgrade along the
         HEALTHY→DEGRADED→OVERLOADED→DOWN chain).  Combined with the
-        hard depth bound ``D_max=20`` this guarantees Theorem 1 even on
+        hard depth bound ``D_max`` (``self.max_depth``) this guarantees Theorem 1 even on
         cyclic graphs.  The caller MUST seed ``worst_health`` with the
         initial fault target so that cycles back to the trigger do not
         re-emit an effect for it.
         """
         # CPS D_max depth limit — guarantees termination for cyclic graphs.
-        if depth > 20:
+        if depth > self.max_depth:
             return
 
         failed_comp = self.graph.get_component(failed_id)
@@ -725,9 +747,12 @@ class CascadeEngine:
             if not edge:
                 continue
 
-            # Calculate cascade effect based on dependency type and weight
+            # Calculate cascade effect based on dependency type and weight.
+            # Pass edge_latency_ms so that async (Rule 5) can advance
+            # simulation time T by τ inside _calculate_cascade_effect.
             cascade_health, reason, time_delta = self._calculate_cascade_effect(
-                dep_comp, failed_comp, failed_health, edge.dependency_type, edge.weight
+                dep_comp, failed_comp, failed_health, edge.dependency_type, edge.weight,
+                edge_latency_ms=edge.latency_ms,
             )
 
             if cascade_health == HealthStatus.HEALTHY:
@@ -800,29 +825,38 @@ class CascadeEngine:
         failed_health: HealthStatus,
         dep_type: str,
         weight: float,
+        edge_latency_ms: float = 0.0,
     ) -> tuple[HealthStatus, str, int]:
         """Calculate how a failure cascades to a dependent component.
 
         Implements the transition functions for CPS Rules 2-5:
-        - Rule 2: Required dep with upstream DOWN -> DOWN (with timeout
-          dt).  By the time ``failed_health == DOWN`` is observed the
-          LOGICAL upstream is fully unavailable — its replicas and
-          failover paths have collectively been declared dead by the
-          fault scenario.  Neither the dependent's replica count nor
-          the upstream's replica count can substitute for that total
-          outage, so the cascade is hard.
+        - Rule 2 (single replica): Required dep with upstream DOWN and
+          ``failed.replicas == 1`` -> DOWN (with timeout dt).  A
+          singleton upstream is fully unavailable; no redundancy exists
+          to absorb the failure, so the cascade is hard.
         - Rule 2b (soft escape): weight <= 0.1 -> DEGRADED.  Soft
           required edges model best-effort / fallback-ready calls
           (retry-budget absorbed, circuit-broken, cached last-known-
           good), so they do not propagate a hard failure.
-        - Rule 3: Optional dep, upstream DOWN -> DEGRADED.
-        - Rule 4: Async dep, upstream DOWN -> DEGRADED (60s delay).
-        - Rule 5: Non-DOWN upstream (DEGRADED/OVERLOADED) -> latency-
+        - Rule 3 (multiple replicas): Required dep with upstream DOWN
+          and ``failed.replicas > 1`` -> DEGRADED.  When the upstream
+          has multiple replicas, remaining replicas can absorb load at
+          reduced capacity; the dependent is degraded but not failed.
+        - Rule 4: Optional dep, upstream DOWN -> DEGRADED (10s delay).
+        - Rule 5: Async dep, upstream DOWN -> DEGRADED; propagation is
+          delayed by the edge latency τ (ms → s) in addition to the 60s
+          base, modelling queue/event-bus propagation lag.  Non-DOWN
+          upstream does not cascade.
+        - Rule 6: Non-DOWN upstream (DEGRADED/OVERLOADED) -> latency-
           driven degradation on the dependent.
+
+        ``edge_latency_ms`` is used by Rule 5 (async) to advance the
+        simulation time T by τ, differentiating delayed async propagation
+        from the immediate optional propagation of Rule 4.
 
         Returns (health_status, reason, time_delta_seconds).
         """
-        # Optional dependencies cause degradation, not failure
+        # Optional dependencies cause degradation, not failure (Rule 4)
         if dep_type == "optional":
             if failed_health == HealthStatus.DOWN:
                 return (
@@ -832,22 +866,32 @@ class CascadeEngine:
                 )
             return HealthStatus.HEALTHY, "", 0
 
-        # Async dependencies cause delayed degradation
+        # Async dependencies cause delayed degradation (Rule 5).
+        # Unlike optional (Rule 4, immediate), async propagation is delayed
+        # by the edge latency τ: time_delta = 60s base + τ (ms → s).
+        # This advances simulation time T, so CascadeEffect.estimated_time_seconds
+        # reflects the queue/event-bus propagation lag.
         if dep_type == "async":
             if failed_health == HealthStatus.DOWN:
+                tau_ms = edge_latency_ms
+                tau_seconds = max(1, round(tau_ms / 1000.0)) if tau_ms > 0 else 0
                 return (
                     HealthStatus.DEGRADED,
-                    f"Async dependency {failed.name} is down, queue building up",
-                    60,
+                    f"Async dependency {failed.name} is down, queue building up "
+                    f"(propagation delay: {60 + tau_seconds}s, edge τ={tau_ms:.0f}ms)",
+                    60 + tau_seconds,
                 )
             return HealthStatus.HEALTHY, "", 0
 
-        # Required dependency, upstream fully DOWN.  ``failed_health == DOWN``
-        # already represents a total outage of the logical upstream (all
-        # replicas / failover collectively exhausted), so the only way to
-        # avoid cascading DOWN is an explicit soft-weight edge in which
-        # the caller signals a fallback.  The dependent's own replicas do
-        # not help — every replica hits the same dead dependency.
+        # Required dependency, upstream fully DOWN.
+        # Rule 3 (replicas > 1): when the failing upstream has multiple replicas,
+        # the target itself is modelled as DOWN (Rule 1) but the cascade to
+        # dependents is attenuated to DEGRADED — the redundancy absorbs the
+        # impact so dependents lose capacity but are not fully failed.
+        # Rule 2 (singleton): a single-replica upstream going DOWN means total
+        # outage of that logical component → dependent is DOWN.
+        # Soft-weight edge (weight ≤ 0.1) always attenuates to DEGRADED regardless
+        # of replica count (fallback / circuit-broken call).
         if failed_health == HealthStatus.DOWN:
             if weight <= 0.1:
                 return (
@@ -855,6 +899,14 @@ class CascadeEngine:
                     f"Required-but-soft dependency {failed.name} is down "
                     f"(edge weight={weight:.2f}); assumed fallback absorbs impact",
                     5,
+                )
+            if failed.replicas > 1:
+                return (
+                    HealthStatus.DEGRADED,
+                    f"Required dependency {failed.name} is down "
+                    f"(replicas={failed.replicas}); remaining replicas absorb load "
+                    f"at reduced capacity (Rule 3)",
+                    10,
                 )
             timeout = int(dependent.capacity.timeout_seconds)
             retry_time = int(timeout * dependent.capacity.retry_multiplier)
