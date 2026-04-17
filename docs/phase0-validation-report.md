@@ -186,3 +186,90 @@ No kind clusters found.
 - `tests/fixtures/kind-config.yaml` — kind cluster config (control-plane + worker, named `faultray-test`).
 - `tests/integration/test_k8s_discovery.py` — pytest integration test, marked `@pytest.mark.integration`, skipped automatically if kind/docker/kubectl aren't reachable from the session. Manual verification above is the primary evidence; the test is the reproducer.
 - This report section.
+
+---
+
+## Terraform Check (Task 3)
+
+**Goal.** Verify that `faultray tf-check` parses a Terraform plan JSON, detects destructive changes, reports blast radius, and that `--fail-on-regression` actually gates CI (non-zero exit) when resilience regresses.
+
+### Commands run (verbatim)
+
+```bash
+# Create sample plan fixture (aws_instance.web + aws_db_instance.primary; DB scheduled for delete)
+cat tests/fixtures/sample-tf-plan.json  # see fixture file for full content
+
+# 1. Basic analysis
+python3 -m faultray tf-check tests/fixtures/sample-tf-plan.json
+# => EXIT 0
+
+# 2. With --fail-on-regression
+python3 -m faultray tf-check tests/fixtures/sample-tf-plan.json --fail-on-regression
+# => EXIT 0  ⚠️  expected 1 (DB delete should regress)
+
+# 3. JSON output
+python3 -m faultray tf-check tests/fixtures/sample-tf-plan.json --json
+# => EXIT 0
+
+# 4. With stricter --min-score 99 + --fail-on-regression
+python3 -m faultray tf-check tests/fixtures/sample-tf-plan.json --fail-on-regression --min-score 99
+# => EXIT 0  (score_after=100.0 > 99, so threshold not triggered either)
+```
+
+### Text output (verbatim, trimmed)
+
+```
+╭────────────────────────── FaultRay Terraform Check ──────────────────────────╮
+│ Terraform Plan Analysis                                                      │
+│   Resources Added:     +0                                                    │
+│   Resources Changed:   0                                                     │
+│   Resources Destroyed: -1                                                    │
+│   Score Before: 100.0                                                        │
+│   Score After:  100.0 (0.0)                                                  │
+│   Recommendation: HIGH RISK                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                         Resource Changes
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Address                             ┃ Actions         ┃  Risk  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ aws_db_instance.primary             │ delete          │   10   │
+└─────────────────────────────────────┴─────────────────┴────────┘
+```
+
+### JSON output (verbatim)
+
+```json
+{
+  "plan_file": "tests/fixtures/sample-tf-plan.json",
+  "resources_added": 0,
+  "resources_changed": 0,
+  "resources_destroyed": 1,
+  "score_before": 100.0,
+  "score_after": 100.0,
+  "score_delta": 0.0,
+  "new_risks": [],
+  "resolved_risks": [],
+  "recommendation": "high risk"
+}
+```
+
+### Judgement
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| 1 | plan JSON parseable | ✓ | 4 invocations exited with correct resource counts (Destroyed: -1, DB address correctly surfaced). |
+| 2 | resource_changes から DB 削除を検出 | ✓ | Text table + JSON both show `aws_db_instance.primary` with action `delete` and Risk `10`. |
+| 3 | blast radius 算出 | △ | Risk column shows `10` (correctly high for DB delete), but `score_before` == `score_after` == `100.0`, `score_delta: 0.0`, `new_risks: []`. Risk/recommendation layer works; score-delta layer does not factor destructive changes into the numeric score. Internal inconsistency. |
+| 4 | `--fail-on-regression` で exit code 1 | ✗ | **Bug.** DB delete produces Recommendation=HIGH RISK but exit code 0. Because `score_delta` is always 0 for plans that didn't start from an existing model, the regression check never fires. `--min-score 99` with `--fail-on-regression` also returns 0 (score_after=100.0 still passes threshold). CI/CD gating via this flag is non-functional on this scenario. |
+
+### Phase 1 candidate issues discovered
+
+1. **🚨 `tf-check --fail-on-regression` is broken for destructive-only plans** — The gate decision is driven purely by `score_after < score_before`, but the simulation uses the same topology model for both sides (no "before" reflects the pre-plan state when the model starts empty). Destructive resource changes produce Risk=10 in the per-resource table and Recommendation=HIGH RISK, yet `score_delta` stays `0.0` and exit code is 0. **This makes the CI gate ineffective.** Recommended fix: wire `--fail-on-regression` to also consider `recommendation == "high risk"` and/or the max row risk (≥ threshold). Regression test: the `sample-tf-plan.json` fixture added in this task can be used as the failing case.
+2. **`new_risks` is always empty in the sample case** — Even though a DB deletion is the riskiest possible change, `new_risks: []` in JSON output. The risk enumeration isn't wired to the change analyzer. Phase 1 candidate to fix alongside #1.
+3. **Score-delta layer ignores destructive changes** — `score_before` and `score_after` are both 100.0 despite `Resources Destroyed: -1`. The scoring pipeline needs to feed plan-applied state into the "after" model (not the current-state model).
+
+### Files produced by this task
+
+- `tests/fixtures/sample-tf-plan.json` — AWS EC2 + RDS plan with DB scheduled for delete. Minimal, no AWS account needed.
+- This report section.

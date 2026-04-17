@@ -11,6 +11,7 @@ build/
 !vscode-extension/package.json
 !vscode-extension/tsconfig.json
 !mcp-server.json
+!tests/fixtures/*.json
 .ruff_cache/
 .pytest_cache/
 faultray-model.json

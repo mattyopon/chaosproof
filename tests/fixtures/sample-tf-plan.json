@@ -1,0 +1,54 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.11.4",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_instance.web",
+          "type": "aws_instance",
+          "name": "web",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "ami": "ami-0abcdef1234567890",
+            "instance_type": "t3.micro",
+            "tags": {"Name": "web-server"}
+          }
+        },
+        {
+          "address": "aws_db_instance.primary",
+          "type": "aws_db_instance",
+          "name": "primary",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "engine": "postgres",
+            "instance_class": "db.t3.micro",
+            "allocated_storage": 20
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_instance.web",
+      "type": "aws_instance",
+      "name": "web",
+      "change": {
+        "actions": ["no-op"],
+        "before": {"instance_type": "t3.micro"},
+        "after": {"instance_type": "t3.micro"}
+      }
+    },
+    {
+      "address": "aws_db_instance.primary",
+      "type": "aws_db_instance",
+      "name": "primary",
+      "change": {
+        "actions": ["delete"],
+        "before": {"engine": "postgres", "instance_class": "db.t3.micro", "allocated_storage": 20},
+        "after": null
+      }
+    }
+  ]
+}
