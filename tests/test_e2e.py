@@ -8,7 +8,9 @@ Each test is independent and uses temporary files.
 import json
 import os
 import subprocess
+import sys
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -75,14 +77,28 @@ MOCK_TF_PLAN = json.dumps(
 )
 
 
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+
+
 def run(cmd: str, timeout: int = 60) -> subprocess.CompletedProcess[str]:
-    """Run a shell command and return the CompletedProcess."""
+    """Run a faultray CLI command and return the CompletedProcess.
+
+    *cmd* should look like ``"faultray <subcommand> [args …]"``.
+    The leading ``faultray`` token is replaced with
+    ``[sys.executable, "-m", "faultray"]`` so the test does not depend on
+    the CLI entry-point being on ``$PATH``.
+    """
+    parts = cmd.split()
+    # Strip the leading "faultray" token if present
+    if parts and parts[0] == "faultray":
+        parts = parts[1:]
+    argv = [sys.executable, "-m", "faultray"] + parts
     return subprocess.run(
-        cmd,
-        shell=True,
+        argv,
         capture_output=True,
         text=True,
         timeout=timeout,
+        cwd=_PROJECT_ROOT,
     )
 
 
