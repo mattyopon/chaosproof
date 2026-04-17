@@ -380,3 +380,95 @@ Model uses schema v1.0, migrating to v4.0
 
 - This report section.
 - (No new fixtures; `before-model.json` / `after-model.json` are `/tmp` scratch files built from the Task 2 scan output.)
+
+---
+
+## Financial Impact (Task 5)
+
+**Goal.** Verify `faultray financial` against the real Task 2 K8s topology (3 components, 2 deps). Confirm component-level annual loss is computed, `--cost-per-hour` actually overrides pricing, and JSON output is pipe-friendly.
+
+### Commands run (verbatim)
+
+```bash
+# 1. Default run on real K8s topology
+python3 -m faultray financial /tmp/k8s-topology.json
+# => EXIT 0
+
+# 2. With explicit --cost-per-hour + JSON
+python3 -m faultray financial /tmp/k8s-topology.json --cost-per-hour 10000 --json
+# => EXIT 0
+
+# 3. Sensitivity check — cost-per-hour = 1 vs 1e6
+python3 -m faultray financial /tmp/k8s-topology.json --cost-per-hour 1       --json  # total_annual_loss: 1.01
+python3 -m faultray financial /tmp/k8s-topology.json --cost-per-hour 1000000 --json  # total_annual_loss: 1,014,240.84
+```
+
+### Default-pricing report (verbatim, trimmed)
+
+```
+╭────────────────────── FaultRay Financial Impact Report ──────────────────────╮
+│ Resilience Score: 88/100                                                     │
+│ Estimated Annual Downtime: 1.0 hours                                         │
+│ Estimated Annual Loss:     $10,140                                           │
+│ Top Risks by Financial Impact:                                               │
+│   1. deploy-faultray-demo-redis (database) -> $10K/year (1.0h downtime)      │
+│   2. deploy-faultray-demo-nginx (app_server) -> $2/year (0.0h downtime)      │
+│ Recommended Fixes (by ROI):                                                  │
+│   1. Add replica for deploy-faultray-demo-redis (database) -> $24K/yr ->     │
+│      saves $10K (0x ROI)                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### JSON excerpt (verbatim)
+
+```json
+{
+    "resilience_score": 88.0,
+    "total_annual_loss": 10142.41,
+    "total_downtime_hours": 1.01,
+    "roi": 0.4,
+    "top_risks": [
+        {
+            "component_id": "deploy-faultray-demo-redis",
+            "component_type": "database",
+            "annual_downtime_hours": 1.01,
+            "annual_loss": 10137.72,
+            "risk_description": "Single point of failure (no replicas); 2 dependent component(s)"
+        }
+    ],
+    "component_impacts": [
+        {"component_id": "deploy-faultray-demo-redis",
+         "cost_per_hour": 10000.0,
+         "annual_loss": 10137.72}
+    ]
+}
+```
+
+### `--cost-per-hour` sensitivity table (verbatim)
+
+| `--cost-per-hour` | total_annual_loss (JSON) | component_impacts[0].cost_per_hour |
+|---|---|---|
+| 1 | $1.01 | 1.0 |
+| 10,000 | $10,142.41 | 10000.0 |
+| 1,000,000 | $1,014,240.84 | 1,000,000.0 |
+
+Loss scales linearly with `--cost-per-hour` — override is plumbed end-to-end.
+
+### Judgement
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| 1 | component 別 annual loss 算出 | ✓ | 3 rows in `component_impacts`, each with `annual_loss` + `annual_downtime_hours`. Redis (SPOF database) carries the loss; the two `app_server` components ≈ $0-$5. |
+| 2 | default revenue_per_hour 動作 | ✓ | Default run returns $10,140 annual loss on redis — implicit per-type default ≈ $10K/hr for `database`. Matches CLI help: "Default cost estimates are conservative." |
+| 3 | `--cost-per-hour` が動作 | ✓ | Loss scales linearly from $1 → $10K → $1M across three invocations. Override is applied in the pricing pipeline, not discarded. |
+
+### Phase 1 candidate issues (minor)
+
+1. **Column widths clipped in rich table** — the rendered table uses columns so narrow that header text (`Annual %`, `Downtime`, `$/hr`) is truncated and values are cut mid-digit. Low-severity polish.
+2. **"Overall ROI: 0x" in text but JSON says `"roi": 0.4`** — the text renderer floors the ROI to an integer ("0x") while JSON preserves `0.4`. Users who skim only the text will miss that the recommended fix actually recoups 40% of annual loss. Render 1-decimal ROI in text too.
+3. **No aggregated "loss by component type"** — each row is a component instance. Would be useful to roll up by `type` (e.g. `database: $10K`, `app_server: $2`) for larger topologies. Feature request, not a bug.
+
+### Files produced by this task
+
+- This report section.
+- (No new fixtures; reuses `/tmp/k8s-topology.json` from Task 2.)
