@@ -273,3 +273,110 @@ python3 -m faultray tf-check tests/fixtures/sample-tf-plan.json --fail-on-regres
 
 - `tests/fixtures/sample-tf-plan.json` — AWS EC2 + RDS plan with DB scheduled for delete. Minimal, no AWS account needed.
 - This report section.
+
+---
+
+## Chaos Regression Gate (Task 4)
+
+**Goal.** Verify `faultray gate check` and `faultray gate terraform-plan` against real before/after models; confirm that BLOCKED status corresponds to a non-zero exit code as the `--help` claims ("Exit code 0 = passed, 1 = blocked.").
+
+### Before/After model construction
+
+Used the real k8s topology from Task 2 (`/tmp/k8s-topology.json`) as `before`. Built `after` by removing the redis component (and its 2 incoming dependencies). Script:
+
+```python
+import json, copy
+d = json.load(open('/tmp/k8s-topology.json'))
+open('/tmp/before-model.json','w').write(json.dumps(d, indent=2))
+after = copy.deepcopy(d)
+redis = next(c for c in after['components'] if 'redis' in c['name'])
+after['components'].remove(redis)
+after['dependencies'] = [x for x in after['dependencies']
+                        if x['source_id'] != redis['id'] and x['target_id'] != redis['id']]
+open('/tmp/after-model.json','w').write(json.dumps(after, indent=2))
+```
+
+Result: `before` has 3 components + 2 deps; `after` has 2 components + 0 deps (redis removed).
+
+### Commands run (verbatim)
+
+```bash
+# 1. gate check (text)
+python3 -m faultray gate check --before /tmp/before-model.json --after /tmp/after-model.json
+# => Status: BLOCKED, EXIT 0   ⚠️ expected 1
+
+# 2. gate check (JSON)
+python3 -m faultray gate check --before /tmp/before-model.json --after /tmp/after-model.json --json
+# => "passed": false, EXIT 0  ⚠️ expected 1
+
+# 3. gate terraform-plan (reuses Task 3 fixture)
+python3 -m faultray gate terraform-plan tests/fixtures/sample-tf-plan.json --model /tmp/before-model.json
+# => Status: BLOCKED, delta -88.0, EXIT 0  ⚠️ expected 1
+```
+
+### `gate check` output (verbatim, trimmed)
+
+```
+╭─────────────────────────── Chaos Regression Gate ────────────────────────────╮
+│ Status: BLOCKED                                                              │
+│ Before Score: 88.0                                                           │
+│ After Score: 100.0                                                           │
+│ Delta: +12.0                                                                 │
+│ Blocking Reason: 1 new critical finding(s) introduced                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+... 1 CRITICAL: Pair failure app+nginx; 10 RESOLVED findings (cascading
+meltdown, network partition, single/pair failures involving redis, etc.)
+Recommendation: NOT be merged without remediation.
+```
+
+### `gate check --json` output (verbatim)
+
+```json
+{
+    "passed": false,
+    "before_score": 88.0,
+    "after_score": 100.0,
+    "score_delta": 12.0,
+    "new_critical_findings": [
+        "Pair failure: deploy-faultray-demo-app + deploy-faultray-demo-nginx"
+    ],
+    "new_warnings": [],
+    "resolved_findings": [ "Cascading meltdown (root-cause)", "..." ],
+    "blocking_reason": "1 new critical finding(s) introduced"
+}
+```
+
+### `gate terraform-plan` output (verbatim, trimmed)
+
+```
+Model uses schema v1.0, migrating to v4.0
+╭─────────────────────────── Chaos Regression Gate ────────────────────────────╮
+│ Status: BLOCKED                                                              │
+│ Before Score: 88.0                                                           │
+│ After Score: 0.0                                                             │
+│ Delta: -88.0                                                                 │
+│ Blocking Reason: Resilience score 0.0 is below minimum threshold 60.0;       │
+│                  Score dropped by 88.0 points (max allowed: 5.0)             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### Judgement
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| 1 | before/after を比較できる | ✓ | Both text and JSON outputs correctly render before_score=88.0, after_score=100.0, delta=12.0, and enumerate new/resolved findings. |
+| 2 | resilience score の差分を報告 | ✓ | Numeric delta shown in both text + JSON; findings categorized (new critical / new warning / resolved). |
+| 3 | score 低下時に exit code 1 を返す | ✗ | **Bug.** Status=BLOCKED, JSON `passed: false`, `new_critical_findings` non-empty — yet `echo $?` returns `0`. `--help` explicitly promises `Exit code 0 = passed, 1 = blocked`. |
+| 4 | gate terraform-plan サブコマンド動作 | △ | Analysis is correct (Score 88→0, blocking reason cites min-score + max-drop violations), but exit code is also 0 despite Status=BLOCKED. |
+
+### Phase 1 candidate issues discovered
+
+1. **🚨 `gate check` exits 0 even when `passed: false`** — Directly contradicts the documented CI/CD contract (`--help`: "Exit code 0 = passed, 1 = blocked."). Any GitHub Actions / Jenkins pipeline relying on this gate silently passes every check. JSON payload carries `"passed": false` correctly; the CLI wrapper isn't mapping it to `sys.exit(1)`. One-line fix candidate: `sys.exit(0 if result['passed'] else 1)`.
+2. **🚨 `gate terraform-plan` exits 0 even when BLOCKED** — Same class of bug. Score dropped -88, below min-score threshold, max-drop threshold violated — yet exit 0.
+3. **Combined with Task 3 finding, ALL THREE CI/CD exit-gates are broken**: `tf-check --fail-on-regression`, `gate check`, `gate terraform-plan`. Any production user relying on FaultRay to gate merges has a false sense of security.
+4. **Schema migration warning in output** — `gate terraform-plan` emits `Model uses schema v1.0, migrating to v4.0` to stdout, which pollutes JSON output if the user selects `--json`. Route such messages to stderr to keep stdout pure JSON.
+
+### Files produced by this task
+
+- This report section.
+- (No new fixtures; `before-model.json` / `after-model.json` are `/tmp` scratch files built from the Task 2 scan output.)
