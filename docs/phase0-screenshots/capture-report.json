@@ -1,0 +1,90 @@
+[
+  {
+    "url": "http://localhost:3000/whatif",
+    "httpStatus": 200,
+    "title": "Log In | FaultRay",
+    "status": "ok",
+    "tookMs": 5229,
+    "bodyTextSnippet": "FaultRay\nFeatures\nCompare\nPricing\nDocs\nGitHub\nGet a Demo\nEnglish\n日本語\nDeutsch\nFrançais\n中文\n한국어\nEspañol\nPortuguês\nSign In\n⚠ Research prototype — outputs are NOT validated for DORA, FISC, or any regulatory audit. Do not rely on FaultRay evidence for compliance decisions without independent legal and technical review.\nLogin\nWhy SRE teams choose FaultRay\n\nChaos engineering that proves resilience — without the risk.\n\n⚡\n\n2,000+ failure scenarios\n\nFrom single AZ outages to cascading multi-region failures — all simulated, zero production impact.\n\n🛡\n\nProduction stays safe\n\nPure mathematical simulation. We never touch your infrastructure. Ever.\n\n📊\n\nDORA-aligned research in 1 click\n\nAuto-generate research-draft resilience reports aligned to DORA Article 25 requirements.\n\n⚡\nGet started in 30 seconds\n💳\nNo credit card required\n🔓\n14-day full access\n\nTrusted by SRE teams at companies of all sizes.\n\nWelcome to FaultRay\n\nSign in to access your chaos engineering dashboard\n\nContinue with Google\nor\nContinue with Email\n\nBy signing in, you agree to our Terms of Service and Privacy Policy.\n\nWe use cookies to analyze traffic and improve your experience. Analytics cookies are only loaded with your consent. Privacy Policy\n\nDecline\nAccept",
+    "consoleErrors": [
+      "[error] eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+      "[error] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template)."
+    ],
+    "networkCalls": [
+      "GET http://localhost:3000/whatif",
+      "GET http://localhost:3000/login?redirectTo=%2Fwhatif",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/__nextjs_font/geist-latin.woff2",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames"
+    ]
+  },
+  {
+    "url": "http://localhost:3000/topology-map",
+    "httpStatus": 200,
+    "title": "Log In | FaultRay",
+    "status": "ok",
+    "tookMs": 1531,
+    "bodyTextSnippet": "FaultRay\nFeatures\nCompare\nPricing\nDocs\nGitHub\nGet a Demo\nEnglish\n日本語\nDeutsch\nFrançais\n中文\n한국어\nEspañol\nPortuguês\nSign In\n⚠ Research prototype — outputs are NOT validated for DORA, FISC, or any regulatory audit. Do not rely on FaultRay evidence for compliance decisions without independent legal and technical review.\nLogin\nWhy SRE teams choose FaultRay\n\nChaos engineering that proves resilience — without the risk.\n\n⚡\n\n2,000+ failure scenarios\n\nFrom single AZ outages to cascading multi-region failures — all simulated, zero production impact.\n\n🛡\n\nProduction stays safe\n\nPure mathematical simulation. We never touch your infrastructure. Ever.\n\n📊\n\nDORA-aligned research in 1 click\n\nAuto-generate research-draft resilience reports aligned to DORA Article 25 requirements.\n\n⚡\nGet started in 30 seconds\n💳\nNo credit card required\n🔓\n14-day full access\n\nTrusted by SRE teams at companies of all sizes.\n\nWelcome to FaultRay\n\nSign in to access your chaos engineering dashboard\n\nContinue with Google\nor\nContinue with Email\n\nBy signing in, you agree to our Terms of Service and Privacy Policy.\n\nWe use cookies to analyze traffic and improve your experience. Analytics cookies are only loaded with your consent. Privacy Policy\n\nDecline\nAccept",
+    "consoleErrors": [
+      "[error] eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+      "[error] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template)."
+    ],
+    "networkCalls": [
+      "GET http://localhost:3000/topology-map",
+      "GET http://localhost:3000/login?redirectTo=%2Ftopology-map",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/__nextjs_font/geist-latin.woff2",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames"
+    ]
+  },
+  {
+    "url": "http://localhost:3000/cost",
+    "httpStatus": 200,
+    "title": "Log In | FaultRay",
+    "status": "ok",
+    "tookMs": 1560,
+    "bodyTextSnippet": "FaultRay\nFeatures\nCompare\nPricing\nDocs\nGitHub\nGet a Demo\nEnglish\n日本語\nDeutsch\nFrançais\n中文\n한국어\nEspañol\nPortuguês\nSign In\n⚠ Research prototype — outputs are NOT validated for DORA, FISC, or any regulatory audit. Do not rely on FaultRay evidence for compliance decisions without independent legal and technical review.\nLogin\nWhy SRE teams choose FaultRay\n\nChaos engineering that proves resilience — without the risk.\n\n⚡\n\n2,000+ failure scenarios\n\nFrom single AZ outages to cascading multi-region failures — all simulated, zero production impact.\n\n🛡\n\nProduction stays safe\n\nPure mathematical simulation. We never touch your infrastructure. Ever.\n\n📊\n\nDORA-aligned research in 1 click\n\nAuto-generate research-draft resilience reports aligned to DORA Article 25 requirements.\n\n⚡\nGet started in 30 seconds\n💳\nNo credit card required\n🔓\n14-day full access\n\nTrusted by SRE teams at companies of all sizes.\n\nWelcome to FaultRay\n\nSign in to access your chaos engineering dashboard\n\nContinue with Google\nor\nContinue with Email\n\nBy signing in, you agree to our Terms of Service and Privacy Policy.\n\nWe use cookies to analyze traffic and improve your experience. Analytics cookies are only loaded with your consent. Privacy Policy\n\nDecline\nAccept",
+    "consoleErrors": [
+      "[error] eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+      "[error] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template)."
+    ],
+    "networkCalls": [
+      "GET http://localhost:3000/cost",
+      "GET http://localhost:3000/login?redirectTo=%2Fcost",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/__nextjs_font/geist-latin.woff2",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames"
+    ]
+  },
+  {
+    "url": "http://localhost:3000/simulate",
+    "httpStatus": 200,
+    "title": "Log In | FaultRay",
+    "status": "ok",
+    "tookMs": 1673,
+    "bodyTextSnippet": "FaultRay\nFeatures\nCompare\nPricing\nDocs\nGitHub\nGet a Demo\nEnglish\n日本語\nDeutsch\nFrançais\n中文\n한국어\nEspañol\nPortuguês\nSign In\n⚠ Research prototype — outputs are NOT validated for DORA, FISC, or any regulatory audit. Do not rely on FaultRay evidence for compliance decisions without independent legal and technical review.\nLogin\nWhy SRE teams choose FaultRay\n\nChaos engineering that proves resilience — without the risk.\n\n⚡\n\n2,000+ failure scenarios\n\nFrom single AZ outages to cascading multi-region failures — all simulated, zero production impact.\n\n🛡\n\nProduction stays safe\n\nPure mathematical simulation. We never touch your infrastructure. Ever.\n\n📊\n\nDORA-aligned research in 1 click\n\nAuto-generate research-draft resilience reports aligned to DORA Article 25 requirements.\n\n⚡\nGet started in 30 seconds\n💳\nNo credit card required\n🔓\n14-day full access\n\nTrusted by SRE teams at companies of all sizes.\n\nWelcome to FaultRay\n\nSign in to access your chaos engineering dashboard\n\nContinue with Google\nor\nContinue with Email\n\nBy signing in, you agree to our Terms of Service and Privacy Policy.\n\nWe use cookies to analyze traffic and improve your experience. Analytics cookies are only loaded with your consent. Privacy Policy\n\nDecline\nAccept",
+    "consoleErrors": [
+      "[error] eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+      "[error] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template)."
+    ],
+    "networkCalls": [
+      "GET http://localhost:3000/simulate",
+      "GET http://localhost:3000/login?redirectTo=%2Fsimulate",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/favicon-32.png",
+      "GET http://localhost:3000/__nextjs_font/geist-latin.woff2",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames",
+      "POST http://localhost:3000/__nextjs_original-stack-frames"
+    ]
+  }
+]
