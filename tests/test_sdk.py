@@ -8,9 +8,11 @@ class TestSDKVersion:
         import faultray
         assert isinstance(faultray.__version__, str)
 
-    def test_version_is_11_1_0(self):
+    def test_version_matches_package(self):
         import faultray
-        assert faultray.__version__ == "11.1.0"
+        from importlib.metadata import version
+
+        assert faultray.__version__ == version("faultray")
 
 
 class TestSDKAllExports:

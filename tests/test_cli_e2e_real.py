@@ -1,5 +1,5 @@
 # Copyright (c) 2025-2026 Yutaro Maeda. All rights reserved.
-# Licensed under the Business Source License 1.1. See LICENSE file for details.
+# Licensed under the Apache License 2.0. See LICENSE file for details.
 
 """Real CLI E2E tests — no mocks, runs actual faultray commands.
 
@@ -53,9 +53,11 @@ class TestCLIVersion:
     """faultray --version."""
 
     def test_version_prints(self) -> None:
+        import faultray
+
         r = _run(["--version"])
         assert r.returncode == 0
-        assert "11.1.0" in r.stdout
+        assert faultray.__version__ in r.stdout
 
     def test_version_format(self) -> None:
         r = _run(["--version"])
