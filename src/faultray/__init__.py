@@ -3,7 +3,7 @@
 
 """FaultRay — pre-deployment infrastructure resilience simulation (research prototype)."""
 
-__version__ = "11.1.0"
+__version__ = "11.2.0"
 
 
 def __getattr__(name: str) -> object:

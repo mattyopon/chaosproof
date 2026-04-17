@@ -445,8 +445,10 @@ class TestMultiEngineConsistency:
         # Layer 1 (software + overhead) <= Layer 2 (hardware only)
         assert result.layer1_software.availability <= result.layer2_hardware.availability + 1e-9
 
-        # Layer 3 (theoretical = hardware + noise) <= Layer 2 (hardware only)
-        assert result.layer3_theoretical.availability <= result.layer2_hardware.availability + 1e-9
+        # Layer 3 (theoretical = independent runtime noise floor) is now
+        # independent of Layer 2 after B3 fix, so no ordering guarantee.
+        # Just verify it's a valid availability value in [0, 1].
+        assert 0.0 <= result.layer3_theoretical.availability <= 1.0
 
 
 # ---------------------------------------------------------------------------
