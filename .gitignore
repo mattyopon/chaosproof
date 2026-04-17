@@ -27,3 +27,13 @@ site/
 .env
 executive-report.html
 docs/proposal/executive-report.html
+
+# TeX artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+paper/*.log
+paper/*.out
