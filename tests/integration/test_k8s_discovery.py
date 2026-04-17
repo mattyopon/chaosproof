@@ -84,8 +84,25 @@ def _docker_reachable() -> bool:
     return result.returncode == 0
 
 
-SKIP_REASON = "requires kind+docker+kubectl (integration only)"
-RUNTIME_OK = bool(KIND_BIN and KUBECTL_BIN and _docker_reachable())
+def _kubernetes_module_available() -> bool:
+    """Return True iff the `kubernetes` Python module is importable.
+
+    ``faultray scan --k8s`` imports this module internally and fails with
+    "kubernetes is required for K8s scanning" when it's absent. CI Python
+    environments may not install it, so we treat its absence as a skip
+    condition alongside the CLI toolchain checks above.
+    """
+    import importlib.util
+    return importlib.util.find_spec("kubernetes") is not None
+
+
+SKIP_REASON = "requires kind+docker+kubectl+kubernetes-python (integration only)"
+RUNTIME_OK = bool(
+    KIND_BIN
+    and KUBECTL_BIN
+    and _docker_reachable()
+    and _kubernetes_module_available()
+)
 
 # Gate the whole module behind the integration marker *and* the env check.
 pytestmark = [
