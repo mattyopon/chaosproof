@@ -472,3 +472,106 @@ Loss scales linearly with `--cost-per-hour` — override is plumbed end-to-end.
 
 - This report section.
 - (No new fixtures; reuses `/tmp/k8s-topology.json` from Task 2.)
+
+---
+
+## faultray-app UI Pages (Task 6)
+
+**Goal.** Hit the 4 UI pages (`/whatif`, `/topology-map`, `/cost`, `/simulate`) in a real browser against the dev server, determine whether each is hardcoded, API-wired, or a stub, and record actual behavior + screenshots.
+
+### Environment
+
+- `/home/user/repos/faultray-app` on current checkout.
+- `npm run dev` started Next.js 16.2.1 (Turbopack), ready in 497 ms.
+- Playwright MCP could not be used — it expects Chrome at `/opt/google/chrome/chrome` which requires sudo to install. Fell back to Playwright via Node using the already-downloaded Chrome for Testing 145.0.7632.6 at `/home/user/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome`. Capture script at `/tmp/capture-faultray-app.js` (not committed — scratch harness).
+- Headless Chromium, viewport 1440×900, `waitUntil: 'networkidle'`, 15 s timeout per page.
+
+### Screenshots + per-page observations
+
+Captured under `docs/phase0-screenshots/` (committed alongside this report):
+
+| Page | HTTP | Title | Observed behavior |
+|---|---|---|---|
+| `/whatif` | 200 | **Log In \| FaultRay** | Client-side redirect to `/login?redirectTo=%2Fwhatif`. Login page rendered instead of what-if UI. |
+| `/topology-map` | 200 | **Log In \| FaultRay** | Same — redirect to login. |
+| `/cost` | 200 | **Log In \| FaultRay** | Same — redirect to login. |
+| `/simulate` | 200 | **Log In \| FaultRay** | Same — redirect to login. |
+
+All four screenshots are **byte-for-byte identical** (120,889 B) because the login page is what actually rendered in each case.
+
+### Network trace (representative — `/whatif`)
+
+```
+GET http://localhost:3000/whatif              (200, triggers middleware redirect)
+GET http://localhost:3000/login?redirectTo=%2Fwhatif
+GET http://localhost:3000/favicon-32.png
+GET http://localhost:3000/__nextjs_font/geist-latin.woff2
+```
+
+No calls to `/api/analysis`, `/api/finance`, `/api/v1/graph-data`, or `/api/simulate` because the user is anonymous and never reaches the page components.
+
+### Route protection
+
+`src/proxy.ts:200-229` is the real Next.js middleware (NOT `src/lib/supabase/middleware.ts`, which only handles session refresh). The `protectedPaths` array covers 50+ routes including `/whatif`, `/cost`, `/topology-map`, `/simulate`, `/heatmap`, `/dora`, `/compliance`, etc. Anonymous access to any of these redirects to `/login?redirectTo=<original>`.
+
+The shipped `docs/phase0-validation-report.md` of Task 2 already had non-prod API calls; middleware auth-gates the UI but not the CLI, so this doesn't block the CLI-centric Tasks 2–5.
+
+### Source-code observations (what the pages WOULD do if logged in)
+
+Read the `.tsx` sources directly to compensate for being unable to log in headlessly:
+
+- **`/whatif`** (`src/app/whatif/page.tsx:1-40`): `"use client"` component. Hardcoded `COMPONENTS` list (`api`, `db_primary`, `cache`, `gateway`, `worker`, `auth`) and `PARAMETERS` list with UI selectors. On submit calls `api.whatIf(component, parameter, value)` → `POST /api/analysis`. On error, a **local fallback** produces a fake `baseline` + `modified` result (`overall_score: 85.2`, `availability_estimate: "99.99%"`, etc.) so the UI always appears to work.
+- **`/topology-map`** (`src/app/topology-map/page.tsx:1-35`): Client component, typed `MapNode` / `MapEdge`. Calls `api.graphData()` → `GET /api/v1/graph-data`.
+- **`/cost`** (`src/app/cost/page.tsx:1-40`): Client component with hardcoded `INDUSTRIES` selector. Calls `api.cost(...)` → `POST /api/finance`.
+- **`/simulate`**: Calls `api.simulate(...)` → `POST /api/simulate` (see `src/lib/api.ts:515`).
+
+### API wiring probe
+
+Anonymous `curl` (auth isn't the issue here — these routes should exist for any caller):
+
+```bash
+$ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/analysis
+404
+$ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/finance
+404
+$ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/simulate
+404
+$ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/v1/graph-data
+404
+```
+
+The routes that actually exist under `src/app/api/` are Stripe / orgs / tasks / notifications / Supabase auth — **no business-logic routes**. `src/lib/api.ts` points at `/api/analysis`, `/api/finance`, `/api/v1/graph-data`, `/api/simulate`, `/api/risk`, `/api/compliance`, `/api/reports`, etc. — **none of these exist** in the Next.js app.
+
+### Env-variable name mismatch (root cause)
+
+```bash
+$ grep -E "NEXT_PUBLIC_FAULTRAY_API_URL|NEXT_PUBLIC_API_URL" .env.local
+NEXT_PUBLIC_FAULTRAY_API_URL=https://api.faultray.com
+
+$ grep -n "NEXT_PUBLIC_API_URL" src/lib/api.ts
+2:const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+```
+
+`.env.local` defines `NEXT_PUBLIC_FAULTRAY_API_URL` (what was intended to point at the Python FastAPI in `api/engine.py`, `api/realtime.py`, etc.), but `src/lib/api.ts` reads `NEXT_PUBLIC_API_URL` (which is unset). `API_BASE` collapses to `""`, so every API call hits the Next.js server itself, which has none of these endpoints wired. **The dashboard UI is effectively dead in local dev** even after login.
+
+### Judgement
+
+| Page | ハードコード/API/スタブ | UI操作可能? | データソース | 判定 |
+|---|---|---|---|---|
+| `/whatif` | API (with local-fallback mock) | ✗ (auth-gated; post-login, API 404 → fallback data) | Would be `/api/analysis` → hardcoded fallback returning `85.2 score` | △ (page loads behind auth but backend is absent; falls through to hardcoded local estimate) |
+| `/topology-map` | API | ✗ | Would be `/api/v1/graph-data` — **404** | ✗ |
+| `/cost` | API | ✗ | Would be `/api/finance` — **404** | ✗ |
+| `/simulate` | API | ✗ | Would be `/api/simulate` — **404** | ✗ |
+
+### Phase 1 candidate issues discovered
+
+1. **🚨 Env-var name mismatch — entire UI's API tier is unwired in local dev.** `.env.local` sets `NEXT_PUBLIC_FAULTRAY_API_URL`; `src/lib/api.ts` reads `NEXT_PUBLIC_API_URL`. Every `apiFetch(...)` call falls back to `""` as base and hits Next.js, which has no business-logic route handlers. Fix = rename one side. Trivial but load-bearing — this is why `/whatif` silently shows mock data.
+2. **🚨 Business-logic API routes don't exist in Next.js at all.** Even with the env var fixed, the FastAPI endpoints (`/api/analysis`, `/api/finance`, `/api/v1/graph-data`, etc.) live in `api/*.py`. The Python API needs to be running and the frontend needs to proxy/call it explicitly (currently the URL would need to be something like `https://api.faultray.com` — which is production).
+3. **Silent mock fallback in `/whatif`** — The page handles API failure by returning a hardcoded `overall_score: 85.2` (`page.tsx:~45`). This hides the broken wiring from users. Log a warning at minimum; better yet, show a "backend unreachable" banner.
+4. **Playwright MCP is not usable in this environment** without sudo to install system Chrome. Consider configuring the Playwright MCP command with `--executable-path` pointing at the already-downloaded Chrome for Testing binary, or document the sudo-less setup.
+
+### Files produced by this task
+
+- `docs/phase0-screenshots/whatif.png`, `topology-map.png`, `cost.png`, `simulate.png` — **all 120,889 bytes, all showing the login page.** Kept intentionally as evidence that the login redirect is deterministic across every protected route.
+- `docs/phase0-screenshots/capture-report.json` — raw capture report (HTTP status, title, body text snippet, console errors, network calls) for each page.
+- This report section.
